@@ -1,0 +1,262 @@
+@import "tailwindcss";
+
+@theme {
+  /* ── Core palette — SOLID navy colors, no transparency ── */
+  --color-bg-primary: #080b1e;
+  --color-bg-secondary: #0c0f24;
+  --color-bg-card: #141736;
+  --color-bg-card-hover: #1a1e42;
+  --color-bg-card-solid: #141736;
+  --color-bg-input: #0f1230;
+  --color-bg-elevated: #1a1e42;
+
+  /* ── Borders — solid navy, no white transparency ── */
+  --color-border: #1e2348;
+  --color-border-light: #282d58;
+  --color-border-subtle: #181c3e;
+
+  /* ── Text ── */
+  --color-text-primary: #e8eaff;
+  --color-text-secondary: #8b8fb0;
+  --color-text-muted: #5e6388;
+
+  /* ── Accent ── */
+  --color-accent: #6c5ce7;
+  --color-accent-light: #a29bfe;
+  --color-accent-muted: rgba(108, 92, 231, 0.15);
+  --color-accent-glow: rgba(108, 92, 231, 0.12);
+
+  /* ── Semantic ── */
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-danger: #f87171;
+  --color-info: #60a5fa;
+
+  /* ── Social ── */
+  --color-instagram: #e1306c;
+  --color-facebook: #1877f2;
+  --color-linkedin: #0a66c2;
+  --color-twitter: #1da1f2;
+  --color-youtube: #ff0000;
+  --color-tiktok: #00f2ea;
+}
+
+/* ── Base ── */
+*,
+*::before,
+*::after {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+}
+
+/* ── Subtle gradient mesh background ── */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(ellipse 80% 60% at 10% 0%, rgba(108, 92, 231, 0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 90% 100%, rgba(74, 108, 247, 0.04) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+/* ── Very faint noise texture overlay ── */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.2;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+  pointer-events: none;
+}
+
+/* ── Typography defaults ── */
+h1, h2, h3, h4, h5, h6 {
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+}
+
+p {
+  line-height: 1.55;
+}
+
+/* ── Card — SOLID background, real contrast ── */
+.card {
+  background: var(--color-bg-card);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  transition: background 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+}
+
+.card:hover {
+  background: var(--color-bg-card-hover);
+  border-color: var(--color-border-light);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Glass surface — more visible with solid fallback ── */
+.glass {
+  background: #141736;
+  backdrop-filter: blur(24px) saturate(1.2);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  border: 1px solid var(--color-border);
+}
+
+/* ── Subtle glow ── */
+.glow-subtle {
+  box-shadow: 0 0 12px rgba(108, 92, 231, 0.08), 0 0 4px rgba(108, 92, 231, 0.04);
+}
+
+/* ── Legacy compat: ai-glow ── */
+.ai-glow {
+  box-shadow: 0 0 12px rgba(108, 92, 231, 0.08);
+}
+
+.ai-gradient {
+  background: linear-gradient(
+    135deg,
+    rgba(108, 92, 231, 0.08) 0%,
+    rgba(74, 108, 247, 0.04) 100%
+  );
+}
+
+.ai-border {
+  border: 1px solid var(--color-border);
+  background: linear-gradient(
+    135deg,
+    rgba(108, 92, 231, 0.05) 0%,
+    transparent 100%
+  );
+}
+
+/* ── Gradient accent text ── */
+.glow-text {
+  background: linear-gradient(135deg, #a29bfe 0%, #60a5fa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Featured card variant — accent gradient border ── */
+.card-featured {
+  background: linear-gradient(135deg, #181d45 0%, #141736 100%);
+  border: 1px solid #2a2f62;
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
+}
+.card-featured::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(108, 92, 231, 0.08) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+/* ── Highlight card variant — colored top border ── */
+.card-highlight {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  border-top: 2px solid var(--card-highlight-color, var(--color-accent));
+}
+
+/* ── Page header styling ── */
+.page-header {
+  padding-bottom: 1.25rem;
+  margin-bottom: 0.25rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.page-header h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--color-text-primary);
+}
+.page-header p {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  margin-top: 0.25rem;
+}
+
+/* ── Section title ── */
+.section-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  letter-spacing: -0.01em;
+}
+
+/* ── Animations ── */
+.fade-in {
+  animation: fadeIn 0.35s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Page transition feel ── */
+.page-enter {
+  animation: pageEnter 0.3s ease-out;
+}
+
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #282d58;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #363c6e;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #282d58 transparent;
+}
