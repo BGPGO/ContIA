@@ -41,6 +41,21 @@ const MAX_ITEMS = 5;
 const inputBase =
   "h-10 px-3 text-sm bg-bg-input border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition-all duration-200 w-full";
 
+/** Extract Instagram username from a link or handle */
+function extractIgUsername(input: string): string {
+  const trimmed = input.trim().replace(/\/+$/, "");
+  // Full URL: https://instagram.com/username or https://www.instagram.com/username/
+  const urlMatch = trimmed.match(/(?:https?:\/\/)?(?:www\.)?instagram\.com\/([a-zA-Z0-9._]+)/);
+  if (urlMatch) return urlMatch[1];
+  // Just @handle or handle
+  return trimmed.replace(/^@/, "");
+}
+
+/** Format an IG username back to a display-friendly link */
+function igDisplayLink(username: string): string {
+  return `instagram.com/${username}`;
+}
+
 function SectionHeader({
   icon: Icon,
   title,
@@ -65,26 +80,28 @@ function SectionHeader({
   );
 }
 
-function TagList({
+function LinkTagList({
   items,
   onRemove,
   onAdd,
   placeholder,
   max,
-  prefix,
+  displayFn,
 }: {
   items: string[];
   onRemove: (idx: number) => void;
   onAdd: (value: string) => void;
   placeholder: string;
   max: number;
-  prefix?: string;
+  displayFn?: (item: string) => string;
 }) {
   const [draft, setDraft] = useState("");
 
   const handleAdd = () => {
-    const trimmed = draft.trim().replace(/^@/, "");
-    if (!trimmed || items.includes(trimmed)) return;
+    const trimmed = draft.trim();
+    if (!trimmed) return;
+    // Prevent duplicates (compare normalized)
+    if (items.includes(trimmed)) return;
     onAdd(trimmed);
     setDraft("");
   };
@@ -106,10 +123,8 @@ function TagList({
               key={idx}
               className="group inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-bg-input border border-border rounded-lg text-text-secondary transition-colors"
             >
-              {prefix && (
-                <span className="text-text-muted">{prefix}</span>
-              )}
-              {item}
+              <Link2 size={10} className="text-text-muted shrink-0" />
+              {displayFn ? displayFn(item) : item}
               <button
                 type="button"
                 onClick={() => onRemove(idx)}
@@ -126,13 +141,8 @@ function TagList({
       {/* add input */}
       {items.length < max && (
         <div className="flex items-center gap-2">
-          {prefix && (
-            <span className="text-xs text-text-muted select-none">
-              {prefix}
-            </span>
-          )}
           <input
-            type="text"
+            type="url"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -180,6 +190,11 @@ export function DNASourcesForm({
 
   const sectionGap = compact ? "space-y-3" : "space-y-5";
 
+  // Build a display value for the IG input
+  const igInputValue = instagramHandle
+    ? (instagramHandle.includes("instagram.com") ? instagramHandle : `https://instagram.com/${instagramHandle}`)
+    : "";
+
   return (
     <div className={sectionGap}>
       {/* ── a) Seu Instagram ── */}
@@ -187,25 +202,23 @@ export function DNASourcesForm({
         <SectionHeader
           icon={InstagramIcon}
           title="Seu Instagram"
-          subtitle="Perfil publico da empresa — analisaremos estilo visual, tom e engajamento"
+          subtitle="Cole o link do perfil da empresa — analisaremos estilo visual, tom e engajamento"
         />
-        <div className="flex items-center gap-2">
-          <span className="flex h-10 items-center px-3 text-sm font-medium text-text-muted bg-bg-input border border-border rounded-l-lg select-none border-r-0">
-            @
-          </span>
-          <input
-            type="text"
-            value={instagramHandle}
-            onChange={(e) =>
-              onUpdate("instagramHandle", e.target.value.replace(/^@/, ""))
-            }
-            placeholder="suaempresa"
-            className={cn(
-              inputBase,
-              "rounded-l-none border-l-0 -ml-2"
-            )}
-          />
-        </div>
+        <input
+          type="url"
+          value={igInputValue}
+          onChange={(e) => {
+            const username = extractIgUsername(e.target.value);
+            onUpdate("instagramHandle", username);
+          }}
+          placeholder="https://instagram.com/suaempresa"
+          className={inputBase}
+        />
+        {instagramHandle && (
+          <p className="text-xs text-text-muted mt-1.5 flex items-center gap-1">
+            <span className="text-accent-light">@{instagramHandle}</span> sera analisado
+          </p>
+        )}
       </div>
 
       {/* ── b) Seu Site ── */}
@@ -229,18 +242,23 @@ export function DNASourcesForm({
         <SectionHeader
           icon={Users}
           title="Concorrentes"
-          subtitle="Perfis que competem no seu nicho — analisaremos estrategia e pontos fortes"
+          subtitle="Cole os links do Instagram dos concorrentes — analisaremos estrategia e pontos fortes"
         />
-        <TagList
+        <LinkTagList
           items={concorrentesIg}
           onRemove={(idx) => {
             const next = concorrentesIg.filter((_, i) => i !== idx);
             onUpdate("concorrentesIg", next);
           }}
-          onAdd={(val) => onUpdate("concorrentesIg", [...concorrentesIg, val])}
-          placeholder="handle do concorrente"
+          onAdd={(val) => {
+            const username = extractIgUsername(val);
+            if (username && !concorrentesIg.includes(username)) {
+              onUpdate("concorrentesIg", [...concorrentesIg, username]);
+            }
+          }}
+          placeholder="https://instagram.com/concorrente"
           max={MAX_ITEMS}
-          prefix="@"
+          displayFn={igDisplayLink}
         />
       </div>
 
@@ -249,7 +267,7 @@ export function DNASourcesForm({
         <SectionHeader
           icon={Link2}
           title="Referencias de Copy"
-          subtitle="Perfis e sites que inspiram seu conteudo — analisaremos tom e estilo"
+          subtitle="Cole links de perfis e sites que inspiram seu conteudo"
         />
 
         {/* Instagram references */}
@@ -257,16 +275,21 @@ export function DNASourcesForm({
           <p className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-2">
             Instagram
           </p>
-          <TagList
+          <LinkTagList
             items={referenciasIg}
             onRemove={(idx) => {
               const next = referenciasIg.filter((_, i) => i !== idx);
               onUpdate("referenciasIg", next);
             }}
-            onAdd={(val) => onUpdate("referenciasIg", [...referenciasIg, val])}
-            placeholder="handle de referencia"
+            onAdd={(val) => {
+              const username = extractIgUsername(val);
+              if (username && !referenciasIg.includes(username)) {
+                onUpdate("referenciasIg", [...referenciasIg, username]);
+              }
+            }}
+            placeholder="https://instagram.com/referencia"
             max={MAX_ITEMS}
-            prefix="@"
+            displayFn={igDisplayLink}
           />
         </div>
 
@@ -275,7 +298,7 @@ export function DNASourcesForm({
           <p className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-2">
             Sites
           </p>
-          <TagList
+          <LinkTagList
             items={referenciasSites}
             onRemove={(idx) => {
               const next = referenciasSites.filter((_, i) => i !== idx);
