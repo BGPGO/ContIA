@@ -8,7 +8,36 @@ DESCRIÇÃO: ${ctx.descricao}`;
   if (ctx.website) block += `\nSITE: ${ctx.website}`;
   if (ctx.siteAnalysis) block += `\nANÁLISE DO SITE:\n${ctx.siteAnalysis}`;
   if (ctx.instagramAnalysis) block += `\nANÁLISE DO INSTAGRAM:\n${ctx.instagramAnalysis}`;
+
+  // DNA da Marca — structured brand intelligence
+  if (ctx.dnaMarca) {
+    try {
+      const dna = JSON.parse(ctx.dnaMarca);
+      block += `\n\n═══ DNA DA MARCA ═══`;
+      if (dna.tom_de_voz) block += `\nTOM DE VOZ: ${dna.tom_de_voz}`;
+      if (dna.personalidade_marca) block += `\nPERSONALIDADE: ${dna.personalidade_marca}`;
+      if (dna.proposta_valor) block += `\nPROPOSTA DE VALOR: ${dna.proposta_valor}`;
+      if (dna.publico_alvo) block += `\nPÚBLICO-ALVO: ${dna.publico_alvo}`;
+      if (dna.estilo_visual) block += `\nESTILO VISUAL: ${dna.estilo_visual}`;
+      if (dna.pilares_conteudo?.length) block += `\nPILARES DE CONTEÚDO: ${dna.pilares_conteudo.join(" | ")}`;
+      if (dna.frequencia_ideal) block += `\nFREQUÊNCIA IDEAL: ${dna.frequencia_ideal}`;
+      if (dna.diferenciais_vs_concorrentes?.length) block += `\nDIFERENCIAIS: ${dna.diferenciais_vs_concorrentes.join(" | ")}`;
+      if (dna.palavras_usar?.length) block += `\nPALAVRAS PARA USAR: ${dna.palavras_usar.join(", ")}`;
+      if (dna.palavras_evitar?.length) block += `\nPALAVRAS PARA EVITAR: ${dna.palavras_evitar.join(", ")}`;
+      if (dna.hashtags_recomendadas?.length) block += `\nHASHTAGS DA MARCA: ${dna.hashtags_recomendadas.join(" ")}`;
+      if (dna.exemplos_legenda?.length) block += `\nEXEMPLOS DE TOM (use como referência de estilo):\n${dna.exemplos_legenda.map((e: string, i: number) => `  ${i + 1}. ${e}`).join("\n")}`;
+      block += `\n═══════════════════`;
+    } catch {
+      // Invalid DNA JSON, skip
+    }
+  }
+
   return block;
+}
+
+function buildDNAInstruction(ctx: EmpresaContext): string {
+  if (!ctx.dnaMarca) return "";
+  return "\nIMPORTANTE: Siga rigorosamente o DNA DA MARCA acima. Use o tom de voz definido, as palavras recomendadas, e evite as palavras proibidas. As hashtags devem incluir as hashtags da marca. O conteúdo deve estar alinhado aos pilares de conteúdo e diferenciais listados.";
 }
 
 const toneMap: Record<ContentTone, string> = {
@@ -26,7 +55,7 @@ ${buildContextBlock(ctx)}
 
 TOM DE VOZ: ${toneMap[tone]}
 PLATAFORMAS: ${plataformas.join(", ")}
-
+${buildDNAInstruction(ctx)}
 Gere um post completo sobre o tema: "${topic}"
 
 Responda APENAS em JSON válido, sem markdown, neste formato exato:
@@ -45,7 +74,7 @@ export function buildCarouselPrompt(ctx: EmpresaContext, topic: string, tone: Co
 ${buildContextBlock(ctx)}
 
 TOM DE VOZ: ${toneMap[tone]}
-
+${buildDNAInstruction(ctx)}
 Crie um carrossel de ${numSlides} slides sobre: "${topic}"
 
 Estrutura obrigatória:
@@ -78,7 +107,7 @@ export function buildReelsPrompt(ctx: EmpresaContext, topic: string, tone: Conte
 ${buildContextBlock(ctx)}
 
 TOM DE VOZ: ${toneMap[tone]}
-
+${buildDNAInstruction(ctx)}
 Crie um roteiro de Reels sobre: "${topic}"
 
 O roteiro deve ter:
@@ -110,7 +139,7 @@ export function buildEmailPrompt(ctx: EmpresaContext, topic: string, tone: Conte
 ${buildContextBlock(ctx)}
 
 TOM DE VOZ: ${toneMap[tone]}
-
+${buildDNAInstruction(ctx)}
 Crie um email marketing sobre: "${topic}"
 
 O email deve ter:
@@ -137,7 +166,7 @@ export function buildCopyPrompt(ctx: EmpresaContext, topic: string, tone: Conten
 ${buildContextBlock(ctx)}
 
 TOM DE VOZ: ${toneMap[tone]}
-
+${buildDNAInstruction(ctx)}
 Crie uma copy de marketing sobre: "${topic}"
 
 Gere variações para diferentes usos:

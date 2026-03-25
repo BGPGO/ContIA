@@ -9,6 +9,7 @@ export interface EmpresaContext {
   siteAnalysis?: string;
   instagramAnalysis?: string;
   tom?: ContentTone;
+  dnaMarca?: string; // JSON stringified DNASintetizado
 }
 
 export interface GenerationRequest {

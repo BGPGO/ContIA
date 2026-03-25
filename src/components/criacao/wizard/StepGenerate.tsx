@@ -79,16 +79,7 @@ export function StepGenerate({
     if (dna?.dna_sintetizado) {
       const ds = dna.dna_sintetizado;
       context.tom = ds.tom_de_voz as any || context.tom;
-      (context as any).dnaMarca = JSON.stringify({
-        tom_de_voz: ds.tom_de_voz,
-        pilares_conteudo: ds.pilares_conteudo,
-        publico_alvo: ds.publico_alvo,
-        proposta_valor: ds.proposta_valor,
-        palavras_chave: ds.palavras_chave,
-        estilo_visual: ds.estilo_visual,
-        formatos_preferidos: ds.formatos_preferidos,
-        hashtags_marca: ds.hashtags_marca,
-      });
+      context.dnaMarca = JSON.stringify(ds);
       // Backfill site/ig analysis from DNA if not already set
       if (!context.siteAnalysis && dna.site_analysis) {
         context.siteAnalysis = JSON.stringify(dna.site_analysis);

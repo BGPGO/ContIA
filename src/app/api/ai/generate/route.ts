@@ -19,10 +19,15 @@ export async function POST(request: NextRequest) {
     const openai = getOpenAIClient();
     const prompt = getPromptForFormat(format, empresaContext, topic, tone, plataformas);
 
+    const hasDNA = empresaContext?.dnaMarca;
+    const systemPrompt = hasDNA
+      ? "Você é um estrategista de conteúdo sênior que segue rigorosamente o DNA da marca do cliente. Cada post deve refletir o tom de voz, personalidade e pilares de conteúdo definidos. Responda SEMPRE em JSON válido, sem markdown code blocks."
+      : "Você é um assistente de criação de conteúdo. Responda SEMPRE em JSON válido, sem markdown code blocks.";
+
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: "Você é um assistente de criação de conteúdo. Responda SEMPRE em JSON válido, sem markdown code blocks." },
+        { role: "system", content: systemPrompt },
         { role: "user", content: prompt },
       ],
       temperature: 0.8,

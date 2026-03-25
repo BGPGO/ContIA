@@ -40,10 +40,10 @@ export function StepAnalysis({
   const handleUseDNA = () => {
     if (!dna) return;
     if (dna.site_analysis) {
-      setSiteAnalysis(dna.site_analysis);
+      setSiteAnalysis(dna.site_analysis as AnalyzeSiteResponse);
     }
     if (dna.instagram_analysis) {
-      setIgAnalysis(dna.instagram_analysis);
+      setIgAnalysis(dna.instagram_analysis as FullInstagramAnalysis);
     }
     onUseDNA?.();
   };

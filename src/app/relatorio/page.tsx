@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import {
   Brain,
   Target,
@@ -28,6 +28,7 @@ import {
   FileText,
 } from "lucide-react";
 import { useEmpresa } from "@/hooks/useEmpresa";
+import { useMarcaDNA } from "@/hooks/useMarcaDNA";
 import { DNASourcesForm } from "@/components/marca/DNASourcesForm";
 import { cn } from "@/lib/utils";
 
@@ -710,58 +711,42 @@ function extractConcorrentes(marcaDNA: MarcaDNAResponse): ConcorrenteInfo[] {
 
 export default function RelatorioPage() {
   const { empresa, loading: empresaLoading } = useEmpresa();
-  const [marcaDNA, setMarcaDNA] = useState<MarcaDNAResponse | null>(null);
-  const [status, setStatus] = useState<PageStatus>("idle");
-  const [error, setError] = useState<string | null>(null);
+  const { dna: hookDna, loading: dnaLoading, analyzing, refreshing, error: dnaError, analisar, isStale } = useMarcaDNA(empresa?.id);
 
-  // Fetch existing DNA on mount / empresa change
-  const fetchExistingDNA = useCallback(async (empresaId: string) => {
-    setStatus("loading");
-    try {
-      // Try to call the analyze endpoint which returns mock data when AI is not configured
-      // or real data when it is. For existing data, we check if there's a cached result.
-      const res = await fetch("/api/marca/analisar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ empresaId }),
-      });
-      if (res.ok) {
-        const data: MarcaDNAResponse = await res.json();
-        setMarcaDNA(data);
-        setStatus(data.status === "completo" ? "completo" : data.status === "erro" ? "erro" : "completo");
-        if (data.erro) setError(data.erro);
-      } else {
-        setStatus("idle");
+  // Derive marcaDNA (MarcaDNAResponse-compatible) from the hook's dna
+  const marcaDNA: MarcaDNAResponse | null = hookDna
+    ? {
+        id: hookDna.id,
+        empresa_id: hookDna.empresa_id,
+        status: hookDna.status === "pendente" ? "completo" : hookDna.status as MarcaDNAResponse["status"],
+        analise_instagram: hookDna.instagram_analysis,
+        analise_site: hookDna.site_analysis,
+        analises_concorrentes: hookDna.concorrentes_analysis?.reduce(
+          (acc: Record<string, any>, c: any) => { acc[c.nome || c.username || `concorrente`] = c; return acc; },
+          {}
+        ) || null,
+        analises_referencias: hookDna.referencias_analysis?.reduce(
+          (acc: Record<string, any>, r: any) => { acc[r.nome || r.url || `referencia`] = r; return acc; },
+          {}
+        ) || null,
+        dna_sintetizado: hookDna.dna_sintetizado,
+        created_at: hookDna.created_at,
+        updated_at: hookDna.updated_at,
       }
-    } catch {
-      setStatus("idle");
-    }
-  }, []);
+    : null;
 
-  // Trigger analysis
-  const analisar = useCallback(async () => {
-    if (!empresa) return;
-    setStatus("analisando");
-    setError(null);
-    try {
-      const res = await fetch("/api/marca/analisar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ empresaId: empresa.id }),
-      });
-      const data: MarcaDNAResponse = await res.json();
-      setMarcaDNA(data);
-      if (data.status === "erro") {
-        setStatus("erro");
-        setError(data.erro || "Erro desconhecido na analise.");
-      } else {
-        setStatus("completo");
-      }
-    } catch (err: any) {
-      setStatus("erro");
-      setError(err?.message || "Falha na conexao com o servidor.");
-    }
-  }, [empresa]);
+  // Derive page status from hook state
+  const status: PageStatus = analyzing
+    ? "analisando"
+    : dnaLoading
+      ? "loading"
+      : dnaError
+        ? "erro"
+        : hookDna?.dna_sintetizado
+          ? "completo"
+          : "idle";
+
+  const error = dnaError;
 
   // ── loading empresa ──
   if (empresaLoading) {
@@ -787,8 +772,6 @@ export default function RelatorioPage() {
 
   const hasDNA = status === "completo" && marcaDNA?.dna_sintetizado;
   const dna = marcaDNA?.dna_sintetizado;
-  // Keep a non-narrowed reference for conditional rendering
-  const currentStatus = status as string;
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto page-enter">
@@ -814,18 +797,30 @@ export default function RelatorioPage() {
           </div>
           <div className="flex items-center gap-3">
             <StatusBadge status={status} />
+            {refreshing && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-accent/10 text-accent-light">
+                <Loader2 size={12} className="animate-spin" />
+                Atualizando...
+              </span>
+            )}
+            {isStale && !refreshing && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-warning/10 text-warning">
+                <Clock size={12} />
+                DNA desatualizado
+              </span>
+            )}
             {hasDNA && (
               <button
                 onClick={analisar}
-                disabled={currentStatus === "analisando"}
+                disabled={analyzing}
                 className={cn(
                   "inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200",
-                  currentStatus === "analisando"
+                  analyzing
                     ? "bg-bg-elevated text-text-muted cursor-not-allowed"
                     : "bg-accent/15 text-accent-light hover:bg-accent/25 border border-accent/20 hover:border-accent/40"
                 )}
               >
-                <RefreshCw size={14} className={currentStatus === "analisando" ? "animate-spin" : ""} />
+                <RefreshCw size={14} className={analyzing ? "animate-spin" : ""} />
                 Atualizar DNA
               </button>
             )}
@@ -849,7 +844,7 @@ export default function RelatorioPage() {
 
       {/* ── EMPTY / ONBOARDING STATE ── */}
       {(status === "idle" || (status === "erro" && !hasDNA)) && (
-        <EmptyState empresa={empresa} onAnalisar={analisar} analyzing={false} />
+        <EmptyState empresa={empresa} onAnalisar={analisar} analyzing={analyzing} />
       )}
 
       {/* ── LOADING STATE ── */}

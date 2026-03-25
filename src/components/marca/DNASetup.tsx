@@ -298,7 +298,7 @@ function SummaryPill({
   span2 = false,
 }: {
   label: string;
-  value: string;
+  value?: string;
   span2?: boolean;
 }) {
   return (
