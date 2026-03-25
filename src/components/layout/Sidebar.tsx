@@ -30,9 +30,9 @@ const navLinks = [
   { label: "Calendário", href: "/calendario", icon: CalendarDays },
   { label: "Concorrentes", href: "/concorrentes", icon: Users },
   { label: "Notícias", href: "/noticias", icon: Newspaper },
-  { label: "Relatório", href: "/relatorio", icon: Brain },
+  { label: "Relatório", href: "/relatorio", icon: Brain, needsDNA: true },
   { label: "Configurações", href: "/configuracoes", icon: Settings },
-];
+] as const;
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -42,6 +42,11 @@ export function Sidebar() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Check if DNA sources are missing
+  const dnaMissingSources = empresa
+    ? !empresa.instagram_handle && !empresa.website && (!empresa.concorrentes_ig || empresa.concorrentes_ig.length === 0)
+    : false;
 
   const handleWizardCreated = (empresa: Empresa) => {
     // EmpresaProvider already updates the list and selects the new empresa
@@ -143,8 +148,10 @@ export function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-3 flex flex-col gap-0.5">
-          {navLinks.map(({ label, href, icon: Icon }) => {
+          {navLinks.map((link) => {
+            const { label, href, icon: Icon } = link;
             const active = pathname === href || pathname.startsWith(href + "/");
+            const showBadge = "needsDNA" in link && link.needsDNA && dnaMissingSources;
             return (
               <Link
                 key={href}
@@ -159,11 +166,16 @@ export function Sidebar() {
                 {active && (
                   <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-accent" />
                 )}
-                <Icon
-                  className={`w-4 h-4 shrink-0 ${
-                    active ? "text-accent-light" : ""
-                  }`}
-                />
+                <span className="relative shrink-0">
+                  <Icon
+                    className={`w-4 h-4 ${
+                      active ? "text-accent-light" : ""
+                    }`}
+                  />
+                  {showBadge && (
+                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-danger border-2 border-[#0c0f24] animate-pulse" />
+                  )}
+                </span>
                 {label}
               </Link>
             );

@@ -28,6 +28,7 @@ import {
   FileText,
 } from "lucide-react";
 import { useEmpresa } from "@/hooks/useEmpresa";
+import { DNASourcesForm } from "@/components/marca/DNASourcesForm";
 import { cn } from "@/lib/utils";
 
 // ─── types (match API route response) ────────────────────────────────────────
@@ -256,49 +257,76 @@ function AnalyzingCard() {
 
 // ─── empty / onboarding state ────────────────────────────────────────────────
 
-function EmptyState({ onAnalisar, analyzing }: { onAnalisar: () => void; analyzing: boolean }) {
-  const features = [
-    { icon: <Globe size={18} />, label: "Website", desc: "Analisa tom, proposta de valor e identidade visual" },
-    { icon: <Eye size={18} />, label: "Instagram", desc: "Estilo visual, hashtags, frequencia e temas" },
-    { icon: <Shield size={18} />, label: "Concorrentes", desc: "Estrategias, diferenciais e oportunidades" },
-    { icon: <Sparkles size={18} />, label: "Referencias", desc: "Boas praticas e inspiracoes do setor" },
-  ];
+function EmptyState({ empresa, onAnalisar, analyzing }: { empresa: any; onAnalisar: () => void; analyzing: boolean }) {
+  const [instagramHandle, setInstagramHandle] = useState(empresa?.instagram_handle || "");
+  const [website, setWebsite] = useState(empresa?.website || "");
+  const [concorrentesIg, setConcorrentesIg] = useState<string[]>(empresa?.concorrentes_ig || []);
+  const [referenciasIg, setReferenciasIg] = useState<string[]>(empresa?.referencias_ig || []);
+  const [referenciasSites, setReferenciasSites] = useState<string[]>(empresa?.referencias_sites || []);
+  const { updateEmpresa } = useEmpresa();
+
+  const hasSomething = instagramHandle || website || concorrentesIg.length > 0;
+
+  const handleUpdate = (field: string, value: any) => {
+    switch (field) {
+      case "instagramHandle": setInstagramHandle(value); break;
+      case "website": setWebsite(value); break;
+      case "concorrentesIg": setConcorrentesIg(value); break;
+      case "referenciasIg": setReferenciasIg(value); break;
+      case "referenciasSites": setReferenciasSites(value); break;
+    }
+  };
+
+  const handleAnalyze = async () => {
+    if (empresa && updateEmpresa) {
+      await updateEmpresa(empresa.id, {
+        instagram_handle: instagramHandle,
+        website: website || empresa.website,
+        concorrentes_ig: concorrentesIg,
+        referencias_ig: referenciasIg,
+        referencias_sites: referenciasSites,
+      } as any);
+    }
+    onAnalisar();
+  };
 
   return (
-    <div className="max-w-2xl mx-auto text-center page-enter">
-      <div className="relative mb-8">
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-48 h-48 rounded-full bg-accent/8 blur-3xl" />
-        </div>
-        <div className="relative w-24 h-24 mx-auto rounded-2xl bg-gradient-to-br from-accent/20 to-accent/5 border border-accent/20 flex items-center justify-center mb-6">
-          <Brain size={40} className="text-accent-light" />
-        </div>
-      </div>
-      <h2 className="text-2xl font-bold text-text-primary mb-3">DNA da Marca</h2>
-      <p className="text-text-secondary text-sm max-w-md mx-auto mb-8 leading-relaxed">
-        Descubra a identidade completa da sua marca com inteligencia artificial.
-        A analise gera um relatorio completo com tom de voz, pilares de conteudo,
-        analise competitiva e guia de comunicacao.
-      </p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
-        {features.map((f) => (
-          <div key={f.label} className="bg-bg-card border border-border rounded-xl p-4 text-left hover:border-border-light transition-all duration-200 group">
-            <div className="flex items-center gap-3 mb-2">
-              <span className="text-accent-light group-hover:text-accent transition-colors">{f.icon}</span>
-              <span className="text-sm font-semibold text-text-primary">{f.label}</span>
-            </div>
-            <p className="text-xs text-text-muted leading-relaxed">{f.desc}</p>
+    <div className="max-w-3xl mx-auto page-enter">
+      {/* Hero */}
+      <div className="text-center mb-8">
+        <div className="relative mb-6">
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-48 h-48 rounded-full bg-accent/8 blur-3xl" />
           </div>
-        ))}
+          <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-accent/20 to-accent/5 border border-accent/20 flex items-center justify-center">
+            <Brain size={36} className="text-accent-light" />
+          </div>
+        </div>
+        <h2 className="text-2xl font-bold text-text-primary mb-2">DNA da Marca</h2>
+        <p className="text-text-secondary text-sm max-w-lg mx-auto leading-relaxed">
+          Preencha as fontes abaixo e a IA vai analisar tudo automaticamente para
+          gerar o perfil completo da sua marca — tom de voz, pilares de conteudo,
+          analise competitiva e guia de comunicacao.
+        </p>
       </div>
-      <button
-        onClick={onAnalisar}
-        disabled={analyzing}
-        className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl font-semibold text-sm text-white bg-gradient-to-r from-accent to-[#8b5cf6] hover:from-[#7c6df0] hover:to-[#9b6ff7] shadow-lg shadow-accent/25 hover:shadow-accent/40 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {analyzing ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-        {analyzing ? "Analisando..." : "Analisar Marca"}
-      </button>
+
+      {/* Sources Form */}
+      <DNASourcesForm
+        instagramHandle={instagramHandle}
+        website={website || empresa?.website || ""}
+        concorrentesIg={concorrentesIg}
+        referenciasIg={referenciasIg}
+        referenciasSites={referenciasSites}
+        onUpdate={handleUpdate}
+        onAnalyze={hasSomething ? handleAnalyze : undefined}
+        analyzing={analyzing}
+      />
+
+      {!hasSomething && (
+        <p className="text-center text-xs text-text-muted mt-4">
+          Preencha pelo menos o Instagram ou o site da empresa para iniciar a analise.
+        </p>
+      )}
     </div>
   );
 }
@@ -821,7 +849,7 @@ export default function RelatorioPage() {
 
       {/* ── EMPTY / ONBOARDING STATE ── */}
       {(status === "idle" || (status === "erro" && !hasDNA)) && (
-        <EmptyState onAnalisar={analisar} analyzing={false} />
+        <EmptyState empresa={empresa} onAnalisar={analisar} analyzing={false} />
       )}
 
       {/* ── LOADING STATE ── */}
