@@ -10,6 +10,7 @@ import {
   CalendarDays,
   Users,
   Newspaper,
+  Brain,
   Settings,
   ChevronDown,
   Check,
@@ -29,6 +30,7 @@ const navLinks = [
   { label: "Calendário", href: "/calendario", icon: CalendarDays },
   { label: "Concorrentes", href: "/concorrentes", icon: Users },
   { label: "Notícias", href: "/noticias", icon: Newspaper },
+  { label: "Relatório", href: "/relatorio", icon: Brain },
   { label: "Configurações", href: "/configuracoes", icon: Settings },
 ];
 

@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Globe, AtSign, Loader2, Check, AlertCircle } from "lucide-react";
+import { Globe, AtSign, Loader2, Check, AlertCircle, Brain, ArrowRight } from "lucide-react";
 import type { WizardState } from "@/hooks/useCreationWizard";
 import type { AnalyzeSiteResponse, FullInstagramAnalysis } from "@/types/ai";
+import { useEmpresa } from "@/hooks/useEmpresa";
+import { useMarcaDNA } from "@/hooks/useMarcaDNA";
 
 interface StepAnalysisProps {
   state: WizardState;
@@ -11,6 +13,7 @@ interface StepAnalysisProps {
   setSiteAnalysis: (data: AnalyzeSiteResponse) => void;
   setIgAnalysis: (data: FullInstagramAnalysis) => void;
   setError: (error: string | null) => void;
+  onUseDNA?: () => void;
 }
 
 const IG_LOADING_STEPS = [
@@ -25,8 +28,25 @@ export function StepAnalysis({
   setSiteAnalysis,
   setIgAnalysis,
   setError,
+  onUseDNA,
 }: StepAnalysisProps) {
+  const { empresa } = useEmpresa();
+  const { dna, loading: dnaLoading } = useMarcaDNA(empresa?.id);
   const [igStepIndex, setIgStepIndex] = useState(0);
+  const [dismissedDNA, setDismissedDNA] = useState(false);
+
+  const hasDNA = !!dna && !dismissedDNA && !state.siteAnalysis && !state.fullIgAnalysis;
+
+  const handleUseDNA = () => {
+    if (!dna) return;
+    if (dna.site_analysis) {
+      setSiteAnalysis(dna.site_analysis);
+    }
+    if (dna.instagram_analysis) {
+      setIgAnalysis(dna.instagram_analysis);
+    }
+    onUseDNA?.();
+  };
 
   const analyzeSite = async () => {
     if (!state.siteUrl.trim()) return;
@@ -80,6 +100,40 @@ export function StepAnalysis({
 
   return (
     <div className="space-y-6">
+      {hasDNA && (
+        <div className="bg-accent/5 border border-accent/20 rounded-xl p-4 space-y-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center">
+              <Brain size={18} className="text-accent-light" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-text-primary">
+                DNA da Marca carregado
+              </p>
+              <p className="text-xs text-text-secondary">
+                Analise anterior de {new Date(dna.updated_at).toLocaleDateString("pt-BR")}.
+                O conteudo sera gerado usando o perfil completo da sua marca.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleUseDNA}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-accent text-white hover:bg-accent/90 transition-all"
+            >
+              Usar DNA da Marca
+              <ArrowRight size={14} />
+            </button>
+            <button
+              onClick={() => setDismissedDNA(true)}
+              className="px-4 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-bg-card transition-all"
+            >
+              Analisar novamente
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="text-center space-y-2">
         <h2 className="text-xl font-semibold text-text-primary">
           Adicione suas referencias

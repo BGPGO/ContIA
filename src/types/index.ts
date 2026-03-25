@@ -9,6 +9,10 @@ export interface Empresa {
   cor_secundaria: string;
   redes_sociais: RedesSociais;
   config_rss: ConfigRSS[];
+  instagram_handle?: string;
+  concorrentes_ig?: string[];
+  referencias_ig?: string[];
+  referencias_sites?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -121,3 +125,81 @@ export type PlataformaRede =
   | "twitter"
   | "youtube"
   | "tiktok";
+
+// ── Marca DNA ──
+
+export interface MarcaDNA {
+  id: string;
+  empresa_id: string;
+  instagram_analysis: InstagramDNAAnalysis;
+  site_analysis: SiteDNAAnalysis;
+  concorrentes_analysis: ConcorrenteDNAAnalysis[];
+  referencias_analysis: ReferenciaDNAAnalysis[];
+  dna_sintetizado: DNASintetizado;
+  status: "pendente" | "analisando" | "completo" | "erro";
+  ultima_analise: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InstagramDNAAnalysis {
+  username?: string;
+  seguidores?: number;
+  bio?: string;
+  resumo_visual?: string;
+  tom_legendas?: string;
+  temas_recorrentes?: string[];
+  estilo_visual?: string;
+  formatos_mais_usados?: string[];
+  hashtags_frequentes?: string[];
+  frequencia_postagem?: string;
+  posts_recentes?: { caption: string; likes: number; comments: number; isVideo: boolean }[];
+}
+
+export interface SiteDNAAnalysis {
+  resumo?: string;
+  tom_de_voz?: string;
+  publico_alvo?: string;
+  palavras_chave?: string[];
+  proposta_valor?: string;
+  cores_predominantes?: string[];
+}
+
+export interface ConcorrenteDNAAnalysis {
+  nome: string;
+  instagram?: string;
+  seguidores?: number;
+  resumo?: string;
+  pontos_fortes?: string[];
+  estrategia_conteudo?: string;
+  frequencia?: string;
+  temas?: string[];
+}
+
+export interface ReferenciaDNAAnalysis {
+  fonte: string;
+  tipo: "instagram" | "site";
+  resumo?: string;
+  tom?: string;
+  estrategia?: string;
+  elementos_destaque?: string[];
+}
+
+export interface DNASintetizado {
+  tom_de_voz?: string;
+  personalidade_marca?: string;
+  proposta_valor?: string;
+  publico_alvo?: string;
+  paleta_cores?: string[];
+  estilo_visual?: string;
+  pilares_conteudo?: string[];
+  temas_recomendados?: string[];
+  formatos_recomendados?: string[];
+  hashtags_recomendadas?: string[];
+  frequencia_ideal?: string;
+  diferenciais_vs_concorrentes?: string[];
+  oportunidades?: string[];
+  palavras_usar?: string[];
+  palavras_evitar?: string[];
+  exemplos_legenda?: string[];
+}

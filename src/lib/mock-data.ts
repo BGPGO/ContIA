@@ -8,6 +8,10 @@ export const empresasMock: Empresa[] = [
     nicho: "Tecnologia / SaaS",
     logo_url: null,
     website: "https://techflow.com.br",
+    instagram_handle: "techflow.br",
+    concorrentes_ig: ["automai.tech", "digitalboost.br"],
+    referencias_ig: ["rockcontent", "resultadosdigitais"],
+    referencias_sites: ["https://rockcontent.com", "https://resultadosdigitais.com.br"],
     cor_primaria: "#6c5ce7",
     cor_secundaria: "#a29bfe",
     redes_sociais: {
@@ -30,6 +34,10 @@ export const empresasMock: Empresa[] = [
     nicho: "Alimentação / Cafeteria",
     logo_url: null,
     website: "https://cafemoenda.com.br",
+    instagram_handle: "cafemoenda",
+    concorrentes_ig: ["starbucksbrasil", "coffeetown.br"],
+    referencias_ig: ["nespresso", "specialtycoffee"],
+    referencias_sites: ["https://perfectdailygrind.com"],
     cor_primaria: "#e17055",
     cor_secundaria: "#fab1a0",
     redes_sociais: {

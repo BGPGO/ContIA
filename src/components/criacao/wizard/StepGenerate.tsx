@@ -7,6 +7,8 @@ import type {
   GeneratedContent,
   EmpresaContext,
 } from "@/types/ai";
+import { useEmpresa } from "@/hooks/useEmpresa";
+import { useMarcaDNA } from "@/hooks/useMarcaDNA";
 
 interface StepGenerateProps {
   state: WizardState;
@@ -34,6 +36,8 @@ export function StepGenerate({
   setError,
   empresaContext,
 }: StepGenerateProps) {
+  const { empresa } = useEmpresa();
+  const { dna } = useMarcaDNA(empresa?.id);
   const [progressIndex, setProgressIndex] = useState(0);
   const triggeredRef = useRef(false);
 
@@ -69,6 +73,29 @@ export function StepGenerate({
     }
     if (state.fullIgAnalysis) {
       context.instagramAnalysis = JSON.stringify(state.fullIgAnalysis);
+    }
+
+    // Enrich with DNA da Marca if available
+    if (dna?.dna_sintetizado) {
+      const ds = dna.dna_sintetizado;
+      context.tom = ds.tom_de_voz as any || context.tom;
+      (context as any).dnaMarca = JSON.stringify({
+        tom_de_voz: ds.tom_de_voz,
+        pilares_conteudo: ds.pilares_conteudo,
+        publico_alvo: ds.publico_alvo,
+        proposta_valor: ds.proposta_valor,
+        palavras_chave: ds.palavras_chave,
+        estilo_visual: ds.estilo_visual,
+        formatos_preferidos: ds.formatos_preferidos,
+        hashtags_marca: ds.hashtags_marca,
+      });
+      // Backfill site/ig analysis from DNA if not already set
+      if (!context.siteAnalysis && dna.site_analysis) {
+        context.siteAnalysis = JSON.stringify(dna.site_analysis);
+      }
+      if (!context.instagramAnalysis && dna.instagram_analysis) {
+        context.instagramAnalysis = JSON.stringify(dna.instagram_analysis);
+      }
     }
 
     try {
