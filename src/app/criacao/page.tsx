@@ -11,7 +11,7 @@ import { StepTemplate } from "@/components/criacao/wizard/StepTemplate";
 import { StepAnalysis } from "@/components/criacao/wizard/StepAnalysis";
 import { StepFormat } from "@/components/criacao/wizard/StepFormat";
 import { StepGenerate } from "@/components/criacao/wizard/StepGenerate";
-import { StepPreview } from "@/components/criacao/wizard/StepPreview";
+import { StepVisualizar } from "@/components/criacao/wizard/StepVisualizar";
 import { StepExport } from "@/components/criacao/wizard/StepExport";
 import type { EmpresaContext } from "@/types/ai";
 
@@ -47,6 +47,10 @@ export default function CriacaoPage() {
     }
     if (state.currentStep === 3 || state.currentStep === 4) {
       wizard.setStep(2);
+      return;
+    }
+    if (state.currentStep === 5) {
+      wizard.setStep(4);
       return;
     }
     if (state.currentStep === 2) {
@@ -188,11 +192,10 @@ export default function CriacaoPage() {
         );
       case 4:
         return (
-          <StepPreview
+          <StepVisualizar
             state={state}
             setField={wizard.setField}
-            setSlideImage={wizard.setSlideImage}
-            setGeneratedImage={wizard.setGeneratedImage}
+            empresa={empresa}
             onRegenerate={() => {
               wizard.clearResults();
               wizard.setStep(3);
@@ -219,7 +222,7 @@ export default function CriacaoPage() {
   const mainSteps = [
     { fromStep: 2, label: "Configurar" },
     { fromStep: 3, label: "Gerar" },
-    { fromStep: 4, label: "Preview" },
+    { fromStep: 4, label: "Visualizar" },
     { fromStep: 5, label: "Finalizar" },
   ];
   const mappedStep = mainSteps.findIndex((s) => s.fromStep === state.currentStep);

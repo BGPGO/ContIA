@@ -54,7 +54,7 @@ export function StepFormat({ state, setField, selectSuggestion }: StepFormatProp
   };
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-5 sm:space-y-7">
       {/* Suggestions from IG */}
       {state.fullIgAnalysis?.suggested_next_posts?.length ? (
         <div className="space-y-2">
@@ -71,7 +71,7 @@ export function StepFormat({ state, setField, selectSuggestion }: StepFormatProp
       {/* Format selector */}
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-text-secondary">Formato</h3>
-        <div className="grid grid-cols-5 gap-2">
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
           {FORMATS.map((fmt) => {
             const isActive = state.format === fmt.value;
             const Icon = fmt.icon;
@@ -79,9 +79,9 @@ export function StepFormat({ state, setField, selectSuggestion }: StepFormatProp
               <button
                 key={fmt.value}
                 onClick={() => setField("format", fmt.value)}
-                className={`flex flex-col items-center gap-2 py-3.5 px-2 rounded-xl border text-sm font-medium transition-all ${
+                className={`flex flex-col items-center gap-2 py-3.5 px-2 rounded-xl border text-sm font-medium transition-all duration-200 ${
                   isActive
-                    ? "border-accent bg-accent/10 text-accent-light shadow-[0_0_12px_rgba(108,92,231,0.15)]"
+                    ? "border-[#4ecdc4] bg-gradient-to-br from-[#4ecdc4]/10 to-transparent text-[#4ecdc4] shadow-[0_0_15px_rgba(78,205,196,0.15)]"
                     : "border-border bg-bg-card text-text-secondary hover:border-border-light hover:bg-bg-card-hover"
                 }`}
               >
@@ -103,9 +103,9 @@ export function StepFormat({ state, setField, selectSuggestion }: StepFormatProp
               <button
                 key={t.value}
                 onClick={() => setField("tone", t.value)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
                   isActive
-                    ? "bg-accent text-white shadow-[0_0_12px_rgba(108,92,231,0.2)]"
+                    ? "bg-gradient-to-r from-[#6c5ce7] to-[#4ecdc4] text-white shadow-[0_0_15px_rgba(78,205,196,0.2)]"
                     : "bg-bg-card border border-border text-text-secondary hover:border-border-light hover:text-text-primary"
                 }`}
               >
@@ -127,9 +127,9 @@ export function StepFormat({ state, setField, selectSuggestion }: StepFormatProp
               <button
                 key={p}
                 onClick={() => togglePlatform(p)}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-full text-sm font-medium transition-all ${
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
                   isActive
-                    ? "bg-bg-card border-2 text-text-primary"
+                    ? "bg-bg-card border-2 text-text-primary ring-1 ring-[#4ecdc4]/20"
                     : "bg-bg-input border border-border text-text-muted hover:text-text-secondary hover:border-border-light"
                 }`}
                 style={isActive ? { borderColor: `${color}60` } : undefined}

@@ -11,6 +11,7 @@ import type {
   SuggestedPost,
   CreationTemplate,
 } from "@/types/ai";
+import type { PostDesignTemplate } from "@/components/post-design/PostCanvas";
 
 // ── State ──
 
@@ -49,6 +50,11 @@ export interface WizardState {
   generatedImageUrl: string | null;
   generatingImage: boolean;
 
+  // Design
+  designTemplate: PostDesignTemplate;
+  designBrandColor: string;
+  designAspectRatio: "1:1" | "4:5" | "9:16";
+
   // Export
   saving: boolean;
   saved: boolean;
@@ -82,6 +88,9 @@ const initialState: WizardState = {
   slideImages: {},
   generatedImageUrl: null,
   generatingImage: false,
+  designTemplate: "bold-statement" as PostDesignTemplate,
+  designBrandColor: "#4ecdc4",
+  designAspectRatio: "4:5" as const,
   saving: false,
   saved: false,
   error: null,
@@ -180,6 +189,9 @@ function reducer(state: WizardState, action: Action): WizardState {
         slideImages: {},
         generatedImageUrl: null,
         saved: false,
+        designTemplate: "bold-statement" as PostDesignTemplate,
+        designBrandColor: "#4ecdc4",
+        designAspectRatio: "4:5" as const,
       };
 
     case "RESET":

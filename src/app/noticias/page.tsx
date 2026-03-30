@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import {
   Rss,
   ChevronDown,
@@ -13,13 +14,15 @@ import {
   Newspaper,
   Tag,
   Clock,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { useEmpresa } from "@/hooks/useEmpresa";
 import { noticiasMock } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 import { ConfigRSS, Noticia } from "@/types";
 
-// ─── helpers ────────────────────────────────────────────────────────────────
+// ── helpers ────────────────────────────────────────────────────────────────
 
 function formatRelativeDate(dateStr: string): string {
   const now = new Date();
@@ -40,19 +43,24 @@ function formatRelativeDate(dateStr: string): string {
 // Stable topic colour mapping
 const TOPIC_COLORS: Record<string, string> = {
   "Inteligencia Artificial": "var(--color-accent)",
+  "Intelig\u00eancia Artificial": "var(--color-accent)",
   Startups: "var(--color-warning)",
   "Redes Sociais": "var(--color-instagram)",
   "Marketing Digital": "var(--color-success)",
+  Marketing: "var(--color-success)",
   SEO: "var(--color-info)",
   Tecnologia: "var(--color-accent-light)",
+  Tech: "var(--color-accent-light)",
   Gastronomia: "#e17055",
+  Geral: "var(--color-info)",
+  Negocios: "var(--color-warning)",
 };
 
 function topicColor(topico: string): string {
   return TOPIC_COLORS[topico] ?? "var(--color-accent)";
 }
 
-// ─── add feed modal ───────────────────────────────────────────────────────────
+// ── add feed modal ───────────────────────────────────────────────────────────
 
 interface AddFeedModalProps {
   onClose: () => void;
@@ -94,8 +102,18 @@ function AddFeedModal({ onClose, onAdd }: AddFeedModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-sm bg-bg-card backdrop-blur-xl border border-border rounded-xl p-4 fade-in shadow-2xl">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="relative w-full max-w-sm bg-bg-card backdrop-blur-xl border border-border rounded-xl p-4 shadow-2xl">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-semibold text-text-primary">Adicionar Feed RSS</h2>
           <button
@@ -162,12 +180,12 @@ function AddFeedModal({ onClose, onAdd }: AddFeedModalProps) {
             </button>
           </div>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 }
 
-// ─── RSS config section ───────────────────────────────────────────────────────
+// ── RSS config section ───────────────────────────────────────────────────────
 
 interface RSSConfigSectionProps {
   feeds: ConfigRSS[];
@@ -195,9 +213,11 @@ function RSSConfigSection({ feeds, onFeedsChange }: RSSConfigSectionProps) {
 
   return (
     <>
-      {showModal && (
-        <AddFeedModal onClose={() => setShowModal(false)} onAdd={addFeed} />
-      )}
+      <AnimatePresence>
+        {showModal && (
+          <AddFeedModal onClose={() => setShowModal(false)} onAdd={addFeed} />
+        )}
+      </AnimatePresence>
 
       <div className="bg-bg-card backdrop-blur-xl border border-border rounded-xl overflow-hidden">
         {/* section header */}
@@ -232,73 +252,83 @@ function RSSConfigSection({ feeds, onFeedsChange }: RSSConfigSectionProps) {
         </button>
 
         {/* collapsible body */}
-        {!collapsed && (
-          <div className="px-4 pb-3 space-y-1">
-            {feeds.length === 0 ? (
-              <p className="text-text-muted text-xs text-center py-3 italic">
-                Nenhum feed configurado.
-              </p>
-            ) : (
-              feeds.map((feed, idx) => {
-                const cor = topicColor(feed.topico);
-                return (
-                  <div
-                    key={idx}
-                    className={cn(
-                      "flex items-center justify-between gap-3 px-3 py-2 rounded-lg transition-colors",
-                      feed.ativo
-                        ? "bg-bg-card/50"
-                        : "bg-bg-card/20 opacity-40"
-                    )}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span
-                        className="w-1.5 h-1.5 rounded-full shrink-0"
-                        style={{ backgroundColor: cor }}
-                      />
-                      <span className="text-xs font-medium text-text-primary truncate">
-                        {feed.nome}
-                      </span>
-                      <span className="text-[10px] text-text-muted font-mono truncate hidden sm:block">
-                        {truncateUrl(feed.url)}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span
-                        className="text-[10px] font-medium px-1.5 py-0.5 rounded-full hidden sm:inline-block"
-                        style={{
-                          backgroundColor: `${cor}15`,
-                          color: cor,
-                        }}
-                      >
-                        {feed.topico}
-                      </span>
-                      <button
-                        onClick={() => toggleFeed(idx)}
-                        className="transition-colors"
-                        style={{ color: feed.ativo ? "var(--color-success)" : "var(--color-text-muted)" }}
-                        title={feed.ativo ? "Desativar feed" : "Ativar feed"}
-                      >
-                        {feed.ativo ? (
-                          <ToggleRight size={16} />
-                        ) : (
-                          <ToggleLeft size={16} />
+        <AnimatePresence>
+          {!collapsed && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+              className="overflow-hidden"
+            >
+              <div className="px-4 pb-3 space-y-1">
+                {feeds.length === 0 ? (
+                  <p className="text-text-muted text-xs text-center py-3 italic">
+                    Nenhum feed configurado.
+                  </p>
+                ) : (
+                  feeds.map((feed, idx) => {
+                    const cor = topicColor(feed.topico);
+                    return (
+                      <div
+                        key={idx}
+                        className={cn(
+                          "flex items-center justify-between gap-3 px-3 py-2 rounded-lg transition-colors",
+                          feed.ativo
+                            ? "bg-bg-card/50"
+                            : "bg-bg-card/20 opacity-40"
                         )}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        )}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span
+                            className="w-1.5 h-1.5 rounded-full shrink-0"
+                            style={{ backgroundColor: cor }}
+                          />
+                          <span className="text-xs font-medium text-text-primary truncate">
+                            {feed.nome}
+                          </span>
+                          <span className="text-[10px] text-text-muted font-mono truncate hidden sm:block">
+                            {truncateUrl(feed.url)}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span
+                            className="text-[10px] font-medium px-1.5 py-0.5 rounded-full hidden sm:inline-block"
+                            style={{
+                              backgroundColor: `${cor}15`,
+                              color: cor,
+                            }}
+                          >
+                            {feed.topico}
+                          </span>
+                          <button
+                            onClick={() => toggleFeed(idx)}
+                            className="transition-colors"
+                            style={{ color: feed.ativo ? "var(--color-success)" : "var(--color-text-muted)" }}
+                            title={feed.ativo ? "Desativar feed" : "Ativar feed"}
+                          >
+                            {feed.ativo ? (
+                              <ToggleRight size={16} />
+                            ) : (
+                              <ToggleLeft size={16} />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </>
   );
 }
 
-// ─── topic filter pills ──────────────────────────────────────────────────────
+// ── topic filter pills ──────────────────────────────────────────────────────
 
 interface TopicFiltersProps {
   topics: string[];
@@ -309,7 +339,9 @@ interface TopicFiltersProps {
 function TopicFilters({ topics, selected, onChange }: TopicFiltersProps) {
   return (
     <div className="flex flex-wrap gap-1.5">
-      <button
+      <motion.button
+        whileTap={{ scale: 0.92 }}
+        layout
         onClick={() => onChange(null)}
         className={cn(
           "px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all",
@@ -319,14 +351,16 @@ function TopicFilters({ topics, selected, onChange }: TopicFiltersProps) {
         )}
       >
         Todos
-      </button>
+      </motion.button>
 
       {topics.map((t) => {
         const cor = topicColor(t);
         const active = selected === t;
         return (
-          <button
+          <motion.button
             key={t}
+            whileTap={{ scale: 0.92 }}
+            layout
             onClick={() => onChange(active ? null : t)}
             className="px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all"
             style={
@@ -344,29 +378,34 @@ function TopicFilters({ topics, selected, onChange }: TopicFiltersProps) {
             }
           >
             {t}
-          </button>
+          </motion.button>
         );
       })}
     </div>
   );
 }
 
-// ─── news card ────────────────────────────────────────────────────────────────
+// ── news card ────────────────────────────────────────────────────────────────
 
 interface NewsCardProps {
   noticia: Noticia;
+  index: number;
 }
 
-function NewsCard({ noticia }: NewsCardProps) {
+function NewsCard({ noticia, index }: NewsCardProps) {
   const cor = topicColor(noticia.topico);
   const relDate = formatRelativeDate(noticia.publicado_em);
 
   return (
-    <a
+    <motion.a
       href={noticia.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="bg-bg-card backdrop-blur-xl border border-border rounded-xl p-4 fade-in flex flex-col gap-2.5 group cursor-pointer no-underline hover:bg-bg-card-hover hover:border-border-light transition-all"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.08, duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+      whileHover={{ y: -4, transition: { duration: 0.2 } }}
+      className="bg-bg-card backdrop-blur-xl border border-border rounded-xl p-4 flex flex-col gap-2.5 group cursor-pointer no-underline hover:bg-bg-card-hover hover:border-border-light transition-colors"
     >
       {/* top row: source + date */}
       <div className="flex items-center justify-between gap-2">
@@ -415,35 +454,98 @@ function NewsCard({ noticia }: NewsCardProps) {
           {noticia.topico}
         </span>
       </div>
-    </a>
+    </motion.a>
   );
 }
 
-// ─── main page ────────────────────────────────────────────────────────────────
+// ── main page ────────────────────────────────────────────────────────────────
 
 export default function NoticiasPage() {
   const { empresa } = useEmpresa();
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [feeds, setFeeds] = useState<ConfigRSS[]>(empresa?.config_rss ?? []);
+  const [noticias, setNoticias] = useState<Noticia[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [usingMock, setUsingMock] = useState(false);
 
   // keep feeds in sync when empresa changes
-  const empresaFeeds = empresa?.config_rss ?? [];
-  const mergedFeeds = useMemo(() => {
-    // if feeds state was seeded from empresa, just use state
-    return feeds;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [feeds]);
+  useEffect(() => {
+    if (empresa?.config_rss) {
+      setFeeds(empresa.config_rss);
+    }
+  }, [empresa?.config_rss]);
 
-  // Derive unique topics from mock data
+  const fetchNoticias = useCallback(async () => {
+    if (!empresa) return;
+
+    setLoading(true);
+    setUsingMock(false);
+
+    try {
+      const params = new URLSearchParams({
+        nicho: empresa.nicho || "geral",
+        empresa_id: empresa.id,
+      });
+      const res = await fetch(`/api/noticias?${params.toString()}`);
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+
+      if (data.noticias && data.noticias.length > 0) {
+        // Mapear resposta da API para o tipo Noticia da pagina
+        const mapped: Noticia[] = data.noticias.map((n: {
+          id: string;
+          titulo: string;
+          descricao?: string;
+          url: string;
+          fonte: string;
+          topico: string;
+          publicado_em: string;
+          imagem_url: string | null;
+          resumo?: string;
+        }) => ({
+          id: n.id,
+          titulo: n.titulo,
+          fonte: n.fonte,
+          url: n.url,
+          resumo: n.resumo || n.descricao || "",
+          topico: n.topico,
+          publicado_em: n.publicado_em,
+          imagem_url: n.imagem_url,
+        }));
+        setNoticias(mapped);
+      } else {
+        // Sem resultados da API — usar mock
+        setNoticias(noticiasMock);
+        setUsingMock(true);
+      }
+    } catch (err) {
+      console.error("Erro ao buscar noticias, usando dados mock:", err);
+      setNoticias(noticiasMock);
+      setUsingMock(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [empresa]);
+
+  // Fetch on mount and when empresa changes
+  useEffect(() => {
+    fetchNoticias();
+  }, [fetchNoticias]);
+
+  // Derive unique topics from noticias
   const topics = useMemo(() => {
-    return Array.from(new Set(noticiasMock.map((n) => n.topico))).sort();
-  }, []);
+    return Array.from(new Set(noticias.map((n) => n.topico))).sort();
+  }, [noticias]);
 
   // Filter news
   const filtered = useMemo(() => {
-    if (!selectedTopic) return noticiasMock;
-    return noticiasMock.filter((n) => n.topico === selectedTopic);
-  }, [selectedTopic]);
+    if (!selectedTopic) return noticias;
+    return noticias.filter((n) => n.topico === selectedTopic);
+  }, [selectedTopic, noticias]);
 
   if (!empresa) {
     return (
@@ -454,49 +556,108 @@ export default function NoticiasPage() {
   }
 
   return (
-    <div className="fade-in space-y-4 p-4 max-w-6xl mx-auto">
+    <div className="space-y-4 p-4 max-w-6xl mx-auto">
 
       {/* ── header ─────────────────────────────────────────────────────── */}
-      <h1 className="text-xl font-semibold text-text-primary tracking-tight">
-        Consolidador de Noticias
-      </h1>
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center justify-between"
+      >
+        <h1 className="text-xl font-semibold text-text-primary tracking-tight">
+          Consolidador de Noticias
+        </h1>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={fetchNoticias}
+          disabled={loading}
+          className={cn(
+            "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border",
+            loading
+              ? "border-border text-text-muted cursor-not-allowed"
+              : "border-accent/30 text-accent hover:bg-accent/10"
+          )}
+        >
+          {loading ? (
+            <Loader2 size={12} className="animate-spin" />
+          ) : (
+            <RefreshCw size={12} />
+          )}
+          Atualizar
+        </motion.button>
+      </motion.div>
+
+      {/* ── mock fallback notice ──────────────────────────────────────── */}
+      {usingMock && !loading && (
+        <div className="bg-bg-card border border-border rounded-lg px-3 py-2 text-xs text-text-muted flex items-center gap-2">
+          <Tag size={12} />
+          Exibindo dados de exemplo. Os feeds RSS reais nao retornaram resultados.
+        </div>
+      )}
 
       {/* ── RSS config ──────────────────────────────────────────────────── */}
       <RSSConfigSection
-        feeds={mergedFeeds.length ? mergedFeeds : empresaFeeds}
+        feeds={feeds}
         onFeedsChange={setFeeds}
       />
 
       {/* ── topic filters ───────────────────────────────────────────────── */}
-      <TopicFilters
-        topics={topics}
-        selected={selectedTopic}
-        onChange={setSelectedTopic}
-      />
+      {!loading && topics.length > 0 && (
+        <TopicFilters
+          topics={topics}
+          selected={selectedTopic}
+          onChange={setSelectedTopic}
+        />
+      )}
 
       {/* ── news grid ───────────────────────────────────────────────────── */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-text-secondary">
-            {selectedTopic ? selectedTopic : "Todas as noticias"}
-          </span>
-          <span className="text-[11px] text-text-muted tabular-nums">
-            {filtered.length} {filtered.length === 1 ? "artigo" : "artigos"}
-          </span>
-        </div>
+        {!loading && (
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-text-secondary">
+              {selectedTopic ? selectedTopic : "Todas as noticias"}
+            </span>
+            <span className="text-[11px] text-text-muted tabular-nums">
+              {filtered.length} {filtered.length === 1 ? "artigo" : "artigos"}
+            </span>
+          </div>
+        )}
 
-        {filtered.length === 0 ? (
-          <div className="bg-bg-card backdrop-blur-xl border border-border rounded-xl text-center py-10 space-y-2">
+        {loading ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="bg-bg-card backdrop-blur-xl border border-border rounded-xl text-center py-14 space-y-3"
+          >
+            <Loader2 size={24} className="text-accent mx-auto animate-spin" />
+            <p className="text-text-secondary text-sm">Buscando noticias dos feeds RSS...</p>
+          </motion.div>
+        ) : filtered.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-bg-card backdrop-blur-xl border border-border rounded-xl text-center py-10 space-y-2"
+          >
             <Newspaper size={28} className="text-text-muted mx-auto" />
             <p className="text-text-secondary text-sm">Nenhum artigo encontrado.</p>
             <p className="text-text-muted text-xs">Tente selecionar outro topico.</p>
-          </div>
+          </motion.div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {filtered.map((n) => (
-              <NewsCard key={n.id} noticia={n} />
-            ))}
-          </div>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={selectedTopic ?? "all"}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="grid grid-cols-1 md:grid-cols-2 gap-3"
+            >
+              {filtered.map((n, i) => (
+                <NewsCard key={n.id} noticia={n} index={i} />
+              ))}
+            </motion.div>
+          </AnimatePresence>
         )}
       </div>
     </div>

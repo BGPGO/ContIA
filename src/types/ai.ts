@@ -33,6 +33,17 @@ export interface GeneratedContent {
   emailBody?: string;
   imagePrompt: string;
   imageUrl?: string;
+  visualPost?: VisualPostContent;  // structured content for visual design
+}
+
+/** Structured content for visual post design */
+export interface VisualPostContent {
+  headline: string;        // Main impactful headline (max 60 chars)
+  subheadline?: string;    // Supporting line (max 100 chars)
+  body?: string;           // Body text (max 200 chars for visual posts)
+  accentText?: string;     // Highlighted stat or key phrase
+  cta: string;             // Short CTA (max 40 chars)
+  suggestedTemplate: "bold-statement" | "gradient-wave" | "minimal-clean" | "quote-card" | "tip-numbered" | "stats-highlight" | "split-content" | "carousel-slide";
 }
 
 export interface CarouselSlide {

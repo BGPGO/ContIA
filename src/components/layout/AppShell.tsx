@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { motion, AnimatePresence } from "motion/react";
 import EmpresaProvider from "@/components/layout/EmpresaProvider";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { EmpresaWizard } from "@/components/empresas/EmpresaWizard";
@@ -14,7 +15,7 @@ const AUTH_ROUTES = ["/login", "/register", "/auth"];
 /* ─────────────────────────────────────────────────────────────
    AppContent — lives INSIDE EmpresaProvider so it can read context
 ───────────────────────────────────────────────────────────── */
-function AppContent({ children }: { children: React.ReactNode }) {
+function AppContent({ children, pathname }: { children: React.ReactNode; pathname: string }) {
   const { empresas, loading } = useEmpresa();
   const supabaseConfigured = isSupabaseConfigured();
 
@@ -37,10 +38,19 @@ function AppContent({ children }: { children: React.ReactNode }) {
     <>
       <div className="flex min-h-screen bg-bg-primary">
         <Sidebar />
-        <main className="flex-1 overflow-auto bg-bg-primary">
-          <div className="mx-auto max-w-[1400px] px-6 py-6 md:px-8 md:py-8 page-enter">
-            {children}
-          </div>
+        <main className="flex-1 overflow-auto bg-bg-primary pt-14 md:pt-0">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={pathname}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+              className="mx-auto max-w-[1400px] px-4 py-4 sm:px-6 sm:py-6 md:px-8 md:py-8"
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
 
@@ -63,15 +73,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   if (isAuthPage) {
     return (
-      <div className="min-h-screen bg-bg-primary flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+        className="min-h-screen bg-bg-primary flex items-center justify-center p-4"
+      >
         {children}
-      </div>
+      </motion.div>
     );
   }
 
   return (
     <EmpresaProvider>
-      <AppContent>{children}</AppContent>
+      <AppContent pathname={pathname}>{children}</AppContent>
     </EmpresaProvider>
   );
 }

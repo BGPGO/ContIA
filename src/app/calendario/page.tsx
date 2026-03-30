@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import {
   ChevronLeft,
   ChevronRight,
   X,
+  Calendar,
 } from "lucide-react";
 import {
   startOfMonth,
@@ -90,10 +92,11 @@ function FilterChip({
   label: string;
 }) {
   return (
-    <button
+    <motion.button
+      whileTap={{ scale: 0.92 }}
       onClick={onToggle}
       className={cn(
-        "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium border transition-all duration-150",
+        "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium border transition-all duration-150 shrink-0",
         active
           ? "text-text-primary"
           : "bg-bg-card border-border text-text-muted opacity-50 hover:opacity-75"
@@ -120,7 +123,7 @@ function FilterChip({
         />
       )}
       {label}
-    </button>
+    </motion.button>
   );
 }
 
@@ -148,9 +151,10 @@ function PostChip({
         selected && "ring-1 ring-accent/60"
       )}
       style={{
-        borderLeft: `3px solid ${color}`,
+        borderLeft: `4px solid ${color}`,
         paddingLeft: "5px",
         color: "var(--color-text-secondary)",
+        background: `linear-gradient(90deg, ${color}08, transparent)`,
       }}
       title={post.titulo}
     >
@@ -172,7 +176,11 @@ function PostDetailPopover({
   const date = getPostDate(post);
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: -8, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -8, scale: 0.95 }}
+      transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
       className="absolute z-30 left-0 top-full mt-1 w-56 bg-bg-card backdrop-blur-xl border border-border rounded-xl shadow-2xl p-3 space-y-2"
       onClick={(e) => e.stopPropagation()}
     >
@@ -218,7 +226,7 @@ function PostDetailPopover({
           <span>{format(new Date(date), "dd/MM/yyyy", { locale: ptBR })}</span>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -248,7 +256,7 @@ function DayCell({
   return (
     <div
       className={cn(
-        "relative min-h-[80px] p-1.5 border-r border-b border-border-subtle flex flex-col gap-[3px]",
+        "relative min-h-[80px] p-1.5 border-r border-b border-border-subtle flex flex-col gap-[3px] hover:bg-[#4ecdc4]/5 transition-colors duration-150",
         !inMonth && "opacity-25"
       )}
       onClick={() => {
@@ -261,14 +269,14 @@ function DayCell({
           className={cn(
             "text-xs leading-none",
             today
-              ? "text-accent font-semibold"
+              ? "text-[#4ecdc4] font-semibold"
               : "text-text-muted"
           )}
         >
           {format(day, "d")}
         </span>
         {today && (
-          <span className="w-1 h-1 rounded-full bg-accent" />
+          <span className="w-1 h-1 rounded-full bg-[#4ecdc4]" />
         )}
       </div>
 
@@ -292,12 +300,96 @@ function DayCell({
       </div>
 
       {/* detail popover */}
-      {hasSelected && (
-        <PostDetailPopover
-          post={selectedPost}
-          onClose={() => onSelectPost(null)}
-        />
-      )}
+      <AnimatePresence>
+        {hasSelected && (
+          <PostDetailPopover
+            post={selectedPost}
+            onClose={() => onSelectPost(null)}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ─── mobile list item for a day ──────────────────────────────────────────────
+
+function MobileDayListItem({
+  day,
+  currentMonth,
+  posts,
+}: {
+  day: Date;
+  currentMonth: Date;
+  posts: Post[];
+}) {
+  const inMonth = isSameMonth(day, currentMonth);
+  const today = isToday(day);
+
+  if (!inMonth || posts.length === 0) return null;
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-2 px-1">
+        <span
+          className={cn(
+            "text-xs font-medium",
+            today ? "text-[#4ecdc4]" : "text-text-muted"
+          )}
+        >
+          {format(day, "EEE, dd MMM", { locale: ptBR })}
+        </span>
+        {today && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#4ecdc4]/15 text-[#4ecdc4] font-medium">
+            Hoje
+          </span>
+        )}
+        <span className="text-[10px] text-text-muted ml-auto">
+          {posts.length} post{posts.length !== 1 ? "s" : ""}
+        </span>
+      </div>
+      <div className="space-y-1">
+        {posts.map((post) => {
+          const color = getPlataformaCor(post.plataformas[0]);
+          const statusConf = STATUS_CONFIG[post.status];
+          const date = getPostDate(post);
+          return (
+            <div
+              key={post.id}
+              className="flex items-center gap-2 bg-bg-card border border-border rounded-lg p-2.5"
+              style={{ borderLeftWidth: 3, borderLeftColor: color }}
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-text-primary truncate">
+                  {post.titulo}
+                </p>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span
+                    className={cn("w-1.5 h-1.5 rounded-full", statusConf.dot)}
+                  />
+                  <span className="text-[10px] text-text-muted">
+                    {statusConf.label}
+                  </span>
+                  {date && (
+                    <span className="text-[10px] text-text-muted tabular-nums">
+                      {format(new Date(date), "HH:mm")}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {post.plataformas.map((p) => (
+                  <span
+                    key={p}
+                    className="w-[6px] h-[6px] rounded-full"
+                    style={{ backgroundColor: getPlataformaCor(p) }}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -317,6 +409,19 @@ function CalendarSkeleton() {
             <div className="h-3 bg-bg-elevated rounded" />
             <div className="h-3 bg-bg-elevated rounded w-3/4" />
           </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MobileListSkeleton() {
+  return (
+    <div className="space-y-3 animate-pulse">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="space-y-1.5">
+          <div className="h-3 w-24 bg-bg-elevated rounded" />
+          <div className="h-12 bg-bg-elevated rounded-lg" />
         </div>
       ))}
     </div>
@@ -343,6 +448,7 @@ export default function CalendarioPage() {
     () => new Set<Post["status"]>(["publicado", "agendado", "rascunho", "erro"])
   );
 
+  const [direction, setDirection] = useState(0);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
 
   const allTematicas = useMemo(
@@ -431,115 +537,181 @@ export default function CalendarioPage() {
   const countRascunho = filteredPosts.filter((p) => p.status === "rascunho").length;
 
   return (
-    <div className="fade-in space-y-4 p-4 max-w-7xl mx-auto">
+    <div className="space-y-3 sm:space-y-4 p-2 sm:p-4 max-w-7xl mx-auto">
 
       {/* ── header ──────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-text-primary tracking-tight">
-          Calendário de Conteúdo
+        <h1 className="text-base sm:text-xl font-semibold text-text-primary tracking-tight">
+          Calendario
         </h1>
         <div className="flex items-center gap-1">
-          <button
-            onClick={() => setCurrentMonth((m) => subMonths(m, 1))}
-            className="p-1 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-card-hover transition-all"
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => { setDirection(-1); setCurrentMonth((m) => subMonths(m, 1)); }}
+            className="p-1 rounded-lg text-text-muted hover:text-[#4ecdc4] hover:bg-[#4ecdc4]/10 transition-all duration-200"
             aria-label="Mes anterior"
           >
             <ChevronLeft size={16} />
-          </button>
-          <span className="text-sm font-medium text-text-primary min-w-[130px] text-center">
-            {capitalizedMonth}
-          </span>
-          <button
-            onClick={() => setCurrentMonth((m) => addMonths(m, 1))}
-            className="p-1 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-card-hover transition-all"
+          </motion.button>
+          <AnimatePresence mode="wait">
+            <motion.span
+              key={capitalizedMonth}
+              initial={{ opacity: 0, y: direction * 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: direction * -10 }}
+              transition={{ duration: 0.2 }}
+              className="text-xs sm:text-sm font-medium text-text-primary min-w-[100px] sm:min-w-[130px] text-center"
+            >
+              {capitalizedMonth}
+            </motion.span>
+          </AnimatePresence>
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => { setDirection(1); setCurrentMonth((m) => addMonths(m, 1)); }}
+            className="p-1 rounded-lg text-text-muted hover:text-[#4ecdc4] hover:bg-[#4ecdc4]/10 transition-all duration-200"
             aria-label="Proximo mes"
           >
             <ChevronRight size={16} />
-          </button>
+          </motion.button>
         </div>
       </div>
 
-      {/* ── filters ─────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        {ALL_PLATFORMS.map((p) => (
-          <FilterChip
-            key={p}
-            label={getPlataformaLabel(p)}
-            color={getPlataformaCor(p)}
-            active={activePlatforms.has(p)}
-            onToggle={() => togglePlatform(p)}
-          />
-        ))}
-
-        {/* separator */}
-        <span className="w-px h-4 bg-border mx-1" />
-
-        {allTematicas.map((t) => (
-          <FilterChip
-            key={t}
-            label={t}
-            active={effectiveActiveTematicas.has(t)}
-            onToggle={() => toggleTematica(t)}
-          />
-        ))}
-
-        {/* separator */}
-        <span className="w-px h-4 bg-border mx-1" />
-
-        {(["publicado", "agendado", "rascunho"] as Post["status"][]).map((s) => {
-          const conf = STATUS_CONFIG[s];
-          return (
+      {/* ── filters (horizontally scrollable on mobile) ────────────────── */}
+      <div className="overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
+        <div className="flex items-center gap-1.5 min-w-max sm:flex-wrap sm:min-w-0">
+          {ALL_PLATFORMS.map((p) => (
             <FilterChip
-              key={s}
-              label={conf.label}
-              color={conf.color}
-              active={activeStatuses.has(s)}
-              onToggle={() => toggleStatus(s)}
+              key={p}
+              label={getPlataformaLabel(p)}
+              color={getPlataformaCor(p)}
+              active={activePlatforms.has(p)}
+              onToggle={() => togglePlatform(p)}
             />
-          );
-        })}
+          ))}
+
+          <span className="w-px h-4 bg-border mx-1 shrink-0" />
+
+          {allTematicas.map((t) => (
+            <FilterChip
+              key={t}
+              label={t}
+              active={effectiveActiveTematicas.has(t)}
+              onToggle={() => toggleTematica(t)}
+            />
+          ))}
+
+          <span className="w-px h-4 bg-border mx-1 shrink-0" />
+
+          {(["publicado", "agendado", "rascunho"] as Post["status"][]).map((s) => {
+            const conf = STATUS_CONFIG[s];
+            return (
+              <FilterChip
+                key={s}
+                label={conf.label}
+                color={conf.color}
+                active={activeStatuses.has(s)}
+                onToggle={() => toggleStatus(s)}
+              />
+            );
+          })}
+        </div>
       </div>
 
-      {/* ── calendar grid ───────────────────────────────────────────────── */}
-      <div className="bg-bg-card backdrop-blur-xl border border-border rounded-xl p-3">
-
-        {/* weekday header */}
-        <div className="grid grid-cols-7">
-          {WEEKDAY_LABELS.map((label) => (
-            <div
-              key={label}
-              className="text-center text-[11px] uppercase tracking-wider text-text-muted py-2 font-medium"
-            >
-              {label}
+      {/* ── Desktop: calendar grid (hidden on <md) ─────────────────────── */}
+      <div className="hidden md:block bg-bg-card backdrop-blur-xl border border-border rounded-xl p-3">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={format(currentMonth, "yyyy-MM")}
+            initial={{ opacity: 0, x: direction * 80 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: direction * -80 }}
+            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+          >
+            {/* weekday header */}
+            <div className="grid grid-cols-7">
+              {WEEKDAY_LABELS.map((label) => (
+                <div
+                  key={label}
+                  className="text-center text-[11px] uppercase tracking-wider text-text-muted py-2 font-medium"
+                >
+                  {label}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        {/* days grid */}
+            {/* days grid */}
+            {loading ? (
+              <CalendarSkeleton />
+            ) : (
+              <div className="grid grid-cols-7 border-t border-l border-border-subtle">
+                {calendarDays.map((day) => {
+                  const key = format(day, "yyyy-MM-dd");
+                  const dayPosts = postsByDay.get(key) ?? [];
+                  return (
+                    <DayCell
+                      key={key}
+                      day={day}
+                      currentMonth={currentMonth}
+                      posts={dayPosts}
+                      selectedPostId={selectedPostId}
+                      onSelectPost={setSelectedPostId}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* ── Mobile: list view (visible only on <md) ────────────────────── */}
+      <div className="md:hidden space-y-3">
         {loading ? (
-          <CalendarSkeleton />
+          <MobileListSkeleton />
         ) : (
-          <div className="grid grid-cols-7 border-t border-l border-border-subtle">
-            {calendarDays.map((day) => {
+          <>
+            {calendarDays.filter((day) => {
               const key = format(day, "yyyy-MM-dd");
               const dayPosts = postsByDay.get(key) ?? [];
-              return (
-                <DayCell
-                  key={key}
-                  day={day}
-                  currentMonth={currentMonth}
-                  posts={dayPosts}
-                  selectedPostId={selectedPostId}
-                  onSelectPost={setSelectedPostId}
-                />
-              );
-            })}
-          </div>
+              return isSameMonth(day, currentMonth) && dayPosts.length > 0;
+            }).length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-3">
+                <Calendar size={32} className="text-text-muted" />
+                <p className="text-text-muted text-sm">Nenhum post neste mes.</p>
+              </div>
+            ) : (
+              calendarDays.map((day, index) => {
+                const key = format(day, "yyyy-MM-dd");
+                const dayPosts = postsByDay.get(key) ?? [];
+                return (
+                  <motion.div
+                    key={key}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: Math.min(index * 0.03, 0.5) }}
+                  >
+                    <MobileDayListItem
+                      day={day}
+                      currentMonth={currentMonth}
+                      posts={dayPosts}
+                    />
+                  </motion.div>
+                );
+              })
+            )}
+          </>
         )}
       </div>
 
       {/* ── summary stats ───────────────────────────────────────────────── */}
-      <div className="text-sm text-text-secondary flex items-center gap-1 justify-center">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.3 }}
+        className="text-xs sm:text-sm text-text-secondary flex items-center gap-1 justify-center flex-wrap"
+      >
         {loading ? (
           <span className="text-text-muted text-xs">Carregando posts...</span>
         ) : (
@@ -557,7 +729,7 @@ export default function CalendarioPage() {
             <span>total</span>
           </>
         )}
-      </div>
+      </motion.div>
 
     </div>
   );

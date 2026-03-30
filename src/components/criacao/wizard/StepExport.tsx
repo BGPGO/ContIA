@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import {
   Save,
   Calendar,
@@ -13,11 +14,16 @@ import {
   Video,
   Mail,
   PenTool,
+  Download,
+  Image as ImageIcon,
+  Loader2,
 } from "lucide-react";
 import type { WizardState } from "@/hooks/useCreationWizard";
 import type { CreationTemplate, ContentFormat } from "@/types/ai";
 import type { Post } from "@/types";
 import { getPlataformaLabel } from "@/lib/utils";
+import { PostCanvas } from "@/components/post-design/PostCanvas";
+import type { PostDesignData, PostDesignTemplate } from "@/components/post-design/PostCanvas";
 
 interface StepExportProps {
   state: WizardState;
@@ -58,6 +64,9 @@ export function StepExport({
   const [showSchedule, setShowSchedule] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
   const [templateName, setTemplateName] = useState(state.templateName || "");
+  const [exporting, setExporting] = useState(false);
+
+  const canvasRef = useRef<HTMLDivElement>(null);
 
   const { result, visualMode, visualLegenda, visualCta } = state;
 
@@ -74,6 +83,40 @@ export function StepExport({
   };
 
   const FormatIcon = FORMAT_ICONS[state.format];
+
+  /* ── Design data for PostCanvas ── */
+  const designData: PostDesignData = {
+    headline: getTitle(),
+    subheadline: state.topic || undefined,
+    body: getContent()?.slice(0, 200) || undefined,
+    cta: result?.cta || state.visualCta || undefined,
+    brandName: "ContIA",
+    brandColor: state.designBrandColor || "#4ecdc4",
+    hashtags: result?.hashtags || state.visualHashtags || [],
+  };
+
+  /* ── Export image handler ── */
+  const handleExportImage = async () => {
+    if (!canvasRef.current) return;
+    setExporting(true);
+    try {
+      const html2canvas = (await import("html2canvas-pro")).default;
+      const canvas = await html2canvas(canvasRef.current, {
+        scale: 3,
+        useCORS: true,
+        backgroundColor: null,
+      });
+      const url = canvas.toDataURL("image/png");
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `post-${state.topic.slice(0, 20).replace(/\s+/g, "-")}.png`;
+      a.click();
+    } catch (err) {
+      console.error("Export failed:", err);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const handleSaveDraft = async () => {
     setField("saving", true);
@@ -155,9 +198,17 @@ export function StepExport({
     setSavedTemplate(true);
   };
 
+  /* ══════════════════════════════════════════════════════════════════════════
+     Success state (after save)
+     ══════════════════════════════════════════════════════════════════════════ */
   if (state.saved && savedPost) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-6">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ type: "spring", stiffness: 200, damping: 20 }}
+        className="flex flex-col items-center justify-center min-h-[400px] gap-6"
+      >
         <div className="w-16 h-16 rounded-2xl bg-success/10 flex items-center justify-center">
           <Check size={32} className="text-success" />
         </div>
@@ -174,10 +225,13 @@ export function StepExport({
           <RefreshCw size={14} />
           Criar outro conteudo
         </button>
-      </div>
+      </motion.div>
     );
   }
 
+  /* ══════════════════════════════════════════════════════════════════════════
+     Main export UI
+     ══════════════════════════════════════════════════════════════════════════ */
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-semibold text-text-primary text-center">
@@ -185,7 +239,12 @@ export function StepExport({
       </h2>
 
       {/* Summary card */}
-      <div className="bg-bg-card border border-border rounded-xl p-5">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35 }}
+        className="bg-bg-card border border-border rounded-xl p-5"
+      >
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center">
             <FormatIcon size={22} className="text-accent-light" />
@@ -204,12 +263,36 @@ export function StepExport({
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
+
+      {/* Visual Post Preview */}
+      {state.designTemplate && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, delay: 0.05 }}
+          className="bg-bg-card border border-border rounded-xl p-6 flex flex-col items-center gap-4"
+        >
+          <h3 className="text-sm font-semibold text-text-secondary">Preview Final</h3>
+          <PostCanvas
+            ref={canvasRef}
+            data={designData}
+            template={state.designTemplate}
+            aspectRatio={state.designAspectRatio}
+            brandColor={state.designBrandColor}
+          />
+        </motion.div>
+      )}
 
       {/* Action buttons */}
       <div className="space-y-3">
         {/* Save as draft */}
-        <button
+        <motion.button
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.99 }}
           onClick={handleSaveDraft}
           disabled={state.saving}
           className="w-full flex items-center gap-4 bg-bg-card border border-border rounded-xl p-4 hover:border-accent/40 hover:bg-bg-card-hover transition-all text-left group"
@@ -221,11 +304,17 @@ export function StepExport({
             <p className="text-sm font-semibold text-text-primary">Salvar como Rascunho</p>
             <p className="text-xs text-text-muted mt-0.5">Salvar para editar depois</p>
           </div>
-        </button>
+        </motion.button>
 
         {/* Schedule */}
-        <div>
-          <button
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.15 }}
+        >
+          <motion.button
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.99 }}
             onClick={() => setShowSchedule(!showSchedule)}
             className="w-full flex items-center gap-4 bg-bg-card border border-border rounded-xl p-4 hover:border-accent/40 hover:bg-bg-card-hover transition-all text-left group"
           >
@@ -236,28 +325,71 @@ export function StepExport({
               <p className="text-sm font-semibold text-text-primary">Agendar Publicacao</p>
               <p className="text-xs text-text-muted mt-0.5">Escolha data e horario</p>
             </div>
-          </button>
-          {showSchedule && (
-            <div className="mt-2 flex items-center gap-3 bg-bg-card border border-border rounded-xl p-4">
-              <input
-                type="datetime-local"
-                value={scheduleDate}
-                onChange={(e) => setScheduleDate(e.target.value)}
-                className="flex-1 bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent/50"
-              />
-              <button
-                onClick={handleSchedule}
-                disabled={!scheduleDate || state.saving}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-warning text-bg-primary hover:bg-warning/90 disabled:opacity-40 transition-all"
+          </motion.button>
+          <AnimatePresence>
+            {showSchedule && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
               >
-                Agendar
-              </button>
+                <div className="mt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 bg-bg-card border border-border rounded-xl p-3 sm:p-4">
+                  <input
+                    type="datetime-local"
+                    value={scheduleDate}
+                    onChange={(e) => setScheduleDate(e.target.value)}
+                    className="flex-1 bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent/50"
+                  />
+                  <button
+                    onClick={handleSchedule}
+                    disabled={!scheduleDate || state.saving}
+                    className="px-4 py-2 rounded-lg text-sm font-medium bg-warning text-bg-primary hover:bg-warning/90 disabled:opacity-40 transition-all w-full sm:w-auto"
+                  >
+                    Agendar
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+
+        {/* Download as Image */}
+        {state.designTemplate && (
+          <motion.button
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.2 }}
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.99 }}
+            onClick={handleExportImage}
+            disabled={exporting}
+            className="w-full flex items-center gap-4 bg-gradient-to-r from-[#6c5ce7]/10 to-[#4ecdc4]/10 border border-accent/30 rounded-xl p-4 hover:border-accent/50 transition-all text-left group"
+          >
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#6c5ce7] to-[#4ecdc4] flex items-center justify-center">
+              {exporting ? (
+                <Loader2 size={18} className="text-white animate-spin" />
+              ) : (
+                <Download size={18} className="text-white" />
+              )}
             </div>
-          )}
-        </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-text-primary">
+                {exporting ? "Exportando..." : "Baixar como Imagem"}
+              </p>
+              <p className="text-xs text-text-muted mt-0.5">Download PNG em alta resolucao (3x)</p>
+            </div>
+          </motion.button>
+        )}
 
         {/* Copy text */}
-        <button
+        <motion.button
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: state.designTemplate ? 0.25 : 0.2 }}
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.99 }}
           onClick={handleCopy}
           className="w-full flex items-center gap-4 bg-bg-card border border-border rounded-xl p-4 hover:border-accent/40 hover:bg-bg-card-hover transition-all text-left group"
         >
@@ -274,14 +406,19 @@ export function StepExport({
             </p>
             <p className="text-xs text-text-muted mt-0.5">Copiar conteudo para a area de transferencia</p>
           </div>
-        </button>
+        </motion.button>
       </div>
 
       {/* Divider */}
       <div className="border-t border-border" />
 
       {/* Save as template */}
-      <div className="bg-bg-card border border-border rounded-xl p-5 space-y-4">
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: state.designTemplate ? 0.3 : 0.25 }}
+        className="bg-bg-card border border-border rounded-xl p-5 space-y-4"
+      >
         <div className="flex items-center gap-2.5">
           <BookmarkPlus size={16} className="text-accent-light" />
           <h3 className="text-sm font-semibold text-text-primary">Salvar como Template</h3>
@@ -293,7 +430,7 @@ export function StepExport({
             Template salvo!
           </div>
         ) : (
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
             <input
               value={templateName}
               onChange={(e) => setTemplateName(e.target.value)}
@@ -303,13 +440,13 @@ export function StepExport({
             <button
               onClick={handleSaveTemplate}
               disabled={!templateName.trim()}
-              className="px-4 py-2.5 rounded-lg text-sm font-medium bg-accent/10 text-accent-light hover:bg-accent/20 disabled:opacity-40 transition-all shrink-0"
+              className="px-4 py-2.5 rounded-lg text-sm font-medium bg-accent/10 text-accent-light hover:bg-accent/20 disabled:opacity-40 transition-all shrink-0 w-full sm:w-auto"
             >
               {state.templateId ? "Atualizar" : "Salvar"}
             </button>
           </div>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 }
