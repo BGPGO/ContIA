@@ -20,12 +20,16 @@ export function useVideoProject() {
   const [processingStep, setProcessingStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const processingRef = useRef(false);
+  const videoFileRef = useRef<File | null>(null);
 
   const upload = useCallback(
     async (file: File, empresaId: string) => {
       setStatus("uploading");
       setProgress(0);
       setError(null);
+
+      // Store file ref for processing
+      videoFileRef.current = file;
 
       // Create local video URL for preview
       const videoUrl = URL.createObjectURL(file);
@@ -91,55 +95,71 @@ export function useVideoProject() {
     async (proj: VideoProject, file?: File) => {
       if (processingRef.current) return;
       processingRef.current = true;
+      videoFileRef.current = file || videoFileRef.current;
 
       setStatus("processing");
       setProcessingStep(0);
-      setProgress(0);
+      setProgress(10);
 
       try {
-        // Step 1: Preparing
+        // Step 1: Sending to transcription
         setProcessingStep(0);
-        setProgress(10);
+        setProgress(15);
 
-        // Try server-side processing
-        let serverResult: { analysis?: string; transcription?: { segments?: TranscriptionSegment[] } } | null = null;
+        let transcription: TranscriptionSegment[] = [];
+        let aiSummary = "";
 
-        try {
-          const res = await fetch("/api/video/process", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ project_id: proj.id }),
-          });
-          if (res.ok) {
-            serverResult = await res.json();
+        // Try real Whisper transcription if we have the file
+        if (videoFileRef.current) {
+          try {
+            setProcessingStep(1);
+            setProgress(30);
+
+            const formData = new FormData();
+            formData.append("video", videoFileRef.current);
+
+            const res = await fetch("/api/video/transcribe", {
+              method: "POST",
+              body: formData,
+            });
+
+            if (res.ok) {
+              const data = await res.json();
+              transcription = (data.segments || []).map((s: any, i: number) => ({
+                id: s.id || `seg-${i}`,
+                start: s.start,
+                end: s.end,
+                text: s.text,
+              }));
+              aiSummary = `Transcrição real com ${transcription.length} segmentos. ${data.text?.substring(0, 200)}...`;
+              console.log(`[process] Whisper OK: ${transcription.length} segments`);
+            } else {
+              const err = await res.json().catch(() => ({}));
+              console.warn("[process] Whisper failed:", err.error || res.status);
+            }
+          } catch (err) {
+            console.warn("[process] Whisper unavailable:", err);
           }
-        } catch {
-          console.warn("Server processing unavailable");
         }
 
-        setProcessingStep(1);
-        setProgress(40);
-
-        // Step 2: Transcription
-        await new Promise((r) => setTimeout(r, 500));
         setProcessingStep(2);
         setProgress(70);
 
-        // Step 3: AI Analysis
-        await new Promise((r) => setTimeout(r, 500));
-        setProcessingStep(3);
-        setProgress(100);
+        // Fallback to mock if transcription failed
+        if (transcription.length === 0) {
+          console.warn("[process] Using mock transcription");
+          transcription = generateLocalTranscription(proj.duration);
+          aiSummary = `Video "${proj.title}" com ${Math.round(proj.duration)}s. Transcrição automática não disponível — usando legendas de exemplo.`;
+        }
 
-        // Use server results or generate local mock
-        const transcription: TranscriptionSegment[] =
-          serverResult?.transcription?.segments ||
-          generateLocalTranscription(proj.duration);
-
-        const aiSummary =
-          serverResult?.analysis ||
-          `Video "${proj.title}" com ${Math.round(proj.duration)}s de duração. Envie para o chat para análise detalhada com IA.`;
+        // Step 3: Generate cuts
+        setProcessingStep(2);
+        setProgress(90);
 
         const cuts = generateSmartCuts(transcription);
+
+        setProcessingStep(3);
+        setProgress(100);
 
         const updated: VideoProject = {
           ...proj,
