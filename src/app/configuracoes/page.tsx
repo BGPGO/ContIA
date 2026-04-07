@@ -2,7 +2,6 @@
 
 import { useState, useRef, KeyboardEvent } from "react";
 import {
-  Building2,
   Share2,
   Sparkles,
   BarChart3,
@@ -30,7 +29,6 @@ import { Empresa, ConfigRSS } from "@/types";
 // ─── types ────────────────────────────────────────────────────────────────────
 
 type TabId =
-  | "empresa"
   | "redes"
   | "ia"
   | "analytics"
@@ -47,7 +45,6 @@ interface TabItem {
 // ─── constants ────────────────────────────────────────────────────────────────
 
 const TABS: TabItem[] = [
-  { id: "empresa", label: "Empresa", icon: <Building2 size={14} /> },
   { id: "redes", label: "Redes Sociais", icon: <Share2 size={14} /> },
   { id: "ia", label: "Criacao IA", icon: <Sparkles size={14} /> },
   { id: "analytics", label: "Analytics", icon: <BarChart3 size={14} /> },
@@ -328,7 +325,9 @@ function SaveButton({ onClick, loading, error }: SaveButtonProps) {
   );
 }
 
-// ─── empresa form ─────────────────────────────────────────────────────────────
+// NOTE: EmpresaTab removed — company info now lives at /marca
+// The function below is kept as dead code to avoid breaking the file structure.
+// It can be fully removed in a future cleanup.
 
 interface EmpresaFormState {
   nome: string;
@@ -340,7 +339,7 @@ interface EmpresaFormState {
   info_adicional: string;
 }
 
-function EmpresaTab() {
+function _REMOVED_EmpresaTab() {
   const { empresa, empresas, setEmpresaId, createEmpresa, updateEmpresa, deleteEmpresa } = useEmpresa();
   const configured = isSupabaseConfigured();
 
@@ -1511,12 +1510,10 @@ function NoticasRSSTab() {
 // ─── main page ────────────────────────────────────────────────────────────────
 
 export default function ConfiguracoesPage() {
-  const [activeTab, setActiveTab] = useState<TabId>("empresa");
+  const [activeTab, setActiveTab] = useState<TabId>("redes");
 
   function renderContent() {
     switch (activeTab) {
-      case "empresa":
-        return <EmpresaTab />;
       case "redes":
         return <RedesSociaisTab />;
       case "ia":

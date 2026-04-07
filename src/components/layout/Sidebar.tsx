@@ -35,7 +35,7 @@ const navLinks = [
   { label: "Calendario", href: "/calendario", icon: CalendarDays },
   { label: "Concorrentes", href: "/concorrentes", icon: Users },
   { label: "Noticias", href: "/noticias", icon: Newspaper },
-  { label: "Relatorio", href: "/relatorio", icon: Brain, needsDNA: true },
+  { label: "DNA da Marca", href: "/marca", icon: Brain },
   { label: "Inteligencia", href: "/inteligencia", icon: Zap },
   { label: "Conexoes", href: "/conexoes", icon: Cable },
   { label: "Configuracoes", href: "/configuracoes", icon: Settings },
@@ -50,11 +50,6 @@ export function Sidebar() {
   const [showWizard, setShowWizard] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Check if DNA sources are missing
-  const dnaMissingSources = empresa
-    ? !empresa.instagram_handle && !empresa.website && (!empresa.concorrentes_ig || empresa.concorrentes_ig.length === 0)
-    : false;
 
   const handleWizardCreated = (empresa: Empresa) => {
     setShowWizard(false);
@@ -187,7 +182,6 @@ export function Sidebar() {
         {navLinks.map((link, index) => {
           const { label, href, icon: Icon } = link;
           const active = pathname === href || pathname.startsWith(href + "/");
-          const showBadge = "needsDNA" in link && link.needsDNA && dnaMissingSources;
           return (
             <motion.div
               key={href}
@@ -211,14 +205,9 @@ export function Sidebar() {
                     transition={{ type: "spring", stiffness: 350, damping: 30 }}
                   />
                 )}
-                <span className="relative shrink-0">
-                  <Icon
-                    className={`w-4 h-4 ${active ? "text-accent-light" : ""}`}
-                  />
-                  {showBadge && (
-                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[#4ecdc4] border-2 border-[#0c0f24] animate-pulse shadow-[0_0_8px_rgba(78,205,196,0.5)]" />
-                  )}
-                </span>
+                <Icon
+                  className={`w-4 h-4 shrink-0 ${active ? "text-accent-light" : ""}`}
+                />
                 {label}
               </Link>
             </motion.div>
