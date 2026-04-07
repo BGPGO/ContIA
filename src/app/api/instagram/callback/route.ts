@@ -12,21 +12,22 @@ import { createClient } from "@/lib/supabase/server";
  * Troca code por token e salva a conexão
  */
 export async function GET(req: NextRequest) {
+  // Em produção atrás de proxy reverso, origin retorna http://0.0.0.0:3000
+  const proto = req.headers.get("x-forwarded-proto") || "https";
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || req.nextUrl.host;
+  const origin = `${proto}://${host}`;
+
   const code = req.nextUrl.searchParams.get("code");
   const stateParam = req.nextUrl.searchParams.get("state");
   const errorParam = req.nextUrl.searchParams.get("error");
 
   // Usuário negou acesso
   if (errorParam) {
-    return NextResponse.redirect(
-      new URL("/conexoes?error=access_denied", req.nextUrl.origin)
-    );
+    return NextResponse.redirect(new URL("/conexoes?error=access_denied", origin));
   }
 
   if (!code || !stateParam) {
-    return NextResponse.redirect(
-      new URL("/conexoes?error=missing_params", req.nextUrl.origin)
-    );
+    return NextResponse.redirect(new URL("/conexoes?error=missing_params", origin));
   }
 
   // Decodificar state
@@ -34,17 +35,11 @@ export async function GET(req: NextRequest) {
   try {
     state = JSON.parse(Buffer.from(stateParam, "base64url").toString());
   } catch {
-    return NextResponse.redirect(
-      new URL("/conexoes?error=invalid_state", req.nextUrl.origin)
-    );
+    return NextResponse.redirect(new URL("/conexoes?error=invalid_state", origin));
   }
 
   const appId = process.env.META_APP_ID!;
   const appSecret = process.env.META_APP_SECRET!;
-  // Em produção atrás de proxy reverso, usar headers reais
-  const proto = req.headers.get("x-forwarded-proto") || "https";
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || req.nextUrl.host;
-  const origin = `${proto}://${host}`;
   const redirectUri = `${origin}/api/instagram/callback`;
 
   try {
@@ -102,7 +97,7 @@ export async function GET(req: NextRequest) {
     if (dbError) {
       console.error("Erro ao salvar conexão:", dbError);
       return NextResponse.redirect(
-        new URL("/conexoes?error=db_error", req.nextUrl.origin)
+        new URL("/conexoes?error=db_error", origin)
       );
     }
 
@@ -124,13 +119,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(
       new URL(
         `/conexoes?success=instagram&username=${profile.username}`,
-        req.nextUrl.origin
+        origin
       )
     );
   } catch (err) {
     console.error("Erro no callback Instagram:", err);
     return NextResponse.redirect(
-      new URL("/conexoes?error=auth_failed", req.nextUrl.origin)
+      new URL("/conexoes?error=auth_failed", origin)
     );
   }
 }
