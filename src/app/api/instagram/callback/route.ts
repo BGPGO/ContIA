@@ -41,7 +41,11 @@ export async function GET(req: NextRequest) {
 
   const appId = process.env.META_APP_ID!;
   const appSecret = process.env.META_APP_SECRET!;
-  const redirectUri = `${req.nextUrl.origin}/api/instagram/callback`;
+  // Em produção atrás de proxy reverso, usar headers reais
+  const proto = req.headers.get("x-forwarded-proto") || "https";
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || req.nextUrl.host;
+  const origin = `${proto}://${host}`;
+  const redirectUri = `${origin}/api/instagram/callback`;
 
   try {
     // O code do Instagram vem com #_ no final — remover
