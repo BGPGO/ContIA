@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { MarcaDNA } from "@/types";
+import { MarcaDNA, DNASintetizado } from "@/types";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/client";
 
@@ -234,6 +234,49 @@ export function useMarcaDNA(empresaId?: string) {
     [empresaId]
   );
 
+  // ── Save DNA fields (partial update of dna_sintetizado) ────────────
+  const saveDNA = useCallback(
+    async (partial: Partial<DNASintetizado>): Promise<boolean> => {
+      if (!empresaId || !dna) return false;
+
+      const merged: DNASintetizado = { ...dna.dna_sintetizado, ...partial };
+      const updated: MarcaDNA = {
+        ...dna,
+        dna_sintetizado: merged,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Optimistic update
+      setDna(updated);
+      saveToStorage(empresaId, updated);
+
+      // Persist to Supabase
+      if (configured) {
+        try {
+          const supabase = createClient();
+          const { error: err } = await supabase
+            .from("marca_dna")
+            .update({
+              dna_sintetizado: merged,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("empresa_id", empresaId);
+
+          if (err) {
+            console.warn("[MarcaDNA] saveDNA Supabase error:", err.message);
+            return false;
+          }
+          return true;
+        } catch (e) {
+          console.warn("[MarcaDNA] saveDNA failed:", e);
+          return false;
+        }
+      }
+      return true;
+    },
+    [empresaId, dna, configured]
+  );
+
   // ── Clear DNA ───────────────────────────────────────────────────────
   const clear = useCallback(() => {
     if (!empresaId) return;
@@ -248,6 +291,7 @@ export function useMarcaDNA(empresaId?: string) {
     refreshing,
     error,
     analisar,
+    saveDNA,
     refreshInBackground,
     save,
     clear,

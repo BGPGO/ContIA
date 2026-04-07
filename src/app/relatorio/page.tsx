@@ -26,34 +26,20 @@ import {
   PenTool,
   Loader2,
   FileText,
+  Pencil,
+  Link as LinkIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { motion, AnimatePresence } from "motion/react";
 import { useEmpresa } from "@/hooks/useEmpresa";
 import { useMarcaDNA } from "@/hooks/useMarcaDNA";
+import { DNAEditor } from "@/components/marca/DNAEditor";
 import { DNASourcesForm } from "@/components/marca/DNASourcesForm";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import type { DNASintetizado } from "@/types";
 
 // ─── types (match API route response) ────────────────────────────────────────
-
-interface DNASintetizado {
-  tom_de_voz?: string;
-  personalidade_marca?: string;
-  proposta_valor?: string;
-  publico_alvo?: string;
-  paleta_cores?: string[];
-  estilo_visual?: string;
-  pilares_conteudo?: string[];
-  temas_recomendados?: string[];
-  formatos_recomendados?: string[];
-  hashtags_recomendadas?: string[];
-  frequencia_ideal?: string;
-  diferenciais_vs_concorrentes?: string[];
-  oportunidades?: string[];
-  palavras_usar?: string[];
-  palavras_evitar?: string[];
-  exemplos_legenda?: string[];
-}
 
 interface FonteInfo {
   tipo?: string;
@@ -89,16 +75,50 @@ type PageStatus = "idle" | "loading" | "analisando" | "completo" | "erro";
 // ─── status badge ────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: PageStatus }) {
-  const config: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
-    idle: { label: "Pendente", color: "text-warning", bg: "bg-warning/10", icon: <Clock size={12} /> },
-    loading: { label: "Carregando...", color: "text-accent-light", bg: "bg-accent/15", icon: <Loader2 size={12} className="animate-spin" /> },
-    analisando: { label: "Analisando...", color: "text-accent-light", bg: "bg-accent/15", icon: <Loader2 size={12} className="animate-spin" /> },
-    completo: { label: "Completo", color: "text-success", bg: "bg-success/10", icon: <CheckCircle2 size={12} /> },
-    erro: { label: "Erro", color: "text-danger", bg: "bg-danger/10", icon: <AlertCircle size={12} /> },
+  const config: Record<
+    string,
+    { label: string; color: string; bg: string; icon: React.ReactNode }
+  > = {
+    idle: {
+      label: "Pendente",
+      color: "text-warning",
+      bg: "bg-warning/10",
+      icon: <Clock size={12} />,
+    },
+    loading: {
+      label: "Carregando...",
+      color: "text-accent-light",
+      bg: "bg-accent/15",
+      icon: <Loader2 size={12} className="animate-spin" />,
+    },
+    analisando: {
+      label: "Analisando...",
+      color: "text-accent-light",
+      bg: "bg-accent/15",
+      icon: <Loader2 size={12} className="animate-spin" />,
+    },
+    completo: {
+      label: "Completo",
+      color: "text-success",
+      bg: "bg-success/10",
+      icon: <CheckCircle2 size={12} />,
+    },
+    erro: {
+      label: "Erro",
+      color: "text-danger",
+      bg: "bg-danger/10",
+      icon: <AlertCircle size={12} />,
+    },
   };
   const c = config[status] || config.idle;
   return (
-    <span className={cn("inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold", c.color, c.bg)}>
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold",
+        c.color,
+        c.bg
+      )}
+    >
       {c.icon}
       {c.label}
     </span>
@@ -108,7 +128,9 @@ function StatusBadge({ status }: { status: PageStatus }) {
 // ─── skeleton loader ─────────────────────────────────────────────────────────
 
 function Skeleton({ className }: { className?: string }) {
-  return <div className={cn("animate-pulse rounded-lg bg-bg-elevated", className)} />;
+  return (
+    <div className={cn("animate-pulse rounded-lg bg-bg-elevated", className)} />
+  );
 }
 
 function FullSkeleton() {
@@ -117,126 +139,88 @@ function FullSkeleton() {
       <Skeleton className="h-10 w-72" />
       <Skeleton className="h-5 w-96" />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {[1, 2, 3].map((i) => <Skeleton key={i} className="h-40 w-full" />)}
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-40 w-full" />
+        ))}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-48 w-full" />)}
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="h-48 w-full" />
+        ))}
       </div>
     </div>
   );
-}
-
-// ─── section wrapper ─────────────────────────────────────────────────────────
-
-function Section({
-  icon, title, subtitle, children, delay = 0, accentColor = "#6c5ce7",
-}: {
-  icon: React.ReactNode; title: string; subtitle?: string;
-  children: React.ReactNode; delay?: number; accentColor?: string;
-}) {
-  return (
-    <section className="fade-in" style={{ animationDelay: `${delay}ms` }}>
-      <div className="flex items-center gap-3 mb-5">
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-          style={{ backgroundColor: `${accentColor}18`, boxShadow: `0 0 20px ${accentColor}10` }}
-        >
-          <span style={{ color: accentColor }}>{icon}</span>
-        </div>
-        <div>
-          <h2 className="text-lg font-bold text-text-primary">{title}</h2>
-          {subtitle && <p className="text-xs text-text-muted mt-0.5">{subtitle}</p>}
-        </div>
-      </div>
-      {children}
-    </section>
-  );
-}
-
-// ─── chip components ─────────────────────────────────────────────────────────
-
-function Chip({ children, variant = "default" }: { children: React.ReactNode; variant?: "default" | "success" | "danger" | "accent" | "warning" }) {
-  const styles = {
-    default: "bg-bg-elevated text-text-secondary border-border",
-    success: "bg-success/10 text-success border-success/20",
-    danger: "bg-danger/10 text-danger border-danger/20",
-    accent: "bg-accent/15 text-accent-light border-accent/25",
-    warning: "bg-warning/10 text-warning border-warning/20",
-  };
-  return (
-    <span className={cn("inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-200 hover:scale-105", styles[variant])}>
-      {children}
-    </span>
-  );
-}
-
-function HashChip({ tag }: { tag: string }) {
-  return (
-    <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-accent/10 text-accent-light border border-accent/20 hover:bg-accent/20 transition-all duration-200 cursor-default">
-      <Hash size={10} className="opacity-60" />
-      {tag.replace(/^#/, "")}
-    </span>
-  );
-}
-
-// ─── color swatch ────────────────────────────────────────────────────────────
-
-function ColorSwatch({ color }: { color: string }) {
-  return (
-    <div className="flex items-center gap-2.5 group">
-      <div
-        className="w-8 h-8 rounded-lg border border-border-light shadow-md group-hover:scale-110 transition-transform duration-200"
-        style={{ backgroundColor: color, boxShadow: `0 2px 12px ${color}40` }}
-      />
-      <span className="text-xs font-mono text-text-secondary">{color}</span>
-    </div>
-  );
-}
-
-// ─── info row ────────────────────────────────────────────────────────────────
-
-function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | React.ReactNode }) {
-  return (
-    <div className="flex items-start gap-3 py-3 border-b border-border/50 last:border-b-0">
-      <span className="text-accent-light mt-0.5 shrink-0">{icon}</span>
-      <div className="min-w-0">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-0.5">{label}</p>
-        <div className="text-sm text-text-primary leading-relaxed">{value}</div>
-      </div>
-    </div>
-  );
-}
-
-// ─── hex points for SVG radar ────────────────────────────────────────────────
-
-function hexPoints(cx: number, cy: number, r: number): string {
-  return Array.from({ length: 6 }, (_, i) => {
-    const angle = (Math.PI / 3) * i - Math.PI / 2;
-    return `${cx + r * Math.cos(angle)},${cy + r * Math.sin(angle)}`;
-  }).join(" ");
 }
 
 // ─── analyzing progress card ─────────────────────────────────────────────────
 
+const PROGRESS_STEPS = [
+  "Analisando posts recentes...",
+  "Processando com IA...",
+  "Gerando DNA da marca...",
+  "Finalizando...",
+];
+
 function AnalyzingCard() {
+  const [step, setStep] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setStep((prev) => (prev < PROGRESS_STEPS.length - 1 ? prev + 1 : prev));
+    }, 8000);
+    return () => clearInterval(timer);
+  }, []);
+
   return (
-    <div className="card-featured p-8 text-center max-w-lg mx-auto fade-in">
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="card-featured p-8 text-center max-w-lg mx-auto"
+    >
       <div className="relative w-20 h-20 mx-auto mb-6">
         <div className="absolute inset-0 rounded-full border-2 border-accent/30 animate-ping" />
-        <div className="absolute inset-2 rounded-full border-2 border-accent/20 animate-ping" style={{ animationDelay: "200ms" }} />
+        <div
+          className="absolute inset-2 rounded-full border-2 border-accent/20 animate-ping"
+          style={{ animationDelay: "200ms" }}
+        />
         <div className="absolute inset-0 rounded-full bg-accent/15 flex items-center justify-center">
           <Brain size={32} className="text-accent-light animate-pulse" />
         </div>
       </div>
-      <h3 className="text-xl font-bold text-text-primary mb-2">Analisando sua marca...</h3>
+      <h3 className="text-xl font-bold text-text-primary mb-2">
+        Gerando DNA da Marca...
+      </h3>
       <p className="text-sm text-text-secondary mb-6 max-w-sm mx-auto">
-        A IA esta processando Instagram, website, concorrentes e referencias para criar o DNA completo da sua marca.
+        A IA esta processando seus dados para criar o DNA completo da sua marca.
       </p>
-      <div className="flex items-center justify-center gap-2 text-xs text-text-muted">
-        <Loader2 size={14} className="animate-spin text-accent-light" />
-        <span>Isso pode levar alguns minutos</span>
+
+      {/* Progress steps */}
+      <div className="space-y-2 text-left max-w-xs mx-auto mb-6">
+        {PROGRESS_STEPS.map((label, i) => (
+          <div
+            key={i}
+            className={cn(
+              "flex items-center gap-2.5 text-xs transition-all duration-500",
+              i < step
+                ? "text-success"
+                : i === step
+                ? "text-accent-light"
+                : "text-text-muted"
+            )}
+          >
+            {i < step ? (
+              <CheckCircle2 size={14} />
+            ) : i === step ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <div className="w-3.5 h-3.5 rounded-full border border-border" />
+            )}
+            {label}
+          </div>
+        ))}
       </div>
-      <div className="flex justify-center gap-1.5 mt-5">
+
+      <div className="flex justify-center gap-1.5">
         {[0, 1, 2, 3, 4].map((i) => (
           <div
             key={i}
@@ -250,33 +234,271 @@ function AnalyzingCard() {
       </div>
       <style jsx>{`
         @keyframes dotPulse {
-          0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
-          40% { opacity: 1; transform: scale(1.2); }
+          0%,
+          80%,
+          100% {
+            opacity: 0.3;
+            transform: scale(0.8);
+          }
+          40% {
+            opacity: 1;
+            transform: scale(1.2);
+          }
         }
       `}</style>
+    </motion.div>
+  );
+}
+
+// ─── Instagram connected + no DNA: CTA to generate ──────────────────────────
+
+function GenerateDNACTA({
+  empresa,
+  onGenerate,
+  analyzing,
+}: {
+  empresa: any;
+  onGenerate: () => void;
+  analyzing: boolean;
+}) {
+  const { updateEmpresa } = useEmpresa();
+  const [website, setWebsite] = useState(empresa?.website || "");
+  const [concorrentesIg, setConcorrentesIg] = useState<string[]>(
+    empresa?.concorrentes_ig || []
+  );
+  const [showExtras, setShowExtras] = useState(false);
+
+  const handleGenerate = async () => {
+    // Save optional extras to empresa before generating
+    if (website !== empresa?.website || concorrentesIg.length > 0) {
+      await updateEmpresa(empresa.id, {
+        website: website || empresa.website,
+        concorrentes_ig: concorrentesIg,
+      } as any);
+    }
+    onGenerate();
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="max-w-2xl mx-auto text-center"
+    >
+      {/* Hero */}
+      <div className="relative mb-8">
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-64 h-64 rounded-full bg-accent/8 blur-3xl" />
+        </div>
+        <div className="relative w-24 h-24 mx-auto rounded-2xl bg-gradient-to-br from-accent/20 to-purple-500/20 border border-accent/20 flex items-center justify-center mb-6">
+          <Brain size={44} className="text-accent-light" />
+        </div>
+        <h2 className="text-2xl font-bold text-text-primary mb-3">
+          Gerar DNA da Marca
+        </h2>
+        <p className="text-text-secondary text-sm max-w-md mx-auto leading-relaxed">
+          Vamos analisar seus posts, engajamento e estilo visual para criar o
+          DNA da sua marca.
+        </p>
+      </div>
+
+      {/* Instagram connected badge */}
+      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-success/10 border border-success/20 text-success text-xs font-medium mb-8">
+        <CheckCircle2 size={14} />
+        Instagram conectado — dados reais serao usados
+      </div>
+
+      {/* Optional extras toggle */}
+      <div className="mb-8">
+        <button
+          onClick={() => setShowExtras(!showExtras)}
+          className="text-xs text-text-muted hover:text-accent-light transition-colors underline underline-offset-2"
+        >
+          {showExtras
+            ? "Ocultar fontes extras"
+            : "Adicionar fontes extras (site, concorrentes)"}
+        </button>
+
+        <AnimatePresence>
+          {showExtras && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mt-4 space-y-4 text-left"
+            >
+              {/* Site URL */}
+              <div className="bg-bg-card border border-border rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Globe size={14} className="text-accent-light" />
+                  <span className="text-xs font-semibold text-text-primary">
+                    Site (opcional)
+                  </span>
+                </div>
+                <input
+                  type="url"
+                  value={website}
+                  onChange={(e) => setWebsite(e.target.value)}
+                  placeholder="https://suaempresa.com.br"
+                  className="w-full h-10 px-3 text-sm bg-bg-input border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition-all duration-200"
+                />
+              </div>
+
+              {/* Competitors */}
+              <div className="bg-bg-card border border-border rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Users size={14} className="text-accent-light" />
+                  <span className="text-xs font-semibold text-text-primary">
+                    Concorrentes Instagram (opcional)
+                  </span>
+                </div>
+                <ConcorrenteInput
+                  items={concorrentesIg}
+                  onChange={setConcorrentesIg}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Generate button */}
+      <button
+        onClick={handleGenerate}
+        disabled={analyzing}
+        className={cn(
+          "inline-flex items-center gap-3 px-8 py-4 rounded-2xl text-base font-bold transition-all duration-300",
+          "bg-gradient-to-r from-accent to-purple-500 text-white shadow-xl shadow-accent/25",
+          "hover:shadow-2xl hover:shadow-accent/35 hover:scale-[1.02]",
+          "disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
+        )}
+      >
+        {analyzing ? (
+          <>
+            <Loader2 size={20} className="animate-spin" />
+            Gerando DNA...
+          </>
+        ) : (
+          <>
+            <Sparkles size={20} />
+            Gerar DNA da Marca
+          </>
+        )}
+      </button>
+    </motion.div>
+  );
+}
+
+// ─── Concorrente input helper ────────────────────────────────────────────────
+
+function ConcorrenteInput({
+  items,
+  onChange,
+}: {
+  items: string[];
+  onChange: (items: string[]) => void;
+}) {
+  const [draft, setDraft] = useState("");
+
+  const handleAdd = () => {
+    const trimmed = draft
+      .trim()
+      .replace(/^@/, "")
+      .replace(/https?:\/\/(www\.)?instagram\.com\//, "")
+      .replace(/\/+$/, "");
+    if (!trimmed || items.includes(trimmed)) return;
+    onChange([...items, trimmed]);
+    setDraft("");
+  };
+
+  return (
+    <div className="space-y-2">
+      {items.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {items.map((item, i) => (
+            <span
+              key={i}
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-bg-input border border-border rounded-lg text-text-secondary"
+            >
+              @{item}
+              <button
+                onClick={() => onChange(items.filter((_, j) => j !== i))}
+                className="ml-0.5 text-text-muted hover:text-danger"
+              >
+                <span className="sr-only">Remover</span>
+                &times;
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAdd())}
+          placeholder="@concorrente"
+          className="flex-1 h-9 px-3 text-sm bg-bg-input border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition-all"
+        />
+        <button
+          onClick={handleAdd}
+          disabled={!draft.trim()}
+          className="px-3 h-9 text-xs font-medium text-accent hover:bg-accent/10 border border-border rounded-lg transition-colors disabled:opacity-40"
+        >
+          Adicionar
+        </button>
+      </div>
     </div>
   );
 }
 
-// ─── empty / onboarding state ────────────────────────────────────────────────
+// ─── Not connected: connect Instagram CTA ───────────────────────────────────
 
-function EmptyState({ empresa, onAnalisar, analyzing }: { empresa: any; onAnalisar: () => void; analyzing: boolean }) {
-  const [instagramHandle, setInstagramHandle] = useState(empresa?.instagram_handle || "");
+function ConnectInstagramCTA({
+  empresa,
+  onFallbackAnalyze,
+  analyzing,
+}: {
+  empresa: any;
+  onFallbackAnalyze: () => void;
+  analyzing: boolean;
+}) {
+  const [instagramHandle, setInstagramHandle] = useState(
+    empresa?.instagram_handle || ""
+  );
   const [website, setWebsite] = useState(empresa?.website || "");
-  const [concorrentesIg, setConcorrentesIg] = useState<string[]>(empresa?.concorrentes_ig || []);
-  const [referenciasIg, setReferenciasIg] = useState<string[]>(empresa?.referencias_ig || []);
-  const [referenciasSites, setReferenciasSites] = useState<string[]>(empresa?.referencias_sites || []);
+  const [concorrentesIg, setConcorrentesIg] = useState<string[]>(
+    empresa?.concorrentes_ig || []
+  );
+  const [referenciasIg, setReferenciasIg] = useState<string[]>(
+    empresa?.referencias_ig || []
+  );
+  const [referenciasSites, setReferenciasSites] = useState<string[]>(
+    empresa?.referencias_sites || []
+  );
   const { updateEmpresa } = useEmpresa();
 
-  const hasSomething = instagramHandle || website || concorrentesIg.length > 0;
+  const hasSomething =
+    instagramHandle || website || concorrentesIg.length > 0;
 
   const handleUpdate = (field: string, value: any) => {
     switch (field) {
-      case "instagramHandle": setInstagramHandle(value); break;
-      case "website": setWebsite(value); break;
-      case "concorrentesIg": setConcorrentesIg(value); break;
-      case "referenciasIg": setReferenciasIg(value); break;
-      case "referenciasSites": setReferenciasSites(value); break;
+      case "instagramHandle":
+        setInstagramHandle(value);
+        break;
+      case "website":
+        setWebsite(value);
+        break;
+      case "concorrentesIg":
+        setConcorrentesIg(value);
+        break;
+      case "referenciasIg":
+        setReferenciasIg(value);
+        break;
+      case "referenciasSites":
+        setReferenciasSites(value);
+        break;
     }
   };
 
@@ -290,13 +512,17 @@ function EmptyState({ empresa, onAnalisar, analyzing }: { empresa: any; onAnalis
         referencias_sites: referenciasSites,
       } as any);
     }
-    onAnalisar();
+    onFallbackAnalyze();
   };
 
   return (
-    <div className="max-w-3xl mx-auto page-enter">
-      {/* Hero */}
-      <div className="text-center mb-8">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="max-w-3xl mx-auto"
+    >
+      {/* Connect CTA */}
+      <div className="text-center mb-10">
         <div className="relative mb-6">
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-48 h-48 rounded-full bg-accent/8 blur-3xl" />
@@ -305,15 +531,32 @@ function EmptyState({ empresa, onAnalisar, analyzing }: { empresa: any; onAnalis
             <Brain size={36} className="text-accent-light" />
           </div>
         </div>
-        <h2 className="text-2xl font-bold text-text-primary mb-2">DNA da Marca</h2>
-        <p className="text-text-secondary text-sm max-w-lg mx-auto leading-relaxed">
-          Preencha as fontes abaixo e a IA vai analisar tudo automaticamente para
-          gerar o perfil completo da sua marca — tom de voz, pilares de conteudo,
-          analise competitiva e guia de comunicacao.
+        <h2 className="text-2xl font-bold text-text-primary mb-3">
+          DNA da Marca
+        </h2>
+        <p className="text-text-secondary text-sm max-w-lg mx-auto leading-relaxed mb-6">
+          Conecte seu Instagram para gerar um DNA preciso baseado nos seus dados
+          reais.
         </p>
+        <Link
+          href="/conexoes"
+          className="inline-flex items-center gap-2.5 px-6 py-3 rounded-xl text-sm font-semibold bg-gradient-to-r from-accent to-purple-500 text-white shadow-lg shadow-accent/20 hover:shadow-xl hover:shadow-accent/30 hover:scale-[1.02] transition-all duration-200"
+        >
+          <LinkIcon size={16} />
+          Conectar Instagram
+        </Link>
       </div>
 
-      {/* Sources Form */}
+      {/* Divider */}
+      <div className="flex items-center gap-4 my-8">
+        <div className="flex-1 border-t border-border/50" />
+        <span className="text-xs text-text-muted font-medium">
+          ou preencha manualmente
+        </span>
+        <div className="flex-1 border-t border-border/50" />
+      </div>
+
+      {/* Legacy form */}
       <DNASourcesForm
         instagramHandle={instagramHandle}
         website={website || empresa?.website || ""}
@@ -327,152 +570,84 @@ function EmptyState({ empresa, onAnalisar, analyzing }: { empresa: any; onAnalis
 
       {!hasSomething && (
         <p className="text-center text-xs text-text-muted mt-4">
-          Preencha pelo menos o Instagram ou o site da empresa para iniciar a analise.
+          Preencha pelo menos o Instagram ou o site da empresa para iniciar a
+          analise.
         </p>
       )}
-    </div>
+    </motion.div>
   );
 }
 
-// ─── brand identity section ──────────────────────────────────────────────────
+// ─── competitive section (view only) ────────────────────────────────────────
 
-function BrandIdentitySection({ dna }: { dna: DNASintetizado }) {
+function CompetitiveSection({
+  dna,
+  concorrentes,
+}: {
+  dna: DNASintetizado;
+  concorrentes: ConcorrenteInfo[];
+}) {
   return (
-    <Section icon={<Brain size={20} />} title="Identidade da Marca" subtitle="Tom de voz, personalidade e proposta de valor" delay={100}>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 bg-bg-card border border-border rounded-xl p-6 space-y-1">
-          {dna.tom_de_voz && <InfoRow icon={<MessageSquare size={16} />} label="Tom de voz" value={dna.tom_de_voz} />}
-          {dna.personalidade_marca && <InfoRow icon={<Users size={16} />} label="Personalidade" value={dna.personalidade_marca} />}
-          {dna.proposta_valor && <InfoRow icon={<Target size={16} />} label="Proposta de valor" value={dna.proposta_valor} />}
-          {dna.publico_alvo && <InfoRow icon={<Megaphone size={16} />} label="Publico-alvo" value={dna.publico_alvo} />}
-          {dna.estilo_visual && <InfoRow icon={<Palette size={16} />} label="Estilo visual" value={dna.estilo_visual} />}
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.3 }}
+    >
+      <div className="flex items-center gap-3 mb-5">
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+          style={{
+            backgroundColor: "#f8717118",
+            boxShadow: "0 0 20px #f8717110",
+          }}
+        >
+          <Shield size={20} style={{ color: "#f87171" }} />
         </div>
-        <div className="bg-bg-card border border-border rounded-xl p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Palette size={16} className="text-accent-light" />
-            <h3 className="text-sm font-semibold text-text-primary">Paleta de Cores</h3>
-          </div>
-          <div className="space-y-3">
-            {dna.paleta_cores?.length ? (
-              dna.paleta_cores.map((cor, i) => <ColorSwatch key={i} color={cor} />)
-            ) : (
-              <p className="text-xs text-text-muted">Nenhuma cor identificada ainda.</p>
-            )}
-          </div>
-          {dna.personalidade_marca && (
-            <div className="mt-6 pt-4 border-t border-border/50">
-              <p className="text-[10px] uppercase tracking-wider text-text-muted mb-3 font-semibold">Resumo visual</p>
-              <div className="relative w-full aspect-square max-w-[140px] mx-auto">
-                <svg viewBox="0 0 100 100" className="w-full h-full">
-                  {[40, 30, 20].map((r) => (
-                    <polygon key={r} points={hexPoints(50, 50, r)} fill="none" stroke="#1e2348" strokeWidth="0.5" />
-                  ))}
-                  <polygon points={hexPoints(50, 50, 32)} fill="rgba(108,92,231,0.12)" stroke="#6c5ce7" strokeWidth="1" />
-                  <circle cx="50" cy="50" r="2" fill="#6c5ce7" />
-                </svg>
-              </div>
-            </div>
-          )}
+        <div>
+          <h2 className="text-lg font-bold text-text-primary">
+            Analise Competitiva
+          </h2>
+          <p className="text-xs text-text-muted mt-0.5">
+            Concorrentes, diferenciais e oportunidades
+          </p>
         </div>
       </div>
-    </Section>
-  );
-}
 
-// ─── content radar section ───────────────────────────────────────────────────
-
-function ContentRadarSection({ dna }: { dna: DNASintetizado }) {
-  return (
-    <Section icon={<BarChart3 size={20} />} title="Radar de Conteudo" subtitle="Pilares, temas, formatos e hashtags recomendadas" delay={200} accentColor="#a29bfe">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Pilares */}
-        <div className="bg-bg-card border border-border rounded-xl p-6">
-          <h3 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-2">
-            <Target size={14} className="text-accent-light" /> Pilares de Conteudo
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {dna.pilares_conteudo?.length ? dna.pilares_conteudo.map((p, i) => <Chip key={i} variant="accent">{p}</Chip>) : <p className="text-xs text-text-muted">Nenhum pilar definido.</p>}
-          </div>
-        </div>
-
-        {/* Temas */}
-        <div className="bg-bg-card border border-border rounded-xl p-6">
-          <h3 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-2">
-            <Lightbulb size={14} className="text-warning" /> Temas Recomendados
-          </h3>
-          <div className="space-y-2.5">
-            {dna.temas_recomendados?.length ? dna.temas_recomendados.map((t, i) => (
-              <div key={i} className="flex items-center gap-3 text-sm text-text-secondary hover:text-text-primary transition-colors">
-                <ChevronRight size={12} className="text-accent-light shrink-0" />
-                <span>{t}</span>
-              </div>
-            )) : <p className="text-xs text-text-muted">Nenhum tema sugerido.</p>}
-          </div>
-        </div>
-
-        {/* Formatos */}
-        <div className="bg-bg-card border border-border rounded-xl p-6">
-          <h3 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-2">
-            <FileText size={14} className="text-info" /> Formatos Recomendados
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {dna.formatos_recomendados?.map((fmt, i) => {
-              const colors = ["#6c5ce7", "#e1306c", "#34d399", "#fbbf24", "#60a5fa"];
-              const c = colors[i % colors.length];
-              return (
-                <span key={i} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 hover:scale-105"
-                  style={{ backgroundColor: `${c}15`, borderColor: `${c}30`, color: c }}>
-                  <Zap size={10} /> {fmt}
-                </span>
-              );
-            })}
-          </div>
-          {dna.frequencia_ideal && (
-            <div className="mt-4 pt-3 border-t border-border/50 flex items-start gap-2 text-xs text-text-muted">
-              <Clock size={12} className="text-accent-light mt-0.5 shrink-0" />
-              <span>Frequencia ideal: <strong className="text-text-secondary">{dna.frequencia_ideal}</strong></span>
-            </div>
-          )}
-        </div>
-
-        {/* Hashtags */}
-        <div className="bg-bg-card border border-border rounded-xl p-6">
-          <h3 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-2">
-            <Hash size={14} className="text-accent-light" /> Hashtags Recomendadas
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {dna.hashtags_recomendadas?.length ? dna.hashtags_recomendadas.map((tag, i) => <HashChip key={i} tag={tag} />) : <p className="text-xs text-text-muted">Nenhuma hashtag sugerida.</p>}
-          </div>
-        </div>
-      </div>
-    </Section>
-  );
-}
-
-// ─── competitive analysis section ────────────────────────────────────────────
-
-function CompetitiveSection({ dna, concorrentes }: { dna: DNASintetizado; concorrentes: ConcorrenteInfo[] }) {
-  return (
-    <Section icon={<Shield size={20} />} title="Analise Competitiva" subtitle="Concorrentes, diferenciais e oportunidades" delay={300} accentColor="#f87171">
       <div className="space-y-4">
         {concorrentes.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {concorrentes.map((comp, i) => (
-              <div key={i} className="bg-bg-card border border-border rounded-xl p-5 hover:border-border-light transition-all duration-200 group">
+              <div
+                key={i}
+                className="bg-bg-card border border-border rounded-xl p-5 hover:border-border-light transition-all duration-200 group"
+              >
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-bold text-text-primary group-hover:text-accent-light transition-colors">{comp.nome}</h4>
+                  <h4 className="text-sm font-bold text-text-primary group-hover:text-accent-light transition-colors">
+                    {comp.nome}
+                  </h4>
                   {comp.seguidores && (
                     <span className="text-xs text-text-muted flex items-center gap-1">
                       <Users size={10} />
-                      {typeof comp.seguidores === "number" ? formatCompact(comp.seguidores) : comp.seguidores}
+                      {typeof comp.seguidores === "number"
+                        ? formatCompact(comp.seguidores)
+                        : comp.seguidores}
                     </span>
                   )}
                 </div>
-                {comp.estrategia && <p className="text-xs text-text-secondary leading-relaxed mb-3">{comp.estrategia}</p>}
+                {comp.estrategia && (
+                  <p className="text-xs text-text-secondary leading-relaxed mb-3">
+                    {comp.estrategia}
+                  </p>
+                )}
                 {comp.pontos_fortes && comp.pontos_fortes.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
                     {comp.pontos_fortes.map((pf, j) => (
-                      <span key={j} className="text-[10px] px-2 py-0.5 rounded-md bg-success/10 text-success border border-success/15">{pf}</span>
+                      <span
+                        key={j}
+                        className="text-[10px] px-2 py-0.5 rounded-md bg-success/10 text-success border border-success/15"
+                      >
+                        {pf}
+                      </span>
                     ))}
                   </div>
                 )}
@@ -482,31 +657,46 @@ function CompetitiveSection({ dna, concorrentes }: { dna: DNASintetizado; concor
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {dna.diferenciais_vs_concorrentes && dna.diferenciais_vs_concorrentes.length > 0 && (
-            <div className="card-featured p-6">
-              <h3 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-2 relative z-10">
-                <TrendingUp size={14} className="text-success" /> Seus Diferenciais
-              </h3>
-              <div className="space-y-3 relative z-10">
-                {dna.diferenciais_vs_concorrentes.map((d, i) => (
-                  <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-success/5 border border-success/10">
-                    <ArrowUpRight size={14} className="text-success mt-0.5 shrink-0" />
-                    <span className="text-sm text-text-secondary">{d}</span>
-                  </div>
-                ))}
+          {dna.diferenciais_vs_concorrentes &&
+            dna.diferenciais_vs_concorrentes.length > 0 && (
+              <div className="card-featured p-6">
+                <h3 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-2 relative z-10">
+                  <TrendingUp size={14} className="text-success" /> Seus
+                  Diferenciais
+                </h3>
+                <div className="space-y-3 relative z-10">
+                  {dna.diferenciais_vs_concorrentes.map((d, i) => (
+                    <div
+                      key={i}
+                      className="flex items-start gap-3 p-3 rounded-lg bg-success/5 border border-success/10"
+                    >
+                      <ArrowUpRight
+                        size={14}
+                        className="text-success mt-0.5 shrink-0"
+                      />
+                      <span className="text-sm text-text-secondary">{d}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {dna.oportunidades && dna.oportunidades.length > 0 && (
             <div className="card-featured p-6">
               <h3 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-2 relative z-10">
-                <Lightbulb size={14} className="text-warning" /> Oportunidades Identificadas
+                <Lightbulb size={14} className="text-warning" /> Oportunidades
+                Identificadas
               </h3>
               <div className="space-y-3 relative z-10">
                 {dna.oportunidades.map((o, i) => (
-                  <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-warning/5 border border-warning/10">
-                    <Lightbulb size={14} className="text-warning mt-0.5 shrink-0" />
+                  <div
+                    key={i}
+                    className="flex items-start gap-3 p-3 rounded-lg bg-warning/5 border border-warning/10"
+                  >
+                    <Lightbulb
+                      size={14}
+                      className="text-warning mt-0.5 shrink-0"
+                    />
                     <span className="text-sm text-text-secondary">{o}</span>
                   </div>
                 ))}
@@ -515,75 +705,7 @@ function CompetitiveSection({ dna, concorrentes }: { dna: DNASintetizado; concor
           )}
         </div>
       </div>
-    </Section>
-  );
-}
-
-// ─── communication guide section ─────────────────────────────────────────────
-
-function CommunicationGuideSection({ dna }: { dna: DNASintetizado }) {
-  return (
-    <Section icon={<PenTool size={20} />} title="Guia de Comunicacao" subtitle="Vocabulario, estilo e exemplos de legenda" delay={400} accentColor="#34d399">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-bg-card border border-border rounded-xl p-6">
-          <h3 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-2">
-            <CheckCircle2 size={14} className="text-success" /> Palavras para Usar
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {dna.palavras_usar?.length ? dna.palavras_usar.map((p, i) => <Chip key={i} variant="success">{p}</Chip>) : <p className="text-xs text-text-muted">Nenhuma palavra sugerida.</p>}
-          </div>
-        </div>
-
-        <div className="bg-bg-card border border-border rounded-xl p-6">
-          <h3 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-2">
-            <AlertCircle size={14} className="text-danger" /> Palavras para Evitar
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {dna.palavras_evitar?.length ? dna.palavras_evitar.map((p, i) => <Chip key={i} variant="danger">{p}</Chip>) : <p className="text-xs text-text-muted">Nenhuma palavra listada.</p>}
-          </div>
-        </div>
-      </div>
-
-      {dna.exemplos_legenda && dna.exemplos_legenda.length > 0 && (
-        <div className="mt-4">
-          <h3 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-2">
-            <MessageSquare size={14} className="text-accent-light" /> Exemplos de Legenda
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {dna.exemplos_legenda.map((ex, i) => (
-              <div key={i} className="bg-bg-card border border-border rounded-xl overflow-hidden hover:border-border-light transition-all duration-200 group">
-                <div className="px-4 py-3 border-b border-border/50 flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-accent to-[#e1306c] flex items-center justify-center">
-                    <span className="text-white text-[10px] font-bold">IG</span>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-text-primary">Sua Marca</p>
-                    <p className="text-[10px] text-text-muted">Post sugerido</p>
-                  </div>
-                </div>
-                <div className="p-4">
-                  <p className="text-xs text-text-secondary leading-relaxed whitespace-pre-wrap">
-                    {typeof ex === "string" ? ex : String(ex)}
-                  </p>
-                </div>
-                <div className="px-4 py-2.5 border-t border-border/50 flex items-center gap-4 text-text-muted">
-                  <span className="text-[10px] flex items-center gap-1 hover:text-danger transition-colors cursor-default">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-                    Curtir
-                  </span>
-                  <span className="text-[10px] flex items-center gap-1">
-                    <MessageSquare size={10} /> Comentar
-                  </span>
-                  <span className="text-[10px] flex items-center gap-1">
-                    <ArrowUpRight size={10} /> Enviar
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </Section>
+    </motion.div>
   );
 }
 
@@ -596,9 +718,16 @@ function SourcesSection({ marcaDNA }: { marcaDNA: MarcaDNAResponse }) {
     sources.push({
       tipo: "instagram",
       nome: `@${marcaDNA.analise_instagram.username || "perfil"}`,
-      resumo: marcaDNA.analise_instagram.resumo_visual || marcaDNA.analise_instagram.tom_legendas || "Perfil Instagram analisado",
+      resumo:
+        marcaDNA.analise_instagram.resumo_visual ||
+        marcaDNA.analise_instagram.tom_legendas ||
+        "Perfil Instagram analisado",
       metricas: marcaDNA.analise_instagram.followers
-        ? { seguidores: marcaDNA.analise_instagram.followers, engajamento: marcaDNA.analise_instagram.engajamento_medio || "N/A" }
+        ? {
+            seguidores: marcaDNA.analise_instagram.followers,
+            engajamento:
+              marcaDNA.analise_instagram.engajamento_medio || "N/A",
+          }
         : undefined,
     });
   }
@@ -612,24 +741,42 @@ function SourcesSection({ marcaDNA }: { marcaDNA: MarcaDNAResponse }) {
   }
 
   if (marcaDNA.analises_concorrentes) {
-    Object.entries(marcaDNA.analises_concorrentes).forEach(([nome, analise]) => {
-      if (analise) {
-        sources.push({
-          tipo: "concorrente",
-          nome,
-          resumo: analise.resumo_visual || analise.tom_legendas || "Concorrente analisado",
-          metricas: analise.followers ? { seguidores: analise.followers } : undefined,
-        });
+    Object.entries(marcaDNA.analises_concorrentes).forEach(
+      ([nome, analise]) => {
+        if (analise) {
+          sources.push({
+            tipo: "concorrente",
+            nome,
+            resumo:
+              analise.resumo_visual ||
+              analise.tom_legendas ||
+              "Concorrente analisado",
+            metricas: analise.followers
+              ? { seguidores: analise.followers }
+              : undefined,
+          });
+        }
       }
-    });
+    );
   }
 
   if (sources.length === 0) return null;
 
   const sourceIcons: Record<string, React.ReactNode> = {
     instagram: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="5"/><circle cx="17.5" cy="6.5" r="1.5"/>
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <rect x="2" y="2" width="20" height="20" rx="5" />
+        <circle cx="12" cy="12" r="5" />
+        <circle cx="17.5" cy="6.5" r="1.5" />
       </svg>
     ),
     website: <Globe size={14} />,
@@ -645,27 +792,75 @@ function SourcesSection({ marcaDNA }: { marcaDNA: MarcaDNAResponse }) {
   };
 
   return (
-    <Section icon={<Eye size={20} />} title="Fontes Analisadas" subtitle="Dados que alimentaram esta analise" delay={500} accentColor="#60a5fa">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.4 }}
+    >
+      <div className="flex items-center gap-3 mb-5">
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+          style={{
+            backgroundColor: "#60a5fa18",
+            boxShadow: "0 0 20px #60a5fa10",
+          }}
+        >
+          <Eye size={20} style={{ color: "#60a5fa" }} />
+        </div>
+        <div>
+          <h2 className="text-lg font-bold text-text-primary">
+            Fontes Analisadas
+          </h2>
+          <p className="text-xs text-text-muted mt-0.5">
+            Dados que alimentaram esta analise
+          </p>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {sources.map((fonte, i) => {
           const tipo = fonte.tipo || "website";
           const color = sourceColors[tipo] || "#6c5ce7";
           return (
-            <div key={i} className="bg-bg-card border border-border rounded-xl p-5 hover:border-border-light transition-all duration-200"
-              style={{ borderTopColor: `${color}60`, borderTopWidth: "2px" }}>
+            <div
+              key={i}
+              className="bg-bg-card border border-border rounded-xl p-5 hover:border-border-light transition-all duration-200"
+              style={{
+                borderTopColor: `${color}60`,
+                borderTopWidth: "2px",
+              }}
+            >
               <div className="flex items-center gap-2.5 mb-3">
-                <span style={{ color }}>{sourceIcons[tipo] || <Globe size={14} />}</span>
-                <span className="text-xs font-semibold text-text-primary truncate">{fonte.nome}</span>
-                <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0"
-                  style={{ backgroundColor: `${color}15`, color }}>{tipo}</span>
+                <span style={{ color }}>
+                  {sourceIcons[tipo] || <Globe size={14} />}
+                </span>
+                <span className="text-xs font-semibold text-text-primary truncate">
+                  {fonte.nome}
+                </span>
+                <span
+                  className="ml-auto text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0"
+                  style={{ backgroundColor: `${color}15`, color }}
+                >
+                  {tipo}
+                </span>
               </div>
-              {fonte.resumo && <p className="text-xs text-text-secondary leading-relaxed">{fonte.resumo}</p>}
+              {fonte.resumo && (
+                <p className="text-xs text-text-secondary leading-relaxed">
+                  {fonte.resumo}
+                </p>
+              )}
               {fonte.metricas && (
                 <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-4">
                   {Object.entries(fonte.metricas).map(([k, v]) => (
                     <div key={k} className="text-center">
-                      <p className="text-xs font-bold text-text-primary">{typeof v === "number" ? formatCompact(v) : String(v)}</p>
-                      <p className="text-[10px] text-text-muted capitalize">{k}</p>
+                      <p className="text-xs font-bold text-text-primary">
+                        {typeof v === "number"
+                          ? formatCompact(v)
+                          : String(v)}
+                      </p>
+                      <p className="text-[10px] text-text-muted capitalize">
+                        {k}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -674,7 +869,7 @@ function SourcesSection({ marcaDNA }: { marcaDNA: MarcaDNAResponse }) {
           );
         })}
       </div>
-    </Section>
+    </motion.div>
   );
 }
 
@@ -689,7 +884,13 @@ function formatCompact(n: number): string {
 function formatDate(dateStr: string): string {
   try {
     const d = new Date(dateStr);
-    return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   } catch {
     return dateStr;
   }
@@ -707,18 +908,32 @@ function extractConcorrentes(marcaDNA: MarcaDNAResponse): ConcorrenteInfo[] {
     }));
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
+// =============================================================================
 // MAIN PAGE
-// ═════════════════════════════════════════════════════════════════════════════
+// =============================================================================
 
 export default function RelatorioPage() {
   const { empresa, loading: empresaLoading } = useEmpresa();
-  const { dna: hookDna, loading: dnaLoading, analyzing, refreshing, error: dnaError, analisar, isStale } = useMarcaDNA(empresa?.id);
+  const {
+    dna: hookDna,
+    loading: dnaLoading,
+    analyzing,
+    refreshing,
+    error: dnaError,
+    analisar,
+    saveDNA,
+    isStale,
+  } = useMarcaDNA(empresa?.id);
+
   const [igConnected, setIgConnected] = useState(false);
+  const [igChecked, setIgChecked] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Check if Instagram is connected
   useEffect(() => {
     if (!empresa?.id) return;
+    setIgChecked(false);
     const supabase = createClient();
     supabase
       .from("social_connections")
@@ -729,6 +944,7 @@ export default function RelatorioPage() {
       .maybeSingle()
       .then(({ data }) => {
         setIgConnected(!!data);
+        setIgChecked(true);
       });
   }, [empresa?.id]);
 
@@ -737,35 +953,58 @@ export default function RelatorioPage() {
     ? {
         id: hookDna.id,
         empresa_id: hookDna.empresa_id,
-        status: hookDna.status === "pendente" ? "completo" : hookDna.status as MarcaDNAResponse["status"],
+        status:
+          hookDna.status === "pendente"
+            ? "completo"
+            : (hookDna.status as MarcaDNAResponse["status"]),
         analise_instagram: hookDna.instagram_analysis,
         analise_site: hookDna.site_analysis,
-        analises_concorrentes: hookDna.concorrentes_analysis?.reduce(
-          (acc: Record<string, any>, c: any) => { acc[c.nome || c.username || `concorrente`] = c; return acc; },
-          {}
-        ) || null,
-        analises_referencias: hookDna.referencias_analysis?.reduce(
-          (acc: Record<string, any>, r: any) => { acc[r.nome || r.url || `referencia`] = r; return acc; },
-          {}
-        ) || null,
+        analises_concorrentes:
+          hookDna.concorrentes_analysis?.reduce(
+            (acc: Record<string, any>, c: any) => {
+              acc[c.nome || c.username || "concorrente"] = c;
+              return acc;
+            },
+            {}
+          ) || null,
+        analises_referencias:
+          hookDna.referencias_analysis?.reduce(
+            (acc: Record<string, any>, r: any) => {
+              acc[r.nome || r.url || "referencia"] = r;
+              return acc;
+            },
+            {}
+          ) || null,
         dna_sintetizado: hookDna.dna_sintetizado,
         created_at: hookDna.created_at,
         updated_at: hookDna.updated_at,
       }
     : null;
 
-  // Derive page status from hook state
+  // Derive page status
   const status: PageStatus = analyzing
     ? "analisando"
     : dnaLoading
-      ? "loading"
-      : dnaError
-        ? "erro"
-        : hookDna?.dna_sintetizado
-          ? "completo"
-          : "idle";
+    ? "loading"
+    : dnaError
+    ? "erro"
+    : hookDna?.dna_sintetizado
+    ? "completo"
+    : "idle";
 
   const error = dnaError;
+  const hasDNA = status === "completo" && marcaDNA?.dna_sintetizado;
+  const dna = marcaDNA?.dna_sintetizado;
+
+  // Handle save from DNAEditor
+  const handleSaveDNA = async (updated: DNASintetizado) => {
+    const ok = await saveDNA(updated);
+    if (ok) {
+      setEditing(false);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    }
+  };
 
   // ── loading empresa ──
   if (empresaLoading) {
@@ -782,15 +1021,17 @@ export default function RelatorioPage() {
       <div className="p-6 md:p-8 max-w-7xl mx-auto page-enter">
         <div className="text-center py-20">
           <AlertCircle size={40} className="text-text-muted mx-auto mb-4" />
-          <h2 className="text-lg font-bold text-text-primary mb-2">Nenhuma empresa selecionada</h2>
-          <p className="text-sm text-text-secondary">Selecione uma empresa no menu lateral para ver o relatorio de inteligencia.</p>
+          <h2 className="text-lg font-bold text-text-primary mb-2">
+            Nenhuma empresa selecionada
+          </h2>
+          <p className="text-sm text-text-secondary">
+            Selecione uma empresa no menu lateral para ver o relatorio de
+            inteligencia.
+          </p>
         </div>
       </div>
     );
   }
-
-  const hasDNA = status === "completo" && marcaDNA?.dna_sintetizado;
-  const dna = marcaDNA?.dna_sintetizado;
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto page-enter">
@@ -805,7 +1046,7 @@ export default function RelatorioPage() {
               <span>{empresa.nome}</span>
               {marcaDNA?.updated_at && (
                 <>
-                  <span className="text-text-muted">·</span>
+                  <span className="text-text-muted">&middot;</span>
                   <span className="text-text-muted flex items-center gap-1">
                     <Clock size={11} />
                     {formatDate(marcaDNA.updated_at)}
@@ -814,8 +1055,24 @@ export default function RelatorioPage() {
               )}
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <StatusBadge status={status} />
+
+            {/* Save success toast */}
+            <AnimatePresence>
+              {saveSuccess && (
+                <motion.span
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-success/10 text-success font-medium"
+                >
+                  <CheckCircle2 size={12} />
+                  Salvo com sucesso
+                </motion.span>
+              )}
+            </AnimatePresence>
+
             {refreshing && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-accent/10 text-accent-light">
                 <Loader2 size={12} className="animate-spin" />
@@ -828,7 +1085,24 @@ export default function RelatorioPage() {
                 DNA desatualizado
               </span>
             )}
+
+            {/* Edit / View toggle */}
             {hasDNA && (
+              <button
+                onClick={() => setEditing(!editing)}
+                className={cn(
+                  "inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200",
+                  editing
+                    ? "bg-warning/15 text-warning border border-warning/25 hover:bg-warning/25"
+                    : "bg-accent/15 text-accent-light hover:bg-accent/25 border border-accent/20 hover:border-accent/40"
+                )}
+              >
+                <Pencil size={14} />
+                {editing ? "Editando DNA" : "Editar DNA"}
+              </button>
+            )}
+
+            {hasDNA && !editing && (
               <button
                 onClick={analisar}
                 disabled={analyzing}
@@ -836,11 +1110,14 @@ export default function RelatorioPage() {
                   "inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200",
                   analyzing
                     ? "bg-bg-elevated text-text-muted cursor-not-allowed"
-                    : "bg-accent/15 text-accent-light hover:bg-accent/25 border border-accent/20 hover:border-accent/40"
+                    : "bg-bg-elevated text-text-secondary hover:bg-bg-input border border-border hover:border-border-light"
                 )}
               >
-                <RefreshCw size={14} className={analyzing ? "animate-spin" : ""} />
-                Atualizar DNA
+                <RefreshCw
+                  size={14}
+                  className={analyzing ? "animate-spin" : ""}
+                />
+                Atualizar
               </button>
             )}
           </div>
@@ -848,24 +1125,18 @@ export default function RelatorioPage() {
       </header>
 
       {/* ── Instagram connection banner ── */}
-      {igConnected ? (
-        <div className="mb-6 p-3 rounded-xl bg-success/10 border border-success/20 flex items-center gap-3 fade-in">
+      {igChecked && igConnected && hasDNA && !editing && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 p-3 rounded-xl bg-success/10 border border-success/20 flex items-center gap-3"
+        >
           <CheckCircle2 size={16} className="text-success shrink-0" />
           <p className="text-xs text-success font-medium">
             Instagram conectado — DNA gerado com dados reais
           </p>
-        </div>
-      ) : !empresaLoading && empresa ? (
-        <div className="mb-6 p-3 rounded-xl bg-warning/10 border border-warning/20 flex items-center gap-3 fade-in">
-          <AlertCircle size={16} className="text-warning shrink-0" />
-          <p className="text-xs text-warning font-medium">
-            Conecte o Instagram para um DNA mais preciso.{" "}
-            <Link href="/conexoes" className="underline hover:text-text-primary transition-colors">
-              Conectar agora
-            </Link>
-          </p>
-        </div>
-      ) : null}
+        </motion.div>
+      )}
 
       {/* ── ANALYZING STATE ── */}
       {status === "analisando" && <AnalyzingCard />}
@@ -881,30 +1152,86 @@ export default function RelatorioPage() {
         </div>
       )}
 
-      {/* ── EMPTY / ONBOARDING STATE ── */}
-      {(status === "idle" || (status === "erro" && !hasDNA)) && (
-        <EmptyState empresa={empresa} onAnalisar={analisar} analyzing={analyzing} />
-      )}
+      {/* ── FLOW DECISION: what to show when no DNA ── */}
+      {(status === "idle" || (status === "erro" && !hasDNA)) &&
+        !analyzing &&
+        igChecked && (
+          <>
+            {igConnected ? (
+              /* Instagram IS connected, no DNA yet -> big CTA */
+              <GenerateDNACTA
+                empresa={empresa}
+                onGenerate={analisar}
+                analyzing={analyzing}
+              />
+            ) : (
+              /* Instagram NOT connected -> connect CTA + fallback form */
+              <ConnectInstagramCTA
+                empresa={empresa}
+                onFallbackAnalyze={analisar}
+                analyzing={analyzing}
+              />
+            )}
+          </>
+        )}
 
       {/* ── LOADING STATE ── */}
-      {status === "loading" && <FullSkeleton />}
+      {(status === "loading" || (!igChecked && status === "idle")) && (
+        <FullSkeleton />
+      )}
 
-      {/* ── FULL REPORT ── */}
+      {/* ── FULL REPORT (with DNAEditor for edit/view) ── */}
       {hasDNA && dna && marcaDNA && (
         <div className="space-y-10">
-          <BrandIdentitySection dna={dna} />
-          <ContentRadarSection dna={dna} />
-          <CompetitiveSection dna={dna} concorrentes={extractConcorrentes(marcaDNA)} />
-          <CommunicationGuideSection dna={dna} />
-          <SourcesSection marcaDNA={marcaDNA} />
+          {/* Edit mode banner */}
+          <AnimatePresence>
+            {editing && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="p-4 rounded-xl bg-warning/10 border border-warning/20 flex items-center gap-3"
+              >
+                <Pencil size={16} className="text-warning shrink-0" />
+                <p className="text-xs text-warning font-medium">
+                  Modo de edicao ativo — altere os campos e clique em
+                  &ldquo;Salvar alteracoes&rdquo; no final da pagina.
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* DNA Editor (handles both view and edit modes) */}
+          <DNAEditor
+            dna={dna}
+            editing={editing}
+            onSave={handleSaveDNA}
+            onCancel={() => setEditing(false)}
+          />
+
+          {/* Competitive + Sources sections (view only — not editable) */}
+          {!editing && (
+            <>
+              <CompetitiveSection
+                dna={dna}
+                concorrentes={extractConcorrentes(marcaDNA)}
+              />
+              <SourcesSection marcaDNA={marcaDNA} />
+            </>
+          )}
 
           {/* Footer branding */}
-          <footer className="pt-6 pb-4 border-t border-border/30 text-center fade-in" style={{ animationDelay: "600ms" }}>
-            <p className="text-xs text-text-muted flex items-center justify-center gap-1.5">
-              <Sparkles size={10} className="text-accent-light" />
-              Relatorio gerado por ContIA · Inteligencia de Marca
-            </p>
-          </footer>
+          {!editing && (
+            <footer
+              className="pt-6 pb-4 border-t border-border/30 text-center fade-in"
+              style={{ animationDelay: "600ms" }}
+            >
+              <p className="text-xs text-text-muted flex items-center justify-center gap-1.5">
+                <Sparkles size={10} className="text-accent-light" />
+                Relatorio gerado por ContIA &middot; Inteligencia de Marca
+              </p>
+            </footer>
+          )}
         </div>
       )}
     </div>
