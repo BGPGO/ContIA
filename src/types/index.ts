@@ -31,6 +31,29 @@ export interface RedeSocialConfig {
   username: string;
   access_token?: string;
   page_id?: string;
+  provider_user_id?: string;
+  profile_picture_url?: string;
+  followers_count?: number;
+}
+
+export interface SocialConnection {
+  id: string;
+  empresa_id: string;
+  provider: PlataformaRede;
+  provider_user_id: string;
+  username: string | null;
+  display_name: string | null;
+  profile_picture_url: string | null;
+  access_token: string;
+  token_expires_at: string | null;
+  page_id: string | null;
+  scopes: string[];
+  is_active: boolean;
+  last_verified_at: string | null;
+  last_error: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Post {

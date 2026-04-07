@@ -1,17 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOpenAIClient, isAIConfigured } from "@/lib/ai/config";
+import { imageSchema, formatZodError } from "@/lib/validation";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   if (!isAIConfigured()) {
     return NextResponse.json({ error: "AI not configured" }, { status: 503 });
   }
 
-  try {
-    const { prompt, size = "1024x1024" } = await request.json();
+  // Rate limiting
+  const clientIp = getClientIp(request);
+  if (!checkRateLimit(clientIp, "generate")) {
+    return NextResponse.json(
+      { error: "Limite de requisicoes excedido. Tente novamente em 1 minuto." },
+      { status: 429 }
+    );
+  }
 
-    if (!prompt) {
-      return NextResponse.json({ error: "Missing prompt" }, { status: 400 });
+  try {
+    const body = await request.json();
+
+    // Input validation
+    const parsed = imageSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: formatZodError(parsed.error) },
+        { status: 400 }
+      );
     }
+
+    const { prompt, size } = parsed.data;
 
     const openai = getOpenAIClient();
 

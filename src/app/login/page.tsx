@@ -19,17 +19,31 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    try {
+      const supabase = createClient();
 
-    if (error) {
-      setError(error.message);
+      // Timeout de 5s para não travar se Supabase estiver fora
+      const result = await Promise.race([
+        supabase.auth.signInWithPassword({ email, password }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("timeout")), 5000)
+        ),
+      ]);
+
+      if (result.error) {
+        setError(result.error.message);
+        setLoading(false);
+        return;
+      }
+
+      router.push("/dashboard");
+      router.refresh();
+    } catch (err) {
+      setError(
+        "Nao foi possivel conectar ao servidor. Verifique sua conexao ou tente novamente."
+      );
       setLoading(false);
-      return;
     }
-
-    router.push("/dashboard");
-    router.refresh();
   }
 
   return (

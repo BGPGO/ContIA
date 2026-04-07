@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOpenAIClient, isAIConfigured } from "@/lib/ai/config";
+import { analyzeInstagramSchema, formatZodError } from "@/lib/validation";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { instagramAnalysisCache, cacheKey } from "@/lib/cache";
 
 // ── Fetch Instagram data via multiple strategies ──────────────────────────
 
@@ -164,13 +167,37 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "AI not configured" }, { status: 503 });
   }
 
+  // Rate limiting (analyze = 5 req/min)
+  const clientIp = getClientIp(request);
+  if (!checkRateLimit(clientIp, "analyze")) {
+    return NextResponse.json(
+      { error: "Limite de requisicoes excedido. Tente novamente em 1 minuto." },
+      { status: 429 }
+    );
+  }
+
   try {
-    const { username } = await request.json();
-    if (!username) {
-      return NextResponse.json({ error: "Missing username" }, { status: 400 });
+    const body = await request.json();
+
+    // Input validation
+    const parsed = analyzeInstagramSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: formatZodError(parsed.error) },
+        { status: 400 }
+      );
     }
 
+    const { username } = parsed.data;
     const cleanUsername = username.replace("@", "").trim();
+
+    // Cache check
+    const ck = cacheKey("ig", cleanUsername);
+    const cached = instagramAnalysisCache.get(ck);
+    if (cached) {
+      return NextResponse.json({ ...cached, _cached: true });
+    }
+
     const openai = getOpenAIClient();
 
     // Fetch Instagram data
@@ -301,6 +328,9 @@ Responda neste JSON EXATO (sem markdown, sem code blocks, apenas JSON puro):
         ],
       };
     }
+
+    // Salvar no cache
+    instagramAnalysisCache.set(ck, analysis);
 
     return NextResponse.json(analysis);
   } catch (error: any) {

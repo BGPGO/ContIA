@@ -98,8 +98,10 @@ Tabelas: `empresas`, `posts`, `concorrentes`, `concorrente_plataformas`
 | `NEXT_PUBLIC_SUPABASE_URL` | Sim* | URL do projeto Supabase |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Sim* | Chave anon do Supabase |
 | `OPENAI_API_KEY` | Sim* | Geração de conteúdo e imagens |
+| `META_APP_ID` | Para Instagram | App ID do Meta for Developers |
+| `META_APP_SECRET` | Para Instagram | App Secret do Meta for Developers |
 
-*Sem essas variáveis, a plataforma roda em modo mock.
+*Sem as variáveis Supabase/OpenAI, a plataforma roda em modo mock.
 
 ## Deploy
 

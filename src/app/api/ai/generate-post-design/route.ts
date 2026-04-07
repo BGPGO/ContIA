@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOpenAIClient, isAIConfigured } from "@/lib/ai/config";
+import { generatePostDesignSchema, formatZodError } from "@/lib/validation";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import type { PostVisualStyle, EmpresaContext } from "@/types/ai";
 
 export async function POST(request: NextRequest) {
@@ -7,12 +9,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "AI not configured" }, { status: 503 });
   }
 
-  try {
-    const { topic, empresaContext, visualStyle, tone, format, additionalInstructions } = await request.json();
+  // Rate limiting
+  const clientIp = getClientIp(request);
+  if (!checkRateLimit(clientIp, "generate")) {
+    return NextResponse.json(
+      { error: "Limite de requisicoes excedido. Tente novamente em 1 minuto." },
+      { status: 429 }
+    );
+  }
 
-    if (!topic) {
-      return NextResponse.json({ error: "Missing topic" }, { status: 400 });
+  try {
+    const body = await request.json();
+
+    // Input validation
+    const parsed = generatePostDesignSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: formatZodError(parsed.error) },
+        { status: 400 }
+      );
     }
+
+    const { topic, empresaContext, visualStyle, tone, format, additionalInstructions } = parsed.data;
 
     const openai = getOpenAIClient();
 

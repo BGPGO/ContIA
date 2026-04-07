@@ -1,15 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOpenAIClient, isAIConfigured } from "@/lib/ai/config";
+import { analyzeSiteSchema, formatZodError } from "@/lib/validation";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { siteAnalysisCache, cacheKey } from "@/lib/cache";
 
 export async function POST(request: NextRequest) {
   if (!isAIConfigured()) {
     return NextResponse.json({ error: "AI not configured" }, { status: 503 });
   }
 
+  // Rate limiting (analyze = 5 req/min)
+  const clientIp = getClientIp(request);
+  if (!checkRateLimit(clientIp, "analyze")) {
+    return NextResponse.json(
+      { error: "Limite de requisicoes excedido. Tente novamente em 1 minuto." },
+      { status: 429 }
+    );
+  }
+
   try {
-    const { url } = await request.json();
-    if (!url) {
-      return NextResponse.json({ error: "Missing URL" }, { status: 400 });
+    const body = await request.json();
+
+    // Input validation + SSRF protection
+    const parsed = analyzeSiteSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: formatZodError(parsed.error) },
+        { status: 400 }
+      );
+    }
+
+    const { url } = parsed.data;
+
+    // Cache check
+    const ck = cacheKey("site", url);
+    const cached = siteAnalysisCache.get(ck);
+    if (cached) {
+      return NextResponse.json({ ...cached, _cached: true });
     }
 
     // Fetch the website content
@@ -69,6 +96,9 @@ Responda em JSON:
       clean = clean.replace(/```json?\n?/g, "").replace(/```$/g, "").trim();
     }
     const analysis = JSON.parse(clean);
+
+    // Salvar no cache
+    siteAnalysisCache.set(ck, analysis);
 
     return NextResponse.json(analysis);
   } catch (error: any) {
