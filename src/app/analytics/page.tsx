@@ -1,63 +1,99 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { motion } from "motion/react";
 import {
-  Eye,
-  TrendingUp,
   Users,
   Heart,
   MessageCircle,
-  Share2,
-  MousePointerClick,
+  Eye,
+  TrendingUp,
   ArrowUpRight,
-  ArrowDownRight,
+  RefreshCw,
+  ExternalLink,
+  Camera,
+  Hash,
+  Type,
+  Smile,
+  Calendar,
+  Image,
+  Film,
+  LayoutGrid,
+  BarChart3,
+  Activity,
+  Target,
+  LinkIcon,
+  Clock,
 } from "lucide-react";
 import { useEmpresa } from "@/hooks/useEmpresa";
-import { getAnalyticsMock } from "@/lib/mock-data";
-import { cn, formatNumber, getPlataformaCor, getPlataformaLabel } from "@/lib/utils";
-import { DadoDiario, Post } from "@/types";
+import { useAnalytics } from "@/hooks/useAnalytics";
+import type {
+  IGAnalyticsData,
+  IGAnalyticsTopPost,
+  IGContentBreakdown,
+} from "@/hooks/useAnalytics";
+import { cn, formatNumber } from "@/lib/utils";
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+// ── Constants ────────────────────────────────────────────────────────────────
 
-function formatShortDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
-}
+const DAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
+const HOUR_LABELS = [
+  "0h", "1h", "2h", "3h", "4h", "5h", "6h", "7h",
+  "8h", "9h", "10h", "11h", "12h", "13h", "14h", "15h",
+  "16h", "17h", "18h", "19h", "20h", "21h", "22h", "23h",
+];
 
-// ── stat card with variants ─────────────────────────────────────────────────
+const MEDIA_TYPE_LABELS: Record<string, string> = {
+  IMAGE: "Imagem",
+  VIDEO: "Video",
+  CAROUSEL_ALBUM: "Carrossel",
+  REELS: "Reels",
+};
 
-interface StatCardProps {
+const MEDIA_TYPE_COLORS: Record<string, string> = {
+  IMAGE: "#6c5ce7",
+  VIDEO: "#e1306c",
+  CAROUSEL_ALBUM: "#4ecdc4",
+  REELS: "#fbbf24",
+};
+
+const MEDIA_TYPE_ICONS: Record<string, React.ReactNode> = {
+  IMAGE: <Image size={14} />,
+  VIDEO: <Film size={14} />,
+  CAROUSEL_ALBUM: <LayoutGrid size={14} />,
+  REELS: <Film size={14} />,
+};
+
+// ── KPI Card ─────────────────────────────────────────────────────────────────
+
+interface KPICardProps {
   icon: React.ReactNode;
   label: string;
   value: string;
   color: string;
   suffix?: string;
-  change?: string;
-  changePositive?: boolean;
+  index: number;
 }
 
-function StatCard({ icon, label, value, color, suffix, change, changePositive }: StatCardProps) {
+function KPICard({ icon, label, value, color, suffix, index }: KPICardProps) {
   return (
-    <div className="bg-bg-card border border-border rounded-xl p-5 transition-all duration-200 hover:border-border-light">
-      <div className="flex items-center justify-between mb-4 relative z-10">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.08, duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+      whileHover={{ y: -4, transition: { duration: 0.2 } }}
+      className="bg-bg-card border border-border rounded-xl p-5 transition-colors duration-300 hover:border-border-light cursor-default"
+    >
+      <div className="flex items-center justify-between mb-4">
         <div
           className="w-10 h-10 rounded-xl flex items-center justify-center"
-          style={{ backgroundColor: `${color}20`, boxShadow: `0 0 16px ${color}12` }}
+          style={{ backgroundColor: `${color}20`, boxShadow: `0 0 20px ${color}15` }}
         >
           <span style={{ color }}>{icon}</span>
         </div>
-        {change && (
-          <span className={cn(
-            "inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg",
-            changePositive ? "text-success bg-success/10" : "text-danger bg-danger/10"
-          )}>
-            {changePositive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-            {change}
-          </span>
-        )}
       </div>
-      <div className="flex items-baseline gap-1.5 relative z-10">
-        <span className="text-3xl font-bold -tracking-tight text-text-primary tabular-nums leading-none">
+      <div className="flex items-baseline gap-1.5">
+        <span className="text-2xl sm:text-3xl font-bold -tracking-tight text-text-primary tabular-nums leading-none">
           {value}
         </span>
         {suffix && (
@@ -66,379 +102,259 @@ function StatCard({ icon, label, value, color, suffix, change, changePositive }:
           </span>
         )}
       </div>
-      <span className="text-sm text-text-secondary mt-2 block relative z-10">{label}</span>
-    </div>
+      <span className="text-sm text-text-secondary mt-2 block">{label}</span>
+    </motion.div>
   );
 }
 
-// ── area chart ──────────────────────────────────────────────────────────────
+// ── Profile Card ─────────────────────────────────────────────────────────────
 
-interface AreaChartProps {
-  dados: DadoDiario[];
-  dataKey: keyof DadoDiario;
-  color: string;
-  colorEnd?: string;
-  formatValue?: (v: number) => string;
-  label: string;
-  sublabel?: string;
-  currentValue?: string;
-}
-
-function AreaChart({ dados, dataKey, color, colorEnd, formatValue, label, sublabel, currentValue }: AreaChartProps) {
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const endColor = colorEnd || color;
-
-  const values = useMemo(() => dados.map((d) => d[dataKey] as number), [dados, dataKey]);
-  const maxVal = useMemo(() => Math.max(...values, 1), [values]);
-  const minVal = useMemo(() => Math.min(...values), [values]);
-  const range = maxVal - minVal || 1;
-
-  const chartH = 160;
-  const chartW = 500;
-  const padding = 10;
-
-  const points = useMemo(() => {
-    return values.map((v, i) => ({
-      x: padding + (i / (values.length - 1)) * (chartW - padding * 2),
-      y: padding + (chartH - padding * 2) - ((v - minVal) / range) * (chartH - padding * 2),
-    }));
-  }, [values, minVal, range, chartH, chartW, padding]);
-
-  const linePath = useMemo(() => {
-    if (points.length < 2) return "";
-    let d = `M ${points[0].x},${points[0].y}`;
-    for (let i = 0; i < points.length - 1; i++) {
-      const p0 = points[Math.max(0, i - 1)];
-      const p1 = points[i];
-      const p2 = points[i + 1];
-      const p3 = points[Math.min(points.length - 1, i + 2)];
-      const cp1x = p1.x + (p2.x - p0.x) / 6;
-      const cp1y = p1.y + (p2.y - p0.y) / 6;
-      const cp2x = p2.x - (p3.x - p1.x) / 6;
-      const cp2y = p2.y - (p3.y - p1.y) / 6;
-      d += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
-    }
-    return d;
-  }, [points]);
-
-  const areaPath = useMemo(() => {
-    if (!linePath) return "";
-    const lastPt = points[points.length - 1];
-    const firstPt = points[0];
-    return `${linePath} L ${lastPt.x},${chartH} L ${firstPt.x},${chartH} Z`;
-  }, [linePath, points, chartH]);
-
-  const fmt = formatValue || ((v: number) => formatNumber(v));
-  const gradId = `area-grad-${dataKey}-${label.replace(/\s/g, "")}`;
-  const lineGradId = `line-grad-${dataKey}-${label.replace(/\s/g, "")}`;
-
-  // Find max and min indices for highlight points
-  const maxIdx = useMemo(() => {
-    let idx = 0;
-    for (let i = 1; i < values.length; i++) {
-      if (values[i] > values[idx]) idx = i;
-    }
-    return idx;
-  }, [values]);
-
-  const minIdx = useMemo(() => {
-    let idx = 0;
-    for (let i = 1; i < values.length; i++) {
-      if (values[i] < values[idx]) idx = i;
-    }
-    return idx;
-  }, [values]);
+function ProfileCard({ data, onRefresh, refreshing }: {
+  data: IGAnalyticsData;
+  onRefresh: () => void;
+  refreshing: boolean;
+}) {
+  const { profile, fetched_at } = data;
 
   return (
-    <div className="bg-bg-card border border-border rounded-xl p-5 hover:border-border-light transition-colors">
-      {/* Chart header */}
-      <div className="flex items-start justify-between mb-1">
-        <div>
-          <h3 className="text-sm font-semibold text-text-primary">{label}</h3>
-          {sublabel && <span className="text-xs text-text-secondary">{sublabel}</span>}
-        </div>
-        <div className="text-right">
-          {hoveredIndex !== null ? (
-            <div>
-              <span className="text-lg font-bold tabular-nums -tracking-tight" style={{ color }}>
-                {fmt(values[hoveredIndex])}
-              </span>
-              <span className="text-xs text-text-muted block">{formatShortDate(dados[hoveredIndex].data)}</span>
-            </div>
-          ) : currentValue ? (
-            <span className="text-lg font-bold tabular-nums -tracking-tight" style={{ color }}>
-              {currentValue}
-            </span>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="relative mt-3" style={{ height: chartH }}>
-        <svg
-          viewBox={`0 0 ${chartW} ${chartH}`}
-          preserveAspectRatio="none"
-          className="w-full h-full"
-        >
-          <defs>
-            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={color} stopOpacity="0.3" />
-              <stop offset="30%" stopColor={color} stopOpacity="0.12" />
-              <stop offset="100%" stopColor={color} stopOpacity="0" />
-            </linearGradient>
-            <linearGradient id={lineGradId} x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor={color} />
-              <stop offset="100%" stopColor={endColor} />
-            </linearGradient>
-          </defs>
-
-          {/* Horizontal grid lines */}
-          {[0.2, 0.4, 0.6, 0.8].map((pct) => (
-            <line
-              key={pct}
-              x1={padding}
-              y1={chartH * pct}
-              x2={chartW - padding}
-              y2={chartH * pct}
-              stroke="var(--color-border-subtle)"
-              strokeWidth="0.5"
-            />
-          ))}
-
-          {/* Vertical hover line */}
-          {hoveredIndex !== null && points[hoveredIndex] && (
-            <line
-              x1={points[hoveredIndex].x}
-              y1={padding}
-              x2={points[hoveredIndex].x}
-              y2={chartH}
-              stroke="var(--color-border-light)"
-              strokeWidth="0.5"
-              strokeDasharray="3 3"
-            />
-          )}
-
-          {/* Area fill */}
-          <path d={areaPath} fill={`url(#${gradId})`} />
-
-          {/* Glow line — soft depth */}
-          <path
-            d={linePath}
-            fill="none"
-            stroke={color}
-            strokeWidth="4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            opacity="0.08"
-          />
-
-          {/* Main line — thin and elegant */}
-          <path
-            d={linePath}
-            fill="none"
-            stroke={`url(#${lineGradId})`}
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-
-          {/* Max point */}
-          {points[maxIdx] && (
-            <>
-              <circle
-                cx={points[maxIdx].x}
-                cy={points[maxIdx].y}
-                r="6"
-                fill={color}
-                opacity="0.12"
+    <motion.div
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="bg-bg-card border border-border rounded-xl p-5 sm:p-6 hover:border-border-light transition-colors"
+    >
+      <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-5">
+        {/* Avatar */}
+        <div className="relative shrink-0">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden ring-2 ring-[#e1306c]/30 ring-offset-2 ring-offset-[#0d1025]">
+            {profile.profile_picture_url ? (
+              <img
+                src={profile.profile_picture_url}
+                alt={profile.username}
+                className="w-full h-full object-cover"
               />
-              <circle
-                cx={points[maxIdx].x}
-                cy={points[maxIdx].y}
-                r="3"
-                fill={color}
-                stroke="var(--color-bg-card)"
-                strokeWidth="1.5"
-              />
-            </>
-          )}
-
-          {/* Min point */}
-          {points[minIdx] && maxIdx !== minIdx && (
-            <>
-              <circle
-                cx={points[minIdx].x}
-                cy={points[minIdx].y}
-                r="6"
-                fill={endColor}
-                opacity="0.12"
-              />
-              <circle
-                cx={points[minIdx].x}
-                cy={points[minIdx].y}
-                r="3"
-                fill={endColor}
-                stroke="var(--color-bg-card)"
-                strokeWidth="1.5"
-              />
-            </>
-          )}
-
-          {/* Hover point */}
-          {hoveredIndex !== null && points[hoveredIndex] && hoveredIndex !== maxIdx && hoveredIndex !== minIdx && (
-            <>
-              <circle
-                cx={points[hoveredIndex].x}
-                cy={points[hoveredIndex].y}
-                r="6"
-                fill={color}
-                opacity="0.15"
-              />
-              <circle
-                cx={points[hoveredIndex].x}
-                cy={points[hoveredIndex].y}
-                r="3.5"
-                fill={color}
-                stroke="var(--color-bg-card)"
-                strokeWidth="1.5"
-              />
-            </>
-          )}
-        </svg>
-
-        {/* Hover zones */}
-        <div className="absolute inset-0 flex">
-          {dados.map((_, i) => (
-            <div
-              key={i}
-              className="flex-1 cursor-crosshair"
-              onMouseEnter={() => setHoveredIndex(i)}
-              onMouseLeave={() => setHoveredIndex(null)}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* X-axis */}
-      <div className="flex justify-between mt-2 px-1">
-        {dados.filter((_, i) => i % Math.ceil(dados.length / 6) === 0 || i === dados.length - 1).map((d) => (
-          <span key={d.data} className="text-[10px] text-text-muted tabular-nums">
-            {new Date(d.data).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── platform breakdown ───────────────────────────────────────────────────────
-
-function PlatformBreakdown({ redes }: { redes: Record<string, { conectado: boolean; username: string }> }) {
-  const mockStats: Record<string, { engajamento: number; seguidores: number }> = {
-    instagram: { engajamento: 5.4, seguidores: 12400 },
-    facebook:  { engajamento: 2.1, seguidores: 8700 },
-    linkedin:  { engajamento: 6.8, seguidores: 5300 },
-    twitter:   { engajamento: 3.3, seguidores: 4100 },
-    youtube:   { engajamento: 7.2, seguidores: 3200 },
-    tiktok:    { engajamento: 9.1, seguidores: 18900 },
-  };
-
-  const connected = Object.entries(redes).filter(([, v]) => v.conectado);
-  if (connected.length === 0) {
-    return <p className="text-text-muted text-sm text-center py-6">Nenhuma plataforma conectada.</p>;
-  }
-
-  const maxEng = Math.max(...connected.map(([k]) => mockStats[k]?.engajamento ?? 0), 1);
-
-  return (
-    <div className="space-y-3.5">
-      {connected.map(([rede]) => {
-        const color = getPlataformaCor(rede);
-        const label = getPlataformaLabel(rede);
-        const stats = mockStats[rede] ?? { engajamento: 3.0, seguidores: 1000 };
-        const barWidth = (stats.engajamento / maxEng) * 100;
-
-        return (
-          <div key={rede} className="flex items-center gap-3">
-            <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-              style={{ backgroundColor: `${color}18` }}
-            >
-              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-text-primary font-medium">{label}</span>
-                <span className="text-xs font-semibold tabular-nums" style={{ color }}>
-                  {stats.engajamento.toFixed(1)}%
-                </span>
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-[#e1306c] to-[#6c5ce7] flex items-center justify-center">
+                <Camera size={28} className="text-white" />
               </div>
-              <div className="h-1.5 rounded-full bg-bg-elevated overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-700"
-                  style={{
-                    width: `${barWidth}%`,
-                    background: `linear-gradient(90deg, ${color}, ${color}99)`,
-                  }}
-                />
-              </div>
-            </div>
-            <span className="text-xs text-text-secondary tabular-nums shrink-0 w-14 text-right">
-              {formatNumber(stats.seguidores)}
-            </span>
+            )}
           </div>
-        );
-      })}
-    </div>
+          <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-gradient-to-r from-[#f09433] via-[#e6683c] to-[#bc1888] flex items-center justify-center">
+            <Camera size={12} className="text-white" />
+          </div>
+        </div>
+
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-lg font-bold text-text-primary">
+              {profile.name || profile.username}
+            </h2>
+            <span className="text-sm text-text-muted">@{profile.username}</span>
+          </div>
+          {profile.biography && (
+            <p className="text-sm text-text-secondary mt-1 line-clamp-2 max-w-lg">
+              {profile.biography}
+            </p>
+          )}
+          <div className="flex items-center gap-4 sm:gap-6 mt-3">
+            <div className="text-center">
+              <span className="text-lg font-bold text-text-primary tabular-nums">
+                {formatNumber(profile.followers_count)}
+              </span>
+              <span className="text-xs text-text-muted block">Seguidores</span>
+            </div>
+            <div className="text-center">
+              <span className="text-lg font-bold text-text-primary tabular-nums">
+                {formatNumber(profile.follows_count)}
+              </span>
+              <span className="text-xs text-text-muted block">Seguindo</span>
+            </div>
+            <div className="text-center">
+              <span className="text-lg font-bold text-text-primary tabular-nums">
+                {formatNumber(profile.media_count)}
+              </span>
+              <span className="text-xs text-text-muted block">Posts</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
+          <span className="text-[10px] text-text-muted hidden sm:inline">
+            {new Date(fetched_at).toLocaleString("pt-BR", {
+              day: "2-digit",
+              month: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
+          <button
+            onClick={onRefresh}
+            disabled={refreshing}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-300",
+              "bg-gradient-to-r from-[#6c5ce7] to-[#4ecdc4] text-white",
+              "hover:shadow-[0_0_20px_rgba(78,205,196,0.3)] hover:-translate-y-0.5",
+              "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+            )}
+          >
+            <RefreshCw size={12} className={refreshing ? "animate-spin" : ""} />
+            Atualizar
+          </button>
+        </div>
+      </div>
+    </motion.div>
   );
 }
 
-// ── best posts ──────────────────────────────────────────────────────────────
+// ── Engagement Bar Chart (last 30 posts) ─────────────────────────────────────
 
-function BestPosts({ posts }: { posts: Post[] }) {
+function EngagementBarChart({ topPosts }: { topPosts: IGAnalyticsTopPost[] }) {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
+  // Show all posts sorted by timestamp for the bar chart
   const sorted = useMemo(
-    () => [...posts]
-      .filter((p) => p.metricas !== null)
-      .sort((a, b) => (b.metricas?.impressoes ?? 0) - (a.metricas?.impressoes ?? 0)),
-    [posts]
+    () => [...topPosts].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()),
+    [topPosts]
   );
 
   if (sorted.length === 0) {
-    return <p className="text-text-muted text-sm text-center py-6">Nenhum post publicado com métricas.</p>;
+    return <p className="text-text-muted text-sm text-center py-10">Sem dados de posts.</p>;
   }
+
+  const maxEng = Math.max(...sorted.map((p) => p.like_count + p.comments_count), 1);
 
   return (
     <div>
-      <div className="grid grid-cols-[1fr_80px_70px_70px_80px] gap-2 px-3 pb-2.5">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted">Título</span>
-        <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted text-right">Impressões</span>
-        <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted text-right hidden sm:block">Curtidas</span>
-        <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted text-right hidden sm:block">Coment.</span>
-        <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted text-right hidden md:block">Compart.</span>
-      </div>
-      <div className="divide-y divide-border-subtle">
-        {sorted.map((post) => {
-          const m = post.metricas!;
+      <div className="flex items-end gap-[3px] h-40 sm:h-48" role="img" aria-label="Engajamento por post">
+        {sorted.map((post, i) => {
+          const total = post.like_count + post.comments_count;
+          const height = (total / maxEng) * 100;
+          const isHovered = hoveredIdx === i;
+
           return (
             <div
               key={post.id}
-              className="grid grid-cols-[1fr_80px_70px_70px_80px] gap-2 px-3 py-3 items-center hover:bg-bg-card-hover transition-colors rounded"
+              className="flex-1 flex flex-col items-center justify-end h-full cursor-pointer relative group"
+              onMouseEnter={() => setHoveredIdx(i)}
+              onMouseLeave={() => setHoveredIdx(null)}
             >
-              <span className="text-sm text-text-primary truncate font-medium">{post.titulo}</span>
-              <span className="text-xs text-text-primary tabular-nums text-right font-semibold">
-                {formatNumber(m.impressoes)}
+              {isHovered && (
+                <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-[#1a1e42] border border-border-light rounded-lg px-2.5 py-1.5 text-[10px] text-text-primary whitespace-nowrap z-10 shadow-lg">
+                  <div className="flex items-center gap-2">
+                    <span className="flex items-center gap-0.5"><Heart size={9} className="text-[#e1306c]" />{post.like_count}</span>
+                    <span className="flex items-center gap-0.5"><MessageCircle size={9} className="text-[#3b82f6]" />{post.comments_count}</span>
+                  </div>
+                </div>
+              )}
+              <div
+                className="w-full rounded-t-sm transition-all duration-200"
+                style={{
+                  height: `${Math.max(height, 3)}%`,
+                  background: isHovered
+                    ? "linear-gradient(180deg, #6c5ce7, #4ecdc4)"
+                    : "linear-gradient(180deg, #6c5ce740, #4ecdc430)",
+                  boxShadow: isHovered ? "0 0 12px rgba(108, 92, 231, 0.4)" : "none",
+                }}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex justify-between mt-2 px-1">
+        <span className="text-[10px] text-text-muted">Mais antigo</span>
+        <span className="text-[10px] text-text-muted">Mais recente</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Donut Chart (Content Type Distribution) ──────────────────────────────────
+
+function DonutChart({ breakdown }: { breakdown: IGContentBreakdown[] }) {
+  const [hoveredType, setHoveredType] = useState<string | null>(null);
+
+  if (breakdown.length === 0) {
+    return <p className="text-text-muted text-sm text-center py-10">Sem dados.</p>;
+  }
+
+  const total = breakdown.reduce((sum, b) => sum + b.count, 0);
+  const size = 140;
+  const strokeWidth = 22;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+
+  let cumulativeOffset = 0;
+  const segments = breakdown.map((b) => {
+    const pct = b.count / total;
+    const dashLen = pct * circumference;
+    const gap = circumference - dashLen;
+    const offset = -cumulativeOffset;
+    cumulativeOffset += dashLen;
+    return { ...b, dashLen, gap, offset };
+  });
+
+  return (
+    <div className="flex flex-col sm:flex-row items-center gap-5">
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          {segments.map((seg) => {
+            const color = MEDIA_TYPE_COLORS[seg.type] ?? "#6c5ce7";
+            const isHovered = hoveredType === seg.type;
+            return (
+              <circle
+                key={seg.type}
+                cx={size / 2}
+                cy={size / 2}
+                r={radius}
+                fill="none"
+                stroke={color}
+                strokeWidth={isHovered ? strokeWidth + 4 : strokeWidth}
+                strokeDasharray={`${seg.dashLen} ${seg.gap}`}
+                strokeDashoffset={seg.offset}
+                strokeLinecap="round"
+                className="transition-all duration-200"
+                opacity={hoveredType && !isHovered ? 0.3 : 1}
+                style={{ transformOrigin: "center", transform: "rotate(-90deg)" }}
+                onMouseEnter={() => setHoveredType(seg.type)}
+                onMouseLeave={() => setHoveredType(null)}
+              />
+            );
+          })}
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-xl font-bold text-text-primary tabular-nums">{total}</span>
+          <span className="text-[10px] text-text-muted">posts</span>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2.5">
+        {breakdown.map((b) => {
+          const color = MEDIA_TYPE_COLORS[b.type] ?? "#6c5ce7";
+          const isHovered = hoveredType === b.type;
+          return (
+            <div
+              key={b.type}
+              className={cn(
+                "flex items-center gap-2.5 cursor-default transition-opacity duration-200",
+                hoveredType && !isHovered ? "opacity-40" : "opacity-100"
+              )}
+              onMouseEnter={() => setHoveredType(b.type)}
+              onMouseLeave={() => setHoveredType(null)}
+            >
+              <div className="flex items-center gap-1.5" style={{ color }}>
+                {MEDIA_TYPE_ICONS[b.type] ?? <Image size={14} />}
+              </div>
+              <span className="text-xs text-text-primary font-medium w-20">
+                {MEDIA_TYPE_LABELS[b.type] ?? b.type}
               </span>
-              <div className="hidden sm:flex items-center justify-end gap-1.5 text-xs text-text-secondary tabular-nums">
-                <Heart size={11} className="text-danger" />
-                {formatNumber(m.curtidas)}
-              </div>
-              <div className="hidden sm:flex items-center justify-end gap-1.5 text-xs text-text-secondary tabular-nums">
-                <MessageCircle size={11} className="text-info" />
-                {formatNumber(m.comentarios)}
-              </div>
-              <div className="hidden md:flex items-center justify-end gap-1.5 text-xs text-text-secondary tabular-nums">
-                <Share2 size={11} className="text-success" />
-                {formatNumber(m.compartilhamentos)}
-              </div>
+              <span className="text-xs font-semibold tabular-nums" style={{ color }}>
+                {b.percentage}%
+              </span>
+              <span className="text-[10px] text-text-muted tabular-nums">
+                ({b.count})
+              </span>
             </div>
           );
         })}
@@ -447,19 +363,369 @@ function BestPosts({ posts }: { posts: Post[] }) {
   );
 }
 
-// ── main page ────────────────────────────────────────────────────────────────
+// ── Heatmap (best posting times) ─────────────────────────────────────────────
+
+function PostingHeatmap({ byDayOfWeek, byHour }: { byDayOfWeek: number[]; byHour: number[] }) {
+  // Create a simplified heatmap: hours grouped into 4 slots x 7 days
+  const hourSlots = [
+    { label: "Madrugada", range: [0, 5] },
+    { label: "Manha", range: [6, 11] },
+    { label: "Tarde", range: [12, 17] },
+    { label: "Noite", range: [18, 23] },
+  ];
+
+  // Build matrix: day x time slot
+  const matrix: number[][] = [];
+  for (let d = 0; d < 7; d++) {
+    const row: number[] = [];
+    for (const slot of hourSlots) {
+      // Simple heuristic: combine day and hour distributions
+      const dayWeight = byDayOfWeek[d] ?? 0;
+      let hourSum = 0;
+      for (let h = slot.range[0]; h <= slot.range[1]; h++) {
+        hourSum += byHour[h] ?? 0;
+      }
+      row.push(dayWeight + hourSum);
+    }
+    matrix.push(row);
+  }
+
+  const maxVal = Math.max(...matrix.flat(), 1);
+
+  return (
+    <div className="space-y-2">
+      {/* Header */}
+      <div className="grid grid-cols-[48px_repeat(4,1fr)] gap-1.5">
+        <div />
+        {hourSlots.map((s) => (
+          <span key={s.label} className="text-[10px] text-text-muted text-center">{s.label}</span>
+        ))}
+      </div>
+
+      {/* Grid */}
+      {DAY_LABELS.map((day, di) => (
+        <div key={day} className="grid grid-cols-[48px_repeat(4,1fr)] gap-1.5">
+          <span className="text-[11px] text-text-secondary font-medium flex items-center">{day}</span>
+          {matrix[di].map((val, si) => {
+            const intensity = val / maxVal;
+            const opacity = 0.1 + intensity * 0.9;
+            return (
+              <div
+                key={si}
+                className="h-7 rounded-md transition-all duration-200 hover:ring-1 hover:ring-[#6c5ce7]/50 cursor-default"
+                style={{
+                  backgroundColor: `rgba(108, 92, 231, ${opacity})`,
+                  boxShadow: intensity > 0.6 ? `0 0 8px rgba(108, 92, 231, ${intensity * 0.3})` : "none",
+                }}
+                title={`${day} ${hourSlots[si].label}: ${val} posts`}
+              />
+            );
+          })}
+        </div>
+      ))}
+
+      {/* Legend */}
+      <div className="flex items-center justify-end gap-1.5 mt-2">
+        <span className="text-[10px] text-text-muted">Menos</span>
+        {[0.1, 0.3, 0.5, 0.7, 0.9].map((o) => (
+          <div
+            key={o}
+            className="w-4 h-4 rounded-sm"
+            style={{ backgroundColor: `rgba(108, 92, 231, ${o})` }}
+          />
+        ))}
+        <span className="text-[10px] text-text-muted">Mais</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Top Posts Grid ────────────────────────────────────────────────────────────
+
+function TopPostsGrid({ posts }: { posts: IGAnalyticsTopPost[] }) {
+  if (posts.length === 0) {
+    return <p className="text-text-muted text-sm text-center py-10">Sem posts para exibir.</p>;
+  }
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+      {posts.map((post, i) => (
+        <motion.a
+          key={post.id}
+          href={post.permalink}
+          target="_blank"
+          rel="noopener noreferrer"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: i * 0.08, duration: 0.3 }}
+          whileHover={{ y: -4, transition: { duration: 0.2 } }}
+          className="bg-bg-card border border-border rounded-xl overflow-hidden hover:border-border-light transition-all duration-300 group"
+        >
+          {/* Thumbnail */}
+          <div className="aspect-square relative overflow-hidden bg-bg-elevated">
+            {(post.thumbnail_url || post.media_url) ? (
+              <img
+                src={post.thumbnail_url || post.media_url}
+                alt="Post thumbnail"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#6c5ce7]/20 to-[#e1306c]/20">
+                <Camera size={24} className="text-text-muted" />
+              </div>
+            )}
+
+            {/* Overlay with metrics */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-3">
+              <div className="flex items-center gap-3 text-white text-xs">
+                <span className="flex items-center gap-1">
+                  <Heart size={11} /> {formatNumber(post.like_count)}
+                </span>
+                <span className="flex items-center gap-1">
+                  <MessageCircle size={11} /> {formatNumber(post.comments_count)}
+                </span>
+              </div>
+              <ExternalLink size={12} className="text-white/70 ml-auto" />
+            </div>
+
+            {/* Badge */}
+            <div className="absolute top-2 left-2">
+              <span className="text-[10px] font-bold bg-black/50 text-white px-1.5 py-0.5 rounded-md backdrop-blur-sm">
+                #{i + 1}
+              </span>
+            </div>
+
+            {/* Type indicator */}
+            <div className="absolute top-2 right-2" style={{ color: MEDIA_TYPE_COLORS[post.media_type] ?? "#6c5ce7" }}>
+              {MEDIA_TYPE_ICONS[post.media_type] ?? <Image size={14} />}
+            </div>
+          </div>
+
+          {/* Caption */}
+          <div className="p-3">
+            <p className="text-xs text-text-secondary line-clamp-2 leading-relaxed mb-2">
+              {post.caption || "Sem legenda"}
+            </p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5 text-[10px] text-text-muted">
+                <span className="flex items-center gap-0.5">
+                  <Heart size={9} className="text-[#e1306c]" />
+                  {formatNumber(post.like_count)}
+                </span>
+                <span className="flex items-center gap-0.5">
+                  <MessageCircle size={9} className="text-[#3b82f6]" />
+                  {formatNumber(post.comments_count)}
+                </span>
+              </div>
+              <span className="text-[10px] font-semibold text-[#4ecdc4] tabular-nums">
+                {post.engagement_rate.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+        </motion.a>
+      ))}
+    </div>
+  );
+}
+
+// ── Hashtag Cloud ────────────────────────────────────────────────────────────
+
+function HashtagCloud({ hashtags }: { hashtags: { tag: string; count: number }[] }) {
+  if (hashtags.length === 0) {
+    return <p className="text-text-muted text-sm text-center py-6">Nenhuma hashtag encontrada.</p>;
+  }
+
+  const maxCount = Math.max(...hashtags.map((h) => h.count), 1);
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {hashtags.map((h) => {
+        const intensity = h.count / maxCount;
+        const size = 11 + intensity * 3;
+        return (
+          <span
+            key={h.tag}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-border hover:border-[#6c5ce7]/40 transition-colors cursor-default"
+            style={{
+              fontSize: `${size}px`,
+              backgroundColor: `rgba(108, 92, 231, ${0.05 + intensity * 0.15})`,
+              color: `rgba(232, 234, 255, ${0.5 + intensity * 0.5})`,
+            }}
+          >
+            {h.tag}
+            <span className="text-[9px] text-text-muted tabular-nums">({h.count})</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Day of Week Chart ────────────────────────────────────────────────────────
+
+function DayOfWeekChart({ byDay }: { byDay: number[] }) {
+  const max = Math.max(...byDay, 1);
+
+  return (
+    <div className="flex items-end gap-2 h-24">
+      {byDay.map((count, i) => {
+        const height = (count / max) * 100;
+        return (
+          <div key={i} className="flex-1 flex flex-col items-center gap-1">
+            <span className="text-[10px] text-text-muted tabular-nums">{count}</span>
+            <div
+              className="w-full rounded-t-md transition-all duration-300 hover:opacity-80"
+              style={{
+                height: `${Math.max(height, 4)}%`,
+                background: "linear-gradient(180deg, #6c5ce7, #4ecdc4)",
+                opacity: 0.4 + (count / max) * 0.6,
+              }}
+            />
+            <span className="text-[10px] text-text-muted font-medium">{DAY_LABELS[i]}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Skeleton Loading ─────────────────────────────────────────────────────────
+
+function SkeletonCard({ className }: { className?: string }) {
+  return (
+    <div className={cn("bg-bg-card border border-border rounded-xl p-5 animate-pulse", className)}>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-xl bg-bg-elevated" />
+        <div className="flex-1 space-y-2">
+          <div className="h-3 bg-bg-elevated rounded w-1/3" />
+          <div className="h-2 bg-bg-elevated rounded w-1/2" />
+        </div>
+      </div>
+      <div className="h-6 bg-bg-elevated rounded w-1/4 mb-2" />
+      <div className="h-3 bg-bg-elevated rounded w-1/3" />
+    </div>
+  );
+}
+
+function LoadingSkeleton() {
+  return (
+    <div className="space-y-6 p-2 sm:p-4 md:p-6 max-w-7xl mx-auto">
+      {/* Profile skeleton */}
+      <div className="bg-bg-card border border-border rounded-xl p-6 animate-pulse">
+        <div className="flex items-start gap-5">
+          <div className="w-20 h-20 rounded-2xl bg-bg-elevated" />
+          <div className="flex-1 space-y-3">
+            <div className="h-5 bg-bg-elevated rounded w-40" />
+            <div className="h-3 bg-bg-elevated rounded w-64" />
+            <div className="flex gap-6 mt-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="space-y-1">
+                  <div className="h-5 bg-bg-elevated rounded w-12" />
+                  <div className="h-2 bg-bg-elevated rounded w-16" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* KPI skeletons */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <SkeletonCard key={i} />
+        ))}
+      </div>
+
+      {/* Chart skeletons */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="bg-bg-card border border-border rounded-xl p-5 animate-pulse h-72" />
+        <div className="bg-bg-card border border-border rounded-xl p-5 animate-pulse h-72" />
+      </div>
+    </div>
+  );
+}
+
+// ── Empty State ──────────────────────────────────────────────────────────────
+
+function EmptyState() {
+  return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5 }}
+        className="text-center max-w-md mx-auto px-6"
+      >
+        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#e1306c]/20 to-[#6c5ce7]/20 flex items-center justify-center mx-auto mb-5">
+          <Camera size={32} className="text-[#e1306c]" />
+        </div>
+        <h2 className="text-xl font-bold text-text-primary mb-2">
+          Instagram nao conectado
+        </h2>
+        <p className="text-sm text-text-secondary mb-6 leading-relaxed">
+          Conecte sua conta do Instagram na pagina de{" "}
+          <a href="/configuracoes" className="text-[#4ecdc4] hover:underline font-medium">
+            Configuracoes
+          </a>{" "}
+          para ver as metricas reais do seu perfil.
+        </p>
+        <a
+          href="/configuracoes"
+          className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-[#6c5ce7] to-[#4ecdc4] rounded-xl hover:shadow-[0_0_25px_rgba(78,205,196,0.3)] hover:-translate-y-0.5 transition-all duration-300"
+        >
+          <LinkIcon size={14} />
+          Conectar Instagram
+        </a>
+      </motion.div>
+    </div>
+  );
+}
+
+// ── Error State ──────────────────────────────────────────────────────────────
+
+function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="text-center max-w-md mx-auto px-6"
+      >
+        <div className="w-20 h-20 rounded-2xl bg-danger/10 flex items-center justify-center mx-auto mb-5">
+          <Activity size={32} className="text-danger" />
+        </div>
+        <h2 className="text-xl font-bold text-text-primary mb-2">
+          Erro ao carregar dados
+        </h2>
+        <p className="text-sm text-text-secondary mb-6 leading-relaxed">
+          {message}
+        </p>
+        <button
+          onClick={onRetry}
+          className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-[#6c5ce7] to-[#4ecdc4] rounded-xl hover:shadow-[0_0_25px_rgba(78,205,196,0.3)] hover:-translate-y-0.5 transition-all duration-300"
+        >
+          <RefreshCw size={14} />
+          Tentar novamente
+        </button>
+      </motion.div>
+    </div>
+  );
+}
+
+// ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function AnalyticsPage() {
   const { empresa } = useEmpresa();
+  const { data, loading, error, notConnected, refresh } = useAnalytics(empresa?.id);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const analytics = useMemo(
-    () => (empresa ? getAnalyticsMock(empresa.id) : null),
-    [empresa]
-  );
+  async function handleRefresh() {
+    setRefreshing(true);
+    await refresh();
+    setRefreshing(false);
+  }
 
-  const dados30 = useMemo(() => analytics?.dados_diarios ?? [], [analytics]);
-
-  if (!empresa || !analytics) {
+  if (!empresa) {
     return (
       <div className="flex items-center justify-center h-64 text-text-secondary text-sm">
         Nenhuma empresa selecionada.
@@ -467,107 +733,280 @@ export default function AnalyticsPage() {
     );
   }
 
-  const totalInteracoes = dados30.reduce((a, b) => a + b.interacoes, 0);
-  const ultimoSeguidores = dados30[dados30.length - 1]?.seguidores_total ?? 0;
+  if (loading && !data) {
+    return <LoadingSkeleton />;
+  }
+
+  if (notConnected) {
+    return (
+      <div className="p-2 sm:p-4 md:p-6 max-w-7xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="page-header mb-6"
+        >
+          <h1>Analytics</h1>
+          <p>{empresa.nome}</p>
+        </motion.div>
+        <EmptyState />
+      </div>
+    );
+  }
+
+  if (error && !data) {
+    return (
+      <div className="p-2 sm:p-4 md:p-6 max-w-7xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="page-header mb-6"
+        >
+          <h1>Analytics</h1>
+          <p>{empresa.nome}</p>
+        </motion.div>
+        <ErrorState message={error} onRetry={handleRefresh} />
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  const { profile, engagement, top_posts, content_breakdown, posting_frequency, insights, content_analysis } = data;
+
+  // Compute reach from insights if available
+  const reachInsight = insights.find((i) => i.name === "reach");
+  const impressionsInsight = insights.find((i) => i.name === "impressions");
+  const avgReach = reachInsight?.values.length
+    ? Math.round(reachInsight.values.reduce((s, v) => s + v.value, 0) / reachInsight.values.length)
+    : 0;
+  const totalImpressions = impressionsInsight?.values.length
+    ? impressionsInsight.values.reduce((s, v) => s + v.value, 0)
+    : 0;
 
   return (
-    <div className="fade-in space-y-6 p-6 max-w-7xl mx-auto">
+    <div className="fade-in space-y-6 p-2 sm:p-4 md:p-6 max-w-7xl mx-auto">
 
       {/* Page Header */}
-      <div className="page-header">
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="page-header"
+      >
         <h1>Analytics</h1>
-        <p>{empresa.nome} &middot; Últimos 30 dias</p>
-      </div>
+        <p>{empresa.nome} &middot; Instagram &middot; Ultimos 30 posts</p>
+      </motion.div>
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard
-          icon={<Eye size={18} />}
-          label="Total de Impressões"
-          value={formatNumber(analytics.total_impressoes)}
-          color="var(--color-accent)"
-          change="+18.2%"
-          changePositive={true}
+      {/* Profile Card */}
+      <ProfileCard data={data} onRefresh={handleRefresh} refreshing={refreshing} />
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+        <KPICard
+          icon={<Users size={18} />}
+          label="Seguidores"
+          value={formatNumber(profile.followers_count)}
+          color="#3b82f6"
+          index={0}
         />
-        <StatCard
+        <KPICard
           icon={<TrendingUp size={18} />}
           label="Taxa de Engajamento"
-          value={analytics.taxa_engajamento.toFixed(1)}
+          value={engagement.engagement_rate.toFixed(1)}
           suffix="%"
-          color="var(--color-success)"
-          change="+2.4%"
-          changePositive={true}
+          color="#4ecdc4"
+          index={1}
         />
-        <StatCard
-          icon={<Users size={18} />}
-          label="Total de Seguidores"
-          value={formatNumber(ultimoSeguidores)}
-          color="var(--color-info)"
-          change={`+${analytics.crescimento_seguidores.toFixed(1)}%`}
-          changePositive={true}
-        />
-        <StatCard
-          icon={<MousePointerClick size={18} />}
-          label="Total de Interações"
-          value={formatNumber(totalInteracoes)}
-          color="var(--color-warning)"
-          change="+12.7%"
-          changePositive={true}
-        />
-      </div>
-
-      {/* 4 Charts in 2x2 grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        <AreaChart
-          dados={dados30}
-          dataKey="impressoes"
+        <KPICard
+          icon={<Eye size={18} />}
+          label="Alcance Medio"
+          value={avgReach > 0 ? formatNumber(avgReach) : "--"}
           color="#6c5ce7"
-          colorEnd="#a29bfe"
-          label="Impressões Diárias"
-          sublabel="Visualizações totais por dia"
-          currentValue={formatNumber(analytics.total_impressoes)}
+          index={2}
         />
-        <AreaChart
-          dados={dados30}
-          dataKey="seguidores_total"
-          color="#3b82f6"
-          colorEnd="#60a5fa"
-          label="Crescimento de Seguidores"
-          sublabel="Total acumulado"
-          currentValue={formatNumber(ultimoSeguidores)}
-        />
-        <AreaChart
-          dados={dados30}
-          dataKey="engajamento"
-          color="#34d399"
-          colorEnd="#6ee7b7"
-          label="Taxa de Engajamento"
-          sublabel="Percentual diário"
-          currentValue={`${analytics.taxa_engajamento.toFixed(1)}%`}
-          formatValue={(v) => `${v.toFixed(1)}%`}
-        />
-        <AreaChart
-          dados={dados30}
-          dataKey="interacoes"
+        <KPICard
+          icon={<BarChart3 size={18} />}
+          label="Impressoes Totais"
+          value={totalImpressions > 0 ? formatNumber(totalImpressions) : "--"}
           color="#fbbf24"
-          colorEnd="#fcd34d"
-          label="Interações por Dia"
-          sublabel="Curtidas, comentários e compartilhamentos"
-          currentValue={formatNumber(totalInteracoes)}
+          index={3}
+        />
+        <KPICard
+          icon={<Heart size={18} />}
+          label="Media de Curtidas"
+          value={formatNumber(engagement.avg_likes)}
+          color="#e1306c"
+          index={4}
+        />
+        <KPICard
+          icon={<MessageCircle size={18} />}
+          label="Media de Comentarios"
+          value={formatNumber(engagement.avg_comments)}
+          color="#34d399"
+          index={5}
         />
       </div>
 
-      {/* Platform breakdown + Best posts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-        <div className="bg-bg-card border border-border rounded-xl p-5 hover:border-border-light transition-colors">
-          <h3 className="text-sm font-semibold text-text-primary mb-4">Por plataforma</h3>
-          <PlatformBreakdown redes={empresa.redes_sociais as Record<string, { conectado: boolean; username: string }>} />
-        </div>
-        <div className="lg:col-span-2 bg-bg-card border border-border rounded-xl p-5 hover:border-border-light transition-colors">
-          <h3 className="text-sm font-semibold text-text-primary mb-4">Melhores posts</h3>
-          <BestPosts posts={analytics.melhores_posts} />
-        </div>
+      {/* Charts Row 1: Engagement + Content Type */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.3, duration: 0.4 }}
+          className="bg-bg-card border border-border rounded-xl p-5 hover:border-border-light transition-colors"
+        >
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="w-7 h-7 rounded-lg bg-[#6c5ce7]/15 flex items-center justify-center">
+              <BarChart3 size={14} className="text-[#6c5ce7]" />
+            </div>
+            <h3 className="text-sm font-semibold text-text-primary">Engajamento por Post</h3>
+            <span className="text-[10px] text-text-muted ml-auto">{top_posts.length} posts analisados</span>
+          </div>
+          <EngagementBarChart topPosts={top_posts} />
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.35, duration: 0.4 }}
+          className="bg-bg-card border border-border rounded-xl p-5 hover:border-border-light transition-colors"
+        >
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="w-7 h-7 rounded-lg bg-[#4ecdc4]/15 flex items-center justify-center">
+              <Target size={14} className="text-[#4ecdc4]" />
+            </div>
+            <h3 className="text-sm font-semibold text-text-primary">Tipos de Conteudo</h3>
+          </div>
+          <DonutChart breakdown={content_breakdown} />
+        </motion.div>
       </div>
+
+      {/* Charts Row 2: Posting Heatmap + Day of Week */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4, duration: 0.4 }}
+          className="lg:col-span-3 bg-bg-card border border-border rounded-xl p-5 hover:border-border-light transition-colors"
+        >
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="w-7 h-7 rounded-lg bg-[#6c5ce7]/15 flex items-center justify-center">
+              <Clock size={14} className="text-[#6c5ce7]" />
+            </div>
+            <h3 className="text-sm font-semibold text-text-primary">Melhores Horarios para Postar</h3>
+          </div>
+          <PostingHeatmap
+            byDayOfWeek={posting_frequency.by_day_of_week}
+            byHour={posting_frequency.by_hour}
+          />
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.45, duration: 0.4 }}
+          className="lg:col-span-2 bg-bg-card border border-border rounded-xl p-5 hover:border-border-light transition-colors"
+        >
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="w-7 h-7 rounded-lg bg-[#fbbf24]/15 flex items-center justify-center">
+              <Calendar size={14} className="text-[#fbbf24]" />
+            </div>
+            <h3 className="text-sm font-semibold text-text-primary">Posts por Dia da Semana</h3>
+          </div>
+          <DayOfWeekChart byDay={posting_frequency.by_day_of_week} />
+          <div className="mt-3 pt-3 border-t border-border-subtle">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-text-secondary">Frequencia</span>
+              <span className="text-sm font-semibold text-[#4ecdc4] tabular-nums">
+                {posting_frequency.posts_per_week} posts/semana
+              </span>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Top Posts */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5, duration: 0.4 }}
+      >
+        <div className="flex items-center gap-2.5 mb-3">
+          <div className="w-7 h-7 rounded-lg bg-[#e1306c]/15 flex items-center justify-center">
+            <ArrowUpRight size={14} className="text-[#e1306c]" />
+          </div>
+          <h3 className="section-title text-[#e8eaff]">Top 5 Posts</h3>
+          <span className="text-[10px] text-text-muted ml-1">por engajamento</span>
+        </div>
+        <TopPostsGrid posts={top_posts} />
+      </motion.div>
+
+      {/* Content Analysis */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.55, duration: 0.4 }}
+        className="grid grid-cols-1 lg:grid-cols-3 gap-3"
+      >
+        {/* Hashtags */}
+        <div className="lg:col-span-2 bg-bg-card border border-border rounded-xl p-5 hover:border-border-light transition-colors">
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="w-7 h-7 rounded-lg bg-[#6c5ce7]/15 flex items-center justify-center">
+              <Hash size={14} className="text-[#6c5ce7]" />
+            </div>
+            <h3 className="text-sm font-semibold text-text-primary">Hashtags Mais Usadas</h3>
+          </div>
+          <HashtagCloud hashtags={content_analysis.top_hashtags} />
+        </div>
+
+        {/* Text Stats */}
+        <div className="bg-bg-card border border-border rounded-xl p-5 hover:border-border-light transition-colors">
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="w-7 h-7 rounded-lg bg-[#34d399]/15 flex items-center justify-center">
+              <Type size={14} className="text-[#34d399]" />
+            </div>
+            <h3 className="text-sm font-semibold text-text-primary">Analise de Texto</h3>
+          </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Type size={14} className="text-text-muted" />
+                <span className="text-xs text-text-secondary">Tamanho medio da legenda</span>
+              </div>
+              <span className="text-sm font-semibold text-text-primary tabular-nums">
+                {content_analysis.avg_caption_length} chars
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Smile size={14} className="text-text-muted" />
+                <span className="text-xs text-text-secondary">Emojis por post</span>
+              </div>
+              <span className="text-sm font-semibold text-text-primary tabular-nums">
+                {content_analysis.avg_emojis_per_post}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Hash size={14} className="text-text-muted" />
+                <span className="text-xs text-text-secondary">Total de hashtags unicas</span>
+              </div>
+              <span className="text-sm font-semibold text-text-primary tabular-nums">
+                {content_analysis.top_hashtags.length}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Smile size={14} className="text-text-muted" />
+                <span className="text-xs text-text-secondary">Total de emojis usados</span>
+              </div>
+              <span className="text-sm font-semibold text-text-primary tabular-nums">
+                {content_analysis.emoji_count}
+              </span>
+            </div>
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 }

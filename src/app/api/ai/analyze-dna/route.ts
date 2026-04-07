@@ -9,6 +9,7 @@ import {
   getMockMarcaDNA,
   MarcaDNAResult,
 } from "@/lib/ai/marca-dna";
+import { runAutoDNA } from "@/lib/ai/auto-dna-generator";
 import { dnaCache, cacheKey } from "@/lib/cache";
 
 // ── POST /api/ai/analyze-dna ─────────────────────────────────────────────────
@@ -16,6 +17,9 @@ import { dnaCache, cacheKey } from "@/lib/cache";
 // Called by DNASetup.tsx after it persists empresa data in Supabase.
 // Receives sources directly in the body (instagram_handle, website, etc.)
 // so it can also handle concorrentes/referencias that aren't in the DB yet.
+//
+// NEW: When `source: "instagram_connected"` is passed, uses the auto-dna
+// pipeline with REAL Instagram API data instead of scraping.
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -25,6 +29,7 @@ export async function POST(request: NextRequest) {
 
     const {
       empresa_id,
+      source,
       instagram_handle,
       website,
       concorrentes_ig,
@@ -32,6 +37,7 @@ export async function POST(request: NextRequest) {
       referencias_sites,
     } = body as {
       empresa_id?: string;
+      source?: string;
       instagram_handle?: string;
       website?: string;
       concorrentes_ig?: string[];
@@ -46,6 +52,47 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // ── Instagram Connected Mode ──
+    // When source is "instagram_connected", use real API data pipeline
+    if (source === "instagram_connected") {
+      console.log(
+        `[analyze-dna] Modo instagram_connected para empresa: ${empresa_id}`
+      );
+
+      if (!isAIConfigured()) {
+        return NextResponse.json(
+          { error: "OpenAI nao configurada" },
+          { status: 503 }
+        );
+      }
+
+      if (!isSupabaseConfigured()) {
+        return NextResponse.json(
+          { error: "Supabase nao configurado" },
+          { status: 503 }
+        );
+      }
+
+      const openai = getOpenAIClient();
+      const { createClient } = await import("@/lib/supabase/server");
+      const supabase = await createClient();
+
+      const result = await runAutoDNA(empresa_id, supabase, openai);
+
+      if (result.status === "completo") {
+        dnaCache.set(cacheKey("dna", empresa_id), result);
+      }
+
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.log(`[analyze-dna] Auto-DNA completo em ${elapsed}s`);
+
+      return NextResponse.json(result, {
+        status: result.status === "erro" ? 422 : 200,
+      });
+    }
+
+    // ── Legacy scraping mode (backward compatible) ──
 
     // Cache check
     const ck = cacheKey("dna", empresa_id);

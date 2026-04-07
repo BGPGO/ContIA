@@ -1,123 +1,190 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { motion, useSpring, useMotionValue } from "motion/react";
 import {
-  FileText,
-  CalendarDays,
-  Clock,
-  BarChart3,
-  CalendarCheck,
+  Users,
+  ImageIcon,
   TrendingUp,
+  Eye,
+  Heart,
+  MessageCircle,
+  Sparkles,
+  ExternalLink,
   Plus,
+  BarChart3,
+  Clock,
+  Zap,
+  AlertCircle,
+  RefreshCw,
+  Calendar,
+  Video,
+  Images,
+  Camera,
 } from "lucide-react";
+import Link from "next/link";
 import { useEmpresa } from "@/hooks/useEmpresa";
-import { usePosts } from "@/hooks/usePosts";
-import { PostModal } from "@/components/posts/PostModal";
-import { cn, getPlataformaCor, getPlataformaLabel } from "@/lib/utils";
-import { Post } from "@/types";
+import { useDashboard } from "@/hooks/useDashboard";
+import { cn, formatNumber } from "@/lib/utils";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
-function isThisMonth(dateStr: string | null): boolean {
-  if (!dateStr) return false;
-  const d = new Date(dateStr);
-  const now = new Date();
-  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+function getGreeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Bom dia";
+  if (h < 18) return "Boa tarde";
+  return "Boa noite";
 }
 
-function isThisWeek(dateStr: string | null): boolean {
-  if (!dateStr) return false;
-  const d = new Date(dateStr);
-  const now = new Date();
-  const startOfWeek = new Date(now);
-  startOfWeek.setDate(now.getDate() - now.getDay());
-  startOfWeek.setHours(0, 0, 0, 0);
-  const endOfWeek = new Date(startOfWeek);
-  endOfWeek.setDate(startOfWeek.getDate() + 6);
-  endOfWeek.setHours(23, 59, 59, 999);
-  return d >= startOfWeek && d <= endOfWeek;
+function formatDate(): string {
+  return new Date().toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 }
 
-function isToday(dateStr: string | null): boolean {
-  if (!dateStr) return false;
-  const d = new Date(dateStr);
-  const now = new Date();
-  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+function formatLabel(type: string): string {
+  const map: Record<string, string> = {
+    IMAGE: "Imagem",
+    VIDEO: "Vídeo",
+    CAROUSEL_ALBUM: "Carrossel",
+    REELS: "Reels",
+  };
+  return map[type] ?? type;
 }
 
-function formatShortDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
-}
-
-function formatTime(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+function formatTypeIcon(type: string) {
+  switch (type) {
+    case "VIDEO":
+    case "REELS":
+      return <Video size={12} />;
+    case "CAROUSEL_ALBUM":
+      return <Images size={12} />;
+    default:
+      return <ImageIcon size={12} />;
+  }
 }
 
 // ─── animated number ────────────────────────────────────────────────────────
 
-function AnimatedNumber({ value, loading }: { value: number; loading?: boolean }) {
+function AnimatedNumber({
+  value,
+  format = false,
+}: {
+  value: number;
+  format?: boolean;
+}) {
   const ref = useRef<HTMLSpanElement>(null);
-  const motionValue = useMotionValue(0);
-  const springValue = useSpring(motionValue, { stiffness: 100, damping: 30, mass: 1 });
+  const motionVal = useMotionValue(0);
+  const springVal = useSpring(motionVal, {
+    stiffness: 100,
+    damping: 30,
+    mass: 1,
+  });
 
   useEffect(() => {
-    motionValue.set(value);
-  }, [value, motionValue]);
+    motionVal.set(value);
+  }, [value, motionVal]);
 
   useEffect(() => {
-    const unsubscribe = springValue.on("change", (latest) => {
+    const unsubscribe = springVal.on("change", (latest) => {
       if (ref.current) {
-        ref.current.textContent = Math.round(latest).toString();
+        ref.current.textContent = format
+          ? formatNumber(Math.round(latest))
+          : Math.round(latest).toLocaleString("pt-BR");
       }
     });
     return unsubscribe;
-  }, [springValue]);
+  }, [springVal, format]);
 
-  if (loading) {
-    return <span className="w-8 h-6 bg-bg-elevated rounded animate-pulse inline-block" />;
-  }
+  return <span ref={ref} className="tabular-nums">0</span>;
+}
 
+// ─── skeleton ───────────────────────────────────────────────────────────────
+
+function CardSkeleton() {
   return (
-    <span
-      ref={ref}
-      className="text-2xl font-bold text-text-primary leading-none -tracking-tight tabular-nums"
-    >
-      0
-    </span>
+    <div className="bg-bg-card border border-border rounded-xl p-5 animate-pulse">
+      <div className="flex items-center gap-3">
+        <div className="w-11 h-11 rounded-xl bg-bg-elevated" />
+        <div className="flex-1 space-y-2">
+          <div className="h-6 w-20 bg-bg-elevated rounded" />
+          <div className="h-3 w-28 bg-bg-elevated rounded" />
+        </div>
+      </div>
+    </div>
   );
 }
 
-// ─── stat card with variants ────────────────────────────────────────────────
+function PostGridSkeleton() {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div
+          key={i}
+          className="bg-bg-card border border-border rounded-xl overflow-hidden animate-pulse"
+        >
+          <div className="aspect-square bg-bg-elevated" />
+          <div className="p-3 space-y-2">
+            <div className="h-3 w-full bg-bg-elevated rounded" />
+            <div className="h-3 w-2/3 bg-bg-elevated rounded" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
-interface StatCardProps {
+// ─── stat card ──────────────────────────────────────────────────────────────
+
+interface OverviewCardProps {
   icon: React.ReactNode;
   label: string;
   value: number;
   tint: string;
-  loading?: boolean;
+  suffix?: string;
+  delay: number;
+  formatVal?: boolean;
 }
 
-function StatCard({ icon, label, value, tint, loading }: StatCardProps) {
+function OverviewCard({
+  icon,
+  label,
+  value,
+  tint,
+  suffix,
+  delay,
+  formatVal,
+}: OverviewCardProps) {
   return (
     <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay, duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
       whileHover={{ y: -4, transition: { duration: 0.2 } }}
-      className="bg-bg-card border border-border rounded-xl p-4 transition-colors duration-300 hover:border-border-light cursor-pointer"
+      className="bg-bg-card border border-border rounded-xl p-5 transition-colors duration-300 hover:border-border-light cursor-default group"
     >
       <div className="flex items-center gap-3.5">
-        <motion.div
-          initial={{ scale: 0.5, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.2, type: "spring", stiffness: 200, damping: 15 }}
-          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-          style={{ backgroundColor: `${tint}20`, boxShadow: `0 0 20px ${tint}25` }}
+        <div
+          className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110"
+          style={{
+            backgroundColor: `${tint}18`,
+            boxShadow: `0 0 24px ${tint}20`,
+          }}
         >
           <span style={{ color: tint }}>{icon}</span>
-        </motion.div>
+        </div>
         <div className="flex flex-col min-w-0">
-          <AnimatedNumber value={value} loading={loading} />
+          <span className="text-2xl font-bold text-text-primary leading-none -tracking-tight">
+            <AnimatedNumber value={value} format={formatVal} />
+            {suffix && (
+              <span className="text-sm font-medium text-text-secondary ml-0.5">
+                {suffix}
+              </span>
+            )}
+          </span>
           <span className="text-xs text-text-secondary mt-1.5">{label}</span>
         </div>
       </div>
@@ -125,128 +192,12 @@ function StatCard({ icon, label, value, tint, loading }: StatCardProps) {
   );
 }
 
-function PlatformDot({ plataforma }: { plataforma: string }) {
-  const color = getPlataformaCor(plataforma);
-  return (
-    <span
-      className="inline-block w-[7px] h-[7px] rounded-full shrink-0"
-      style={{ backgroundColor: color }}
-      title={getPlataformaLabel(plataforma)}
-    />
-  );
-}
-
-function StatusBadge({ status }: { status: Post["status"] }) {
-  const map: Record<Post["status"], { label: string; dotColor: string; textCls: string; bgCls: string }> = {
-    publicado: { label: "Publicado", dotColor: "#4ecdc4", textCls: "text-[#4ecdc4]", bgCls: "bg-[#4ecdc4]/15" },
-    agendado:  { label: "Agendado",  dotColor: "#fbbf24", textCls: "text-[#fbbf24]", bgCls: "bg-[#fbbf24]/15" },
-    rascunho:  { label: "Rascunho",  dotColor: "var(--color-text-muted)", textCls: "text-text-muted", bgCls: "bg-text-muted/10" },
-    erro:      { label: "Erro",      dotColor: "#f87171", textCls: "text-[#f87171]", bgCls: "bg-[#f87171]/15" },
-  };
-  const { label, dotColor, textCls, bgCls } = map[status];
-  return (
-    <span className={cn("inline-flex items-center gap-1.5 shrink-0 px-2 py-0.5 rounded-full", bgCls)}>
-      <span className="w-[5px] h-[5px] rounded-full" style={{ backgroundColor: dotColor }} />
-      <span className={cn("text-[11px] font-medium", textCls)}>{label}</span>
-    </span>
-  );
-}
-
-// ─── loading skeleton rows ────────────────────────────────────────────────────
-
-function SkeletonRows({ count = 3 }: { count?: number }) {
-  return (
-    <div className="divide-y divide-border-subtle">
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0 animate-pulse">
-          <span className="flex-1 h-4 bg-bg-elevated rounded" />
-          <span className="w-16 h-4 bg-bg-elevated rounded" />
-          <span className="w-12 h-5 bg-bg-elevated rounded-full" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // ─── main page ──────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const { empresa } = useEmpresa();
-  const { posts, loading, createPost, updatePost } = usePosts(empresa?.id);
-
-  const [showModal, setShowModal] = useState(false);
-  const [editingPost, setEditingPost] = useState<Post | null>(null);
-
-  const countMes = useMemo(
-    () => posts.filter((p) =>
-      (p.status === "publicado" && isThisMonth(p.publicado_em)) ||
-      (p.status === "agendado" && isThisMonth(p.agendado_para))
-    ).length,
-    [posts]
-  );
-
-  const countSemana = useMemo(
-    () => posts.filter((p) =>
-      (p.status === "publicado" && isThisWeek(p.publicado_em)) ||
-      (p.status === "agendado" && isThisWeek(p.agendado_para))
-    ).length,
-    [posts]
-  );
-
-  const countAgendados = useMemo(
-    () => posts.filter((p) => p.status === "agendado").length,
-    [posts]
-  );
-
-  const postsDoDia = useMemo(
-    () => posts
-      .filter((p) =>
-        (p.status === "publicado" && isToday(p.publicado_em)) ||
-        (p.status === "agendado" && isToday(p.agendado_para))
-      )
-      .sort((a, b) => {
-        const da = a.agendado_para ?? a.publicado_em ?? "";
-        const db = b.agendado_para ?? b.publicado_em ?? "";
-        return da.localeCompare(db);
-      }),
-    [posts]
-  );
-
-  const proximosAgendamentos = useMemo(() => {
-    const now = new Date().toISOString().split("T")[0];
-    return posts
-      .filter((p) => p.status === "agendado" && p.agendado_para && p.agendado_para > now)
-      .sort((a, b) => (a.agendado_para! > b.agendado_para! ? 1 : -1))
-      .slice(0, 6);
-  }, [posts]);
-
-  const todasRedes = ["instagram", "facebook", "linkedin", "twitter", "youtube", "tiktok"];
-  const redesSociais = empresa?.redes_sociais ?? {};
-
-  // ── modal handlers ──
-
-  function openNewPost() {
-    setEditingPost(null);
-    setShowModal(true);
-  }
-
-  function openEditPost(post: Post) {
-    setEditingPost(post);
-    setShowModal(true);
-  }
-
-  function closeModal() {
-    setShowModal(false);
-    setEditingPost(null);
-  }
-
-  async function handleSave(data: Omit<Post, "id" | "created_at" | "metricas">) {
-    if (editingPost) {
-      await updatePost(editingPost.id, data);
-    } else {
-      await createPost(data);
-    }
-  }
+  const { connected, profile, recentPosts, dna, loading, stats, refresh } =
+    useDashboard(empresa?.id);
 
   if (!empresa) {
     return (
@@ -256,227 +207,454 @@ export default function DashboardPage() {
     );
   }
 
-  const cor = empresa.cor_primaria;
+  const firstName = empresa.nome.split(" ")[0];
 
   return (
-    <div className="space-y-4 sm:space-y-6 p-2 sm:p-4 md:p-6 max-w-7xl mx-auto">
-
-      {/* ── Page Header ────────────────────────────────────────────── */}
+    <div className="space-y-5 p-2 sm:p-4 md:p-6 max-w-7xl mx-auto">
+      {/* ── Welcome Header ─────────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="page-header flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4"
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3"
       >
         <div>
-          <h1 className="text-lg sm:text-xl">Bem-vindo, {empresa.nome}</h1>
-          <p>{empresa.nicho}</p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-text-primary">
+            {getGreeting()}, {firstName}
+          </h1>
+          <p className="text-sm text-text-secondary mt-1 capitalize">
+            {formatDate()}
+          </p>
         </div>
-        <button
-          onClick={openNewPost}
-          className="shrink-0 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-gradient-to-r from-[#6c5ce7] to-[#4ecdc4] rounded-lg hover:shadow-[0_0_25px_rgba(78,205,196,0.3)] hover:-translate-y-0.5 transition-all duration-300 w-full sm:w-auto"
-        >
-          <Plus size={13} />
-          Novo Post
-        </button>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Instagram connection badge */}
+          {connected && profile ? (
+            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border border-[#e1306c]/30 bg-[#e1306c]/10 text-[#e1306c]">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+              </span>
+              <Camera size={13} />
+              @{profile.username}
+            </span>
+          ) : !loading ? (
+            <Link
+              href="/conexoes"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border border-dashed border-border text-text-muted hover:text-text-secondary hover:border-border-light transition-colors"
+            >
+              <AlertCircle size={13} />
+              Instagram desconectado
+            </Link>
+          ) : null}
+
+          {/* Quick actions */}
+          <Link
+            href="/criacao"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-gradient-to-r from-[#6c5ce7] to-[#4ecdc4] rounded-lg hover:shadow-[0_0_25px_rgba(78,205,196,0.3)] hover:-translate-y-0.5 transition-all duration-300"
+          >
+            <Plus size={13} />
+            Criar Conteudo
+          </Link>
+          <Link
+            href="/analytics"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-text-secondary bg-bg-card border border-border rounded-lg hover:border-border-light hover:-translate-y-0.5 transition-all duration-300"
+          >
+            <BarChart3 size={13} />
+            Ver Analytics
+          </Link>
+        </div>
       </motion.div>
 
-      {/* ── Stats cards with variants ────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {[
-          { icon: <BarChart3 size={18} />, label: "Posts este mês", value: countMes, tint: cor },
-          { icon: <CalendarDays size={18} />, label: "Posts esta semana", value: countSemana, tint: "var(--color-success)" },
-          { icon: <Clock size={18} />, label: "Agendados", value: countAgendados, tint: "var(--color-warning)" },
-          { icon: <FileText size={18} />, label: "Total de posts", value: posts.length, tint: "var(--color-info)" },
-        ].map((stat, i) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1, duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
-          >
-            <StatCard {...stat} loading={loading} />
-          </motion.div>
-        ))}
-      </div>
-
-      {/* ── Connected channels ───────────────────────────────────── */}
-      <div>
-        <span className="section-title mb-3 block text-[#e8eaff]">Canais conectados</span>
-        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-          {todasRedes.map((rede, index) => {
-            const config = redesSociais[rede as keyof typeof redesSociais];
-            const conectado = config?.conectado ?? false;
-            const corRede = getPlataformaCor(rede);
-            const label = getPlataformaLabel(rede);
-
-            return (
-              <motion.span
-                key={rede}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: index * 0.06, duration: 0.3 }}
-                className={cn(
-                  "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium hover:-translate-y-0.5 transition-all duration-200",
-                  conectado
-                    ? "border"
-                    : "border border-dashed border-border opacity-35"
-                )}
-                style={
-                  conectado
-                    ? { borderColor: `${corRede}40`, color: corRede, backgroundColor: `${corRede}0d` }
-                    : { color: "var(--color-text-muted)" }
-                }
-              >
-                <span
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: conectado ? corRede : "var(--color-text-muted)" }}
-                />
-                {label}
-                {conectado && (
-                  <TrendingUp size={10} style={{ color: corRede, opacity: 0.6 }} />
-                )}
-              </motion.span>
-            );
-          })}
+      {/* ── Instagram Overview Cards ───────────────────────────── */}
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
         </div>
-      </div>
-
-      {/* ── Two-column: Posts do dia + Próximos agendamentos ────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
-
-        {/* Left: Posts do dia */}
+      ) : connected && profile ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <OverviewCard
+            icon={<Users size={20} />}
+            label="Seguidores"
+            value={profile.followers_count}
+            tint="#6c5ce7"
+            delay={0}
+            formatVal
+          />
+          <OverviewCard
+            icon={<ImageIcon size={20} />}
+            label="Posts"
+            value={profile.media_count}
+            tint="#4ecdc4"
+            delay={0.1}
+            formatVal
+          />
+          <OverviewCard
+            icon={<TrendingUp size={20} />}
+            label="Taxa de Engajamento"
+            value={Math.round(stats.engagementRate * 100) / 100}
+            tint="#fbbf24"
+            suffix="%"
+            delay={0.2}
+          />
+          <OverviewCard
+            icon={<Eye size={20} />}
+            label="Alcance"
+            value={stats.reachValue ?? 0}
+            tint="#f093fb"
+            delay={0.3}
+            formatVal
+          />
+        </div>
+      ) : (
+        /* Not connected — CTA card */
         <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.3 }}
-          className="lg:col-span-3 bg-bg-card border border-border rounded-xl p-3 sm:p-5"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="relative overflow-hidden bg-gradient-to-br from-[#6c5ce7]/20 via-bg-card to-[#4ecdc4]/10 border border-[#6c5ce7]/30 rounded-2xl p-6 sm:p-10 text-center"
         >
-          <div className="flex items-center gap-2.5 mb-4">
-            <div className="w-7 h-7 rounded-lg bg-accent/15 flex items-center justify-center">
-              <CalendarCheck size={14} className="text-accent" />
-            </div>
-            <h2 className="section-title text-[#e8eaff]">Posts de hoje</h2>
-            {postsDoDia.length > 0 && (
-              <span className="ml-auto text-[11px] font-medium text-accent bg-accent/10 px-2 py-0.5 rounded-full tabular-nums">
-                {postsDoDia.length}
-              </span>
-            )}
-          </div>
-
-          {loading ? (
-            <SkeletonRows count={3} />
-          ) : postsDoDia.length === 0 ? (
-            <p className="text-text-muted text-sm text-center py-10">
-              Nenhum post para hoje.
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(108,92,231,0.15),transparent_60%)]" />
+          <div className="relative">
+            <motion.div
+              animate={{ y: [0, -6, 0] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+              className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-[#6c5ce7] to-[#4ecdc4] flex items-center justify-center"
+            >
+              <Camera size={32} className="text-white" />
+            </motion.div>
+            <h2 className="text-lg font-semibold text-text-primary mb-2">
+              Conecte seu Instagram
+            </h2>
+            <p className="text-sm text-text-secondary max-w-md mx-auto mb-5">
+              Desbloqueie todo o potencial da plataforma com dados reais de
+              seguidores, posts, engajamento e alcance.
             </p>
-          ) : (
-            <div className="divide-y divide-border-subtle overflow-x-auto">
-              {postsDoDia.map((post, index) => {
-                const dateStr = post.agendado_para ?? post.publicado_em;
-                return (
-                  <motion.div
-                    key={post.id}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.05, duration: 0.3 }}
-                    className="flex items-center gap-2 sm:gap-3 py-3 first:pt-0 last:pb-0 cursor-pointer hover:bg-[#4ecdc4]/5 rounded-lg px-1 -mx-1 transition-colors duration-150 min-w-0"
-                    onClick={() => openEditPost(post)}
-                  >
-                    <p className="text-sm text-text-primary truncate flex-1 min-w-0 font-medium">
-                      {post.titulo}
-                    </p>
-                    <div className="hidden sm:flex items-center gap-1 shrink-0">
-                      {post.plataformas.map((p) => (
-                        <PlatformDot key={p} plataforma={p} />
-                      ))}
-                    </div>
-                    {dateStr && (
-                      <span className="text-[11px] text-text-muted tabular-nums shrink-0 hidden sm:inline">
-                        {formatTime(dateStr)}
-                      </span>
-                    )}
-                    <StatusBadge status={post.status} />
-                  </motion.div>
-                );
-              })}
-            </div>
-          )}
-        </motion.div>
-
-        {/* Right: Proximos agendamentos */}
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.4 }}
-          className="lg:col-span-2 bg-bg-card border border-border rounded-xl p-3 sm:p-5"
-        >
-          <div className="flex items-center gap-2.5 mb-4">
-            <div className="w-7 h-7 rounded-lg bg-warning/15 flex items-center justify-center">
-              <CalendarDays size={14} className="text-warning" />
-            </div>
-            <h2 className="section-title text-[#e8eaff]">Próximos agendamentos</h2>
-            {proximosAgendamentos.length > 0 && (
-              <span className="ml-auto text-[11px] font-medium text-warning bg-warning/10 px-2 py-0.5 rounded-full tabular-nums">
-                {proximosAgendamentos.length}
-              </span>
-            )}
+            <Link
+              href="/conexoes"
+              className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-[#6c5ce7] to-[#4ecdc4] rounded-xl hover:shadow-[0_0_30px_rgba(108,92,231,0.4)] hover:-translate-y-0.5 transition-all duration-300"
+            >
+              <Zap size={16} />
+              Conectar Instagram
+            </Link>
           </div>
-
-          {loading ? (
-            <SkeletonRows count={3} />
-          ) : proximosAgendamentos.length === 0 ? (
-            <p className="text-text-muted text-sm text-center py-10">
-              Nenhum agendamento futuro.
-            </p>
-          ) : (
-            <div className="divide-y divide-border-subtle">
-              {proximosAgendamentos.map((post, index) => (
-                <motion.div
-                  key={post.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05, duration: 0.3 }}
-                  className="py-3 first:pt-0 last:pb-0 space-y-1.5 cursor-pointer hover:bg-[#4ecdc4]/5 rounded-lg px-1 -mx-1 transition-colors duration-150"
-                  onClick={() => openEditPost(post)}
-                >
-                  <p className="text-sm text-text-primary leading-snug line-clamp-1 font-medium">
-                    {post.titulo}
-                  </p>
-                  <div className="flex items-center gap-2.5">
-                    {post.agendado_para && (
-                      <span className="text-xs text-text-secondary tabular-nums">
-                        {formatShortDate(post.agendado_para)}
-                      </span>
-                    )}
-                    <div className="flex items-center gap-1">
-                      {post.plataformas.map((p) => (
-                        <PlatformDot key={p} plataforma={p} />
-                      ))}
-                    </div>
-                    <span className="text-[11px] text-text-muted bg-bg-elevated px-2 py-0.5 rounded">
-                      {post.tematica}
-                    </span>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          )}
         </motion.div>
-
-      </div>
-
-      {/* ── PostModal ──────────────────────────────────────────────── */}
-      {empresa && (
-        <PostModal
-          open={showModal}
-          onClose={closeModal}
-          onSave={handleSave}
-          post={editingPost}
-          empresaId={empresa.id}
-        />
       )}
 
+      {/* ── Recent Posts Grid ──────────────────────────────────── */}
+      {loading ? (
+        <div>
+          <span className="section-title mb-3 block text-[#e8eaff]">
+            Posts recentes
+          </span>
+          <PostGridSkeleton />
+        </div>
+      ) : connected && recentPosts.length > 0 ? (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <span className="section-title text-[#e8eaff]">
+              Posts recentes
+            </span>
+            <button
+              onClick={refresh}
+              className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-text-secondary transition-colors"
+            >
+              <RefreshCw size={12} />
+              Atualizar
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {recentPosts.map((post, index) => {
+              const thumbUrl =
+                post.media_type === "VIDEO"
+                  ? post.thumbnail_url ?? post.media_url
+                  : post.media_url;
+              const captionPreview = post.caption
+                ? post.caption.slice(0, 80) +
+                  (post.caption.length > 80 ? "..." : "")
+                : "Sem legenda";
+
+              return (
+                <motion.a
+                  key={post.id}
+                  href={post.permalink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{
+                    delay: index * 0.08,
+                    duration: 0.4,
+                    ease: [0.4, 0, 0.2, 1],
+                  }}
+                  className="group bg-bg-card border border-border rounded-xl overflow-hidden hover:border-border-light hover:-translate-y-1 transition-all duration-300"
+                >
+                  {/* Thumbnail */}
+                  <div className="relative aspect-square bg-bg-elevated overflow-hidden">
+                    {thumbUrl ? (
+                      <img
+                        src={thumbUrl}
+                        alt={captionPreview}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <ImageIcon
+                          size={32}
+                          className="text-text-muted opacity-30"
+                        />
+                      </div>
+                    )}
+
+                    {/* Overlay on hover with full caption */}
+                    <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-3">
+                      <p className="text-white text-xs leading-relaxed line-clamp-4">
+                        {post.caption ?? "Sem legenda"}
+                      </p>
+                    </div>
+
+                    {/* Media type badge */}
+                    <span className="absolute top-2 right-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-black/60 text-white text-[10px] font-medium backdrop-blur-sm">
+                      {formatTypeIcon(post.media_type)}
+                      {formatLabel(post.media_type)}
+                    </span>
+
+                    {/* Open link icon */}
+                    <span className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <ExternalLink size={14} className="text-white/80" />
+                    </span>
+                  </div>
+
+                  {/* Info */}
+                  <div className="p-3">
+                    <p className="text-xs text-text-secondary line-clamp-2 mb-2 min-h-[2rem]">
+                      {captionPreview}
+                    </p>
+                    <div className="flex items-center gap-3 text-text-muted text-[11px]">
+                      <span className="inline-flex items-center gap-1">
+                        <Heart size={11} className="text-[#e1306c]" />
+                        {formatNumber(post.like_count ?? 0)}
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <MessageCircle size={11} className="text-[#6c5ce7]" />
+                        {formatNumber(post.comments_count ?? 0)}
+                      </span>
+                    </div>
+                  </div>
+                </motion.a>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {/* ── Quick Stats Bar + DNA Status ───────────────────────── */}
+      {!loading && connected && (
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
+          {/* Quick Stats Bar */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4 }}
+            className="lg:col-span-3 bg-bg-card border border-border rounded-xl p-4 sm:p-5"
+          >
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="w-7 h-7 rounded-lg bg-[#4ecdc4]/15 flex items-center justify-center">
+                <BarChart3 size={14} className="text-[#4ecdc4]" />
+              </div>
+              <h2 className="section-title text-[#e8eaff]">
+                Resumo de performance
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {/* Avg Likes */}
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 text-text-muted">
+                  <Heart size={13} className="text-[#e1306c]" />
+                  <span className="text-[11px]">Media de curtidas</span>
+                </div>
+                <p className="text-lg font-bold text-text-primary tabular-nums">
+                  {formatNumber(stats.avgLikes)}
+                </p>
+              </div>
+
+              {/* Avg Comments */}
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 text-text-muted">
+                  <MessageCircle size={13} className="text-[#6c5ce7]" />
+                  <span className="text-[11px]">Media de comentarios</span>
+                </div>
+                <p className="text-lg font-bold text-text-primary tabular-nums">
+                  {formatNumber(stats.avgComments)}
+                </p>
+              </div>
+
+              {/* Last Post */}
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 text-text-muted">
+                  <Clock size={13} className="text-[#fbbf24]" />
+                  <span className="text-[11px]">Post mais recente</span>
+                </div>
+                <p className="text-sm font-semibold text-text-primary">
+                  {stats.lastPostAgo}
+                </p>
+              </div>
+
+              {/* Most Used Format */}
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 text-text-muted">
+                  <Calendar size={13} className="text-[#f093fb]" />
+                  <span className="text-[11px]">Formato mais usado</span>
+                </div>
+                <p className="text-sm font-semibold text-text-primary">
+                  {formatLabel(stats.mostUsedFormat)}
+                </p>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* DNA Status Card */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.5 }}
+            className="lg:col-span-2 bg-bg-card border border-border rounded-xl p-4 sm:p-5"
+          >
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="w-7 h-7 rounded-lg bg-[#6c5ce7]/15 flex items-center justify-center">
+                <Sparkles size={14} className="text-[#6c5ce7]" />
+              </div>
+              <h2 className="section-title text-[#e8eaff]">DNA da Marca</h2>
+            </div>
+
+            <DNACard dna={dna} empresaId={empresa.id} />
+          </motion.div>
+        </div>
+      )}
+
+      {/* DNA card when NOT connected but dna exists */}
+      {!loading && !connected && dna && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="bg-bg-card border border-border rounded-xl p-4 sm:p-5 max-w-lg"
+        >
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="w-7 h-7 rounded-lg bg-[#6c5ce7]/15 flex items-center justify-center">
+              <Sparkles size={14} className="text-[#6c5ce7]" />
+            </div>
+            <h2 className="section-title text-[#e8eaff]">DNA da Marca</h2>
+          </div>
+          <DNACard dna={dna} empresaId={empresa.id} />
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
+// ─── DNA Card inner ─────────────────────────────────────────────────────────
+
+function DNACard({
+  dna,
+  empresaId,
+}: {
+  dna: import("@/types").MarcaDNA | null;
+  empresaId: string;
+}) {
+  if (!dna || dna.status === "pendente") {
+    return (
+      <div className="text-center py-4">
+        <p className="text-sm text-text-muted mb-3">
+          Gere o DNA da sua marca para desbloquear conteudo personalizado pela
+          IA.
+        </p>
+        <Link
+          href="/configuracoes"
+          className="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-gradient-to-r from-[#6c5ce7] to-[#4ecdc4] rounded-lg hover:shadow-[0_0_20px_rgba(108,92,231,0.3)] transition-all duration-300"
+        >
+          <Sparkles size={14} />
+          Gerar DNA da Marca
+        </Link>
+        <p className="text-[11px] text-text-muted mt-2">DNA pendente</p>
+      </div>
+    );
+  }
+
+  const synth = dna.dna_sintetizado;
+
+  return (
+    <div className="space-y-3">
+      {/* Tom de voz */}
+      {synth?.tom_de_voz && (
+        <div>
+          <span className="text-[11px] text-text-muted uppercase tracking-wider">
+            Tom de voz
+          </span>
+          <p className="text-sm text-text-primary mt-0.5 line-clamp-2">
+            {synth.tom_de_voz}
+          </p>
+        </div>
+      )}
+
+      {/* 3 pilares */}
+      {synth?.pilares_conteudo && synth.pilares_conteudo.length > 0 && (
+        <div>
+          <span className="text-[11px] text-text-muted uppercase tracking-wider">
+            Pilares de conteudo
+          </span>
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {synth.pilares_conteudo.slice(0, 3).map((pilar) => (
+              <span
+                key={pilar}
+                className="px-2 py-0.5 text-[11px] font-medium text-[#6c5ce7] bg-[#6c5ce7]/10 border border-[#6c5ce7]/20 rounded-md"
+              >
+                {pilar}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Paleta de cores */}
+      {synth?.paleta_cores && synth.paleta_cores.length > 0 && (
+        <div>
+          <span className="text-[11px] text-text-muted uppercase tracking-wider">
+            Paleta de cores
+          </span>
+          <div className="flex items-center gap-1.5 mt-1">
+            {synth.paleta_cores.slice(0, 6).map((color) => (
+              <span
+                key={color}
+                className="w-5 h-5 rounded-full border border-white/10"
+                style={{ backgroundColor: color }}
+                title={color}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Status badge */}
+      <div className="flex items-center gap-1.5 pt-1">
+        <span
+          className={cn(
+            "w-1.5 h-1.5 rounded-full",
+            dna.status === "completo" ? "bg-green-500" : "bg-yellow-500"
+          )}
+        />
+        <span className="text-[11px] text-text-muted">
+          {dna.status === "completo"
+            ? "DNA atualizado"
+            : dna.status === "analisando"
+              ? "Analisando..."
+              : "DNA pendente"}
+        </span>
+      </div>
     </div>
   );
 }

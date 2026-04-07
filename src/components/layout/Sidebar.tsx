@@ -13,6 +13,7 @@ import {
   Newspaper,
   Brain,
   Cable,
+  Zap,
   Settings,
   ChevronDown,
   Check,
@@ -35,6 +36,7 @@ const navLinks = [
   { label: "Concorrentes", href: "/concorrentes", icon: Users },
   { label: "Noticias", href: "/noticias", icon: Newspaper },
   { label: "Relatorio", href: "/relatorio", icon: Brain, needsDNA: true },
+  { label: "Inteligencia", href: "/inteligencia", icon: Zap },
   { label: "Conexoes", href: "/conexoes", icon: Cable },
   { label: "Configuracoes", href: "/configuracoes", icon: Settings },
 ] as const;
