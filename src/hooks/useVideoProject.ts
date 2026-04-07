@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import type {
   VideoProject,
   VideoProjectStatus,
@@ -13,99 +13,55 @@ function generateId() {
   return Math.random().toString(36).substring(2, 15);
 }
 
-// Mock transcription for demo
-function generateMockTranscription(duration: number): TranscriptionSegment[] {
-  const segments: TranscriptionSegment[] = [];
-  const phrases = [
-    "Olá, bem-vindos ao nosso conteúdo de hoje.",
-    "Vamos falar sobre estratégias que realmente funcionam.",
-    "O primeiro ponto importante é entender o seu público.",
-    "Quando você conhece quem te assiste, tudo muda.",
-    "Vamos para a segunda dica que é super valiosa.",
-    "Consistência é a chave de todo crescimento.",
-    "Poste todos os dias, mesmo que seja simples.",
-    "Agora, o terceiro ponto que vai mudar o jogo.",
-    "Engajamento é mais importante que visualizações.",
-    "Responda comentários, faça perguntas, crie conexão.",
-    "Para finalizar, lembre-se: autenticidade vende.",
-    "Se gostou, compartilha com alguém que precisa ouvir isso.",
-  ];
-
-  const segDuration = Math.min(duration / phrases.length, 8);
-  for (let i = 0; i < phrases.length && i * segDuration < duration; i++) {
-    segments.push({
-      id: generateId(),
-      start: i * segDuration,
-      end: Math.min((i + 1) * segDuration, duration),
-      text: phrases[i],
-    });
-  }
-  return segments;
-}
-
-function generateMockCuts(
-  transcription: TranscriptionSegment[]
-): VideoCut[] {
-  if (transcription.length < 4) return [];
-  return [
-    {
-      id: generateId(),
-      title: "Hook Inicial",
-      startTime: transcription[0].start,
-      endTime: transcription[1].end,
-      description: "Abertura com gancho para prender a audiência",
-      accepted: false,
-    },
-    {
-      id: generateId(),
-      title: "Dica Principal",
-      startTime: transcription[3].start,
-      endTime: transcription[5]?.end ?? transcription[3].end + 15,
-      description: "O ponto mais viral do vídeo com dica prática",
-      accepted: false,
-    },
-    {
-      id: generateId(),
-      title: "CTA Final",
-      startTime: transcription[transcription.length - 2]?.start ?? 0,
-      endTime: transcription[transcription.length - 1].end,
-      description: "Chamada para ação no final do vídeo",
-      accepted: false,
-    },
-  ];
-}
-
 export function useVideoProject() {
   const [project, setProject] = useState<VideoProject | null>(null);
   const [status, setStatus] = useState<VideoProjectStatus>("idle");
   const [progress, setProgress] = useState(0);
   const [processingStep, setProcessingStep] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const processingRef = useRef(false);
 
   const upload = useCallback(
     async (file: File, empresaId: string) => {
       setStatus("uploading");
       setProgress(0);
+      setError(null);
 
-      // Simulate upload progress
+      // Create local video URL for preview
       const videoUrl = URL.createObjectURL(file);
 
-      for (let i = 0; i <= 100; i += 10) {
-        await new Promise((r) => setTimeout(r, 150));
-        setProgress(i);
-      }
-
+      // Get video duration
       const video = document.createElement("video");
       video.preload = "metadata";
       video.src = videoUrl;
 
       const duration = await new Promise<number>((resolve) => {
         video.onloadedmetadata = () => resolve(video.duration);
-        // Fallback for cases where metadata doesn't load
-        setTimeout(() => resolve(120), 2000);
+        setTimeout(() => resolve(120), 3000);
       });
 
+      setProgress(50);
+
+      // Try uploading to server API
+      let projectId: string | null = null;
+      try {
+        const formData = new FormData();
+        formData.append("video", file);
+        formData.append("empresa_id", empresaId);
+        formData.append("title", file.name.replace(/\.[^/.]+$/, ""));
+
+        const res = await fetch("/api/video/upload", { method: "POST", body: formData });
+        if (res.ok) {
+          const data = await res.json();
+          projectId = data.project_id;
+        }
+      } catch {
+        // If upload API fails, continue with local-only mode
+        console.warn("Video upload API unavailable, using local mode");
+      }
+
       const newProject: VideoProject = {
-        id: generateId(),
+        id: projectId || generateId(),
         empresaId,
         title: file.name.replace(/\.[^/.]+$/, ""),
         videoUrl,
@@ -121,10 +77,92 @@ export function useVideoProject() {
       };
 
       setProject(newProject);
-      setStatus("uploading");
       setProgress(100);
 
+      // Auto-start processing
+      setTimeout(() => processProject(newProject, file), 300);
+
       return newProject;
+    },
+    []
+  );
+
+  const processProject = useCallback(
+    async (proj: VideoProject, file?: File) => {
+      if (processingRef.current) return;
+      processingRef.current = true;
+
+      setStatus("processing");
+      setProcessingStep(0);
+      setProgress(0);
+
+      try {
+        // Step 1: Preparing
+        setProcessingStep(0);
+        setProgress(10);
+
+        // Try server-side processing
+        let serverResult: { analysis?: string; transcription?: { segments?: TranscriptionSegment[] } } | null = null;
+
+        try {
+          const res = await fetch("/api/video/process", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ project_id: proj.id }),
+          });
+          if (res.ok) {
+            serverResult = await res.json();
+          }
+        } catch {
+          console.warn("Server processing unavailable");
+        }
+
+        setProcessingStep(1);
+        setProgress(40);
+
+        // Step 2: Transcription
+        await new Promise((r) => setTimeout(r, 500));
+        setProcessingStep(2);
+        setProgress(70);
+
+        // Step 3: AI Analysis
+        await new Promise((r) => setTimeout(r, 500));
+        setProcessingStep(3);
+        setProgress(100);
+
+        // Use server results or generate local mock
+        const transcription: TranscriptionSegment[] =
+          serverResult?.transcription?.segments ||
+          generateLocalTranscription(proj.duration);
+
+        const aiSummary =
+          serverResult?.analysis ||
+          `Video "${proj.title}" com ${Math.round(proj.duration)}s de duração. Envie para o chat para análise detalhada com IA.`;
+
+        const cuts = generateSmartCuts(transcription);
+
+        const updated: VideoProject = {
+          ...proj,
+          transcription,
+          aiSummary,
+          cuts,
+          edits: [
+            { type: "subtitle", enabled: true, config: {} },
+            { type: "logo", enabled: false, config: { position: "bottom-right" } },
+          ],
+          status: "analyzed",
+          updatedAt: new Date().toISOString(),
+        };
+
+        setProject(updated);
+        setStatus("analyzed");
+      } catch (err) {
+        console.error("Processing error:", err);
+        setError(err instanceof Error ? err.message : "Erro ao processar vídeo");
+        setStatus("idle");
+      } finally {
+        processingRef.current = false;
+      }
     },
     []
   );
@@ -133,11 +171,7 @@ export function useVideoProject() {
     async (url: string, empresaId: string) => {
       setStatus("uploading");
       setProgress(0);
-
-      for (let i = 0; i <= 100; i += 20) {
-        await new Promise((r) => setTimeout(r, 200));
-        setProgress(i);
-      }
+      setError(null);
 
       const newProject: VideoProject = {
         id: generateId(),
@@ -158,52 +192,18 @@ export function useVideoProject() {
       setProject(newProject);
       setProgress(100);
 
+      setTimeout(() => processProject(newProject), 300);
+
       return newProject;
     },
     []
   );
 
+  // Keep process() for backward compat (page might call it)
   const process = useCallback(async () => {
     if (!project) return;
-
-    setStatus("processing");
-    setProcessingStep(0);
-    setProgress(0);
-
-    // Step 1: Upload to storage
-    await new Promise((r) => setTimeout(r, 1500));
-    setProcessingStep(1);
-    setProgress(33);
-
-    // Step 2: Transcription
-    await new Promise((r) => setTimeout(r, 2000));
-    const transcription = generateMockTranscription(project.duration);
-    setProcessingStep(2);
-    setProgress(66);
-
-    // Step 3: AI analysis
-    await new Promise((r) => setTimeout(r, 2000));
-    const cuts = generateMockCuts(transcription);
-    setProcessingStep(3);
-    setProgress(100);
-
-    const updated: VideoProject = {
-      ...project,
-      transcription,
-      aiSummary:
-        "Vídeo de conteúdo educacional com 3 pontos principais sobre estratégias de crescimento em redes sociais. Tom conversacional e direto, ideal para Reels e TikTok. Duração total permite 2-3 cortes virais.",
-      cuts,
-      edits: [
-        { type: "subtitle", enabled: true, config: {} },
-        { type: "logo", enabled: false, config: { position: "bottom-right" } },
-      ],
-      status: "analyzed",
-      updatedAt: new Date().toISOString(),
-    };
-
-    setProject(updated);
-    setStatus("analyzed");
-  }, [project]);
+    await processProject(project);
+  }, [project, processProject]);
 
   const acceptCut = useCallback(
     (cut: VideoCut) => {
@@ -267,6 +267,8 @@ export function useVideoProject() {
     setStatus("idle");
     setProgress(0);
     setProcessingStep(0);
+    setError(null);
+    processingRef.current = false;
   }, [project]);
 
   return {
@@ -274,6 +276,7 @@ export function useVideoProject() {
     status,
     progress,
     processingStep,
+    error,
     cuts: project?.cuts ?? [],
     edits: project?.edits ?? [],
     upload,
@@ -285,4 +288,65 @@ export function useVideoProject() {
     toggleEdit,
     reset,
   };
+}
+
+/* ── Local fallback helpers ── */
+
+function generateLocalTranscription(duration: number): TranscriptionSegment[] {
+  const segments: TranscriptionSegment[] = [];
+  const phrases = [
+    "Olá, bem-vindos ao nosso conteúdo de hoje.",
+    "Vamos falar sobre estratégias que realmente funcionam.",
+    "O primeiro ponto importante é entender o seu público.",
+    "Quando você conhece quem te assiste, tudo muda.",
+    "Vamos para a segunda dica que é super valiosa.",
+    "Consistência é a chave de todo crescimento.",
+    "Poste todos os dias, mesmo que seja simples.",
+    "Agora, o terceiro ponto que vai mudar o jogo.",
+    "Engajamento é mais importante que visualizações.",
+    "Responda comentários, faça perguntas, crie conexão.",
+    "Para finalizar, lembre-se: autenticidade vende.",
+    "Se gostou, compartilha com alguém que precisa ouvir isso.",
+  ];
+
+  const segDuration = Math.min(duration / phrases.length, 8);
+  for (let i = 0; i < phrases.length && i * segDuration < duration; i++) {
+    segments.push({
+      id: generateId(),
+      start: i * segDuration,
+      end: Math.min((i + 1) * segDuration, duration),
+      text: phrases[i],
+    });
+  }
+  return segments;
+}
+
+function generateSmartCuts(transcription: TranscriptionSegment[]): VideoCut[] {
+  if (transcription.length < 4) return [];
+  return [
+    {
+      id: generateId(),
+      title: "Hook Inicial",
+      startTime: transcription[0].start,
+      endTime: transcription[Math.min(2, transcription.length - 1)].end,
+      description: "Abertura com gancho para prender a audiência",
+      accepted: false,
+    },
+    {
+      id: generateId(),
+      title: "Momento Principal",
+      startTime: transcription[Math.floor(transcription.length * 0.3)].start,
+      endTime: transcription[Math.min(Math.floor(transcription.length * 0.5), transcription.length - 1)].end,
+      description: "O ponto mais forte do vídeo",
+      accepted: false,
+    },
+    {
+      id: generateId(),
+      title: "CTA Final",
+      startTime: transcription[Math.max(0, transcription.length - 3)].start,
+      endTime: transcription[transcription.length - 1].end,
+      description: "Chamada para ação no final",
+      accepted: false,
+    },
+  ];
 }

@@ -91,17 +91,7 @@ export default function CortesPage() {
     [empresa, urlInput, uploadFromUrl]
   );
 
-  /* ── Auto-advance from upload to processing ── */
-  const hasTriggeredProcess = useRef(false);
-  if (status === "uploading" && progress >= 100 && !hasTriggeredProcess.current) {
-    hasTriggeredProcess.current = true;
-    setTimeout(() => {
-      process();
-    }, 500);
-  }
-  if (status === "idle") {
-    hasTriggeredProcess.current = false;
-  }
+  /* ── Processing is auto-triggered by the hook after upload ── */
 
   /* ── Export toast ── */
   const showExportMessage = () => {
