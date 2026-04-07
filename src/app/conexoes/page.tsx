@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Cable,
@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useEmpresa } from "@/hooks/useEmpresa";
 import { useInstagram } from "@/hooks/useInstagram";
+import { triggerAutoDNA } from "@/lib/ai/dna-trigger";
 
 /* ── Social Icons (SVG) ────────────────────────── */
 
@@ -163,6 +164,8 @@ export default function ConexoesPage() {
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [dnaGenerating, setDnaGenerating] = useState(false);
+  const dnaTriggeredRef = useRef(false);
 
   // Tratar retorno do OAuth callback
   useEffect(() => {
@@ -174,7 +177,7 @@ export default function ConexoesPage() {
     if (success === "instagram" && username) {
       setOauthMessage({
         type: "success",
-        text: `Instagram @${username} conectado com sucesso!`,
+        text: `Instagram @${username} conectado com sucesso! Gerando DNA da marca automaticamente...`,
       });
       window.history.replaceState({}, "", "/conexoes");
     } else if (error) {
@@ -194,6 +197,35 @@ export default function ConexoesPage() {
       window.history.replaceState({}, "", "/conexoes");
     }
   }, []);
+
+  // Auto-trigger DNA generation after successful Instagram connection
+  useEffect(() => {
+    if (!empresa?.id || dnaTriggeredRef.current) return;
+    // Only trigger when we have a success message (fresh connection)
+    if (!oauthMessage || oauthMessage.type !== "success") return;
+
+    dnaTriggeredRef.current = true;
+    setDnaGenerating(true);
+
+    triggerAutoDNA(empresa.id, {
+      onComplete: () => {
+        setDnaGenerating(false);
+        setOauthMessage({
+          type: "success",
+          text: "Instagram conectado e DNA da marca gerado com sucesso!",
+        });
+      },
+      onError: (errMsg) => {
+        setDnaGenerating(false);
+        // Keep the success message for the connection, just note the DNA issue
+        setOauthMessage({
+          type: "success",
+          text: `Instagram conectado! DNA sera gerado na proxima visita ao dashboard.`,
+        });
+        console.warn("[Conexoes] DNA auto-generation failed:", errMsg);
+      },
+    });
+  }, [empresa?.id, oauthMessage]);
 
   if (!empresa) {
     return (
@@ -530,7 +562,9 @@ export default function ConexoesPage() {
                 : "bg-red-500/10 border-red-500/20 text-red-400"
             }`}
           >
-            {oauthMessage.type === "success" ? (
+            {dnaGenerating ? (
+              <RefreshCw size={18} className="animate-spin" />
+            ) : oauthMessage.type === "success" ? (
               <CheckCircle2 size={18} />
             ) : (
               <AlertCircle size={18} />

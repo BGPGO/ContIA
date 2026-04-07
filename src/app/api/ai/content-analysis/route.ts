@@ -10,9 +10,11 @@ import { createClient } from "@/lib/supabase/server";
  * Body: { empresa_id: string }
  */
 export async function POST(req: NextRequest) {
+  console.log("[content-analysis] OPENAI_API_KEY present:", !!process.env.OPENAI_API_KEY);
+
   if (!isAIConfigured()) {
     return NextResponse.json(
-      { error: "AI nao configurada" },
+      { error: "OpenAI API nao configurada. Verifique a variavel OPENAI_API_KEY no servidor.", code: "AI_NOT_CONFIGURED" },
       { status: 503 }
     );
   }

@@ -107,6 +107,24 @@ export function useMarcaDNA(empresaId?: string) {
     }
   }, [dna, empresaId, analyzing]);
 
+  // ── Check if Instagram is connected ──────────────────────────────────
+  const checkInstagramConnected = useCallback(async (): Promise<boolean> => {
+    if (!empresaId || !configured) return false;
+    try {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("social_connections")
+        .select("id")
+        .eq("empresa_id", empresaId)
+        .eq("provider", "instagram")
+        .eq("is_active", true)
+        .maybeSingle();
+      return !!data;
+    } catch {
+      return false;
+    }
+  }, [empresaId, configured]);
+
   // ── Trigger full analysis ────────────────────────────────────────────
   const analisar = useCallback(async () => {
     if (!empresaId) return;
@@ -114,11 +132,20 @@ export function useMarcaDNA(empresaId?: string) {
     setError(null);
 
     try {
-      const res = await fetch("/api/marca/analisar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ empresaId }),
-      });
+      // Check if Instagram is connected to decide which endpoint to use
+      const igConnected = await checkInstagramConnected();
+
+      const res = igConnected
+        ? await fetch("/api/ai/auto-dna", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ empresa_id: empresaId }),
+          })
+        : await fetch("/api/marca/analisar", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ empresaId }),
+          });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -152,7 +179,7 @@ export function useMarcaDNA(empresaId?: string) {
     } finally {
       setAnalyzing(false);
     }
-  }, [empresaId, configured]);
+  }, [empresaId, configured, checkInstagramConnected]);
 
   // ── Background refresh (doesn't block UI) ───────────────────────────
   const refreshInBackground = useCallback(async () => {
@@ -160,11 +187,19 @@ export function useMarcaDNA(empresaId?: string) {
     setRefreshing(true);
 
     try {
-      const res = await fetch("/api/marca/analisar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ empresaId }),
-      });
+      const igConnected = await checkInstagramConnected();
+
+      const res = igConnected
+        ? await fetch("/api/ai/auto-dna", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ empresa_id: empresaId }),
+          })
+        : await fetch("/api/marca/analisar", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ empresaId }),
+          });
 
       if (res.ok) {
         const result: MarcaDNA = await res.json();
@@ -187,7 +222,7 @@ export function useMarcaDNA(empresaId?: string) {
     } finally {
       setRefreshing(false);
     }
-  }, [empresaId, analyzing, configured]);
+  }, [empresaId, analyzing, configured, checkInstagramConnected]);
 
   // ── Manual save (for external updates) ──────────────────────────────
   const save = useCallback(

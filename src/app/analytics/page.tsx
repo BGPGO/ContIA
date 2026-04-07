@@ -771,7 +771,7 @@ export default function AnalyticsPage() {
 
   if (!data) return null;
 
-  const { profile, engagement, top_posts, content_breakdown, posting_frequency, insights, content_analysis } = data;
+  const { profile, engagement, top_posts, content_breakdown, posting_frequency, insights, insights_error, content_analysis } = data;
 
   // Compute reach from insights if available
   const reachInsight = insights.find((i) => i.name === "reach");
@@ -782,6 +782,7 @@ export default function AnalyticsPage() {
   const totalImpressions = impressionsInsight?.values.length
     ? impressionsInsight.values.reduce((s, v) => s + v.value, 0)
     : 0;
+  const insightsUnavailable = avgReach === 0 && totalImpressions === 0;
 
   return (
     <div className="fade-in space-y-6 p-2 sm:p-4 md:p-6 max-w-7xl mx-auto">
@@ -846,6 +847,16 @@ export default function AnalyticsPage() {
           index={5}
         />
       </div>
+
+      {/* Insights unavailable notice */}
+      {insightsUnavailable && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[#6c5ce7]/10 border border-[#6c5ce7]/20 text-sm text-text-secondary">
+          <Eye size={16} className="text-[#6c5ce7] shrink-0" />
+          <span>
+            {insights_error || "Dados de alcance e impressoes ficam disponiveis apos alguns dias de atividade no Instagram."}
+          </span>
+        </div>
+      )}
 
       {/* Charts Row 1: Engagement + Content Type */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">

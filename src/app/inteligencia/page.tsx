@@ -513,6 +513,11 @@ export default function InteligenciaPage() {
           setLoading(false);
           return;
         }
+        if (data.code === "AI_NOT_CONFIGURED") {
+          setError("__AI_NOT_CONFIGURED__");
+          setLoading(false);
+          return;
+        }
         throw new Error(data.error ?? "Erro desconhecido");
       }
 
@@ -590,10 +595,25 @@ export default function InteligenciaPage() {
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400"
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm ${
+            error === "__AI_NOT_CONFIGURED__"
+              ? "bg-amber-500/10 border border-amber-500/20 text-amber-400"
+              : "bg-red-500/10 border border-red-500/20 text-red-400"
+          }`}
         >
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          {error}
+          {error === "__AI_NOT_CONFIGURED__" ? (
+            <>
+              <Zap className="w-4 h-4 shrink-0" />
+              <span>
+                A IA nao esta configurada no servidor. A variavel <strong>OPENAI_API_KEY</strong> precisa estar definida. Se voce acabou de configurar, um novo deploy pode resolver.
+              </span>
+            </>
+          ) : (
+            <>
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              {error}
+            </>
+          )}
         </motion.div>
       )}
 

@@ -7,8 +7,13 @@ import { checkDuplicate, addToHistory } from "@/lib/anti-duplicidade";
 import type { GenerationRequest, GeneratedContent } from "@/types/ai";
 
 export async function POST(request: NextRequest) {
+  console.log("[generate] OPENAI_API_KEY present:", !!process.env.OPENAI_API_KEY);
+
   if (!isAIConfigured()) {
-    return NextResponse.json({ error: "AI not configured" }, { status: 503 });
+    return NextResponse.json(
+      { error: "OpenAI API nao configurada. Verifique a variavel OPENAI_API_KEY no servidor." },
+      { status: 503 }
+    );
   }
 
   // Rate limiting

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, useSpring, useMotionValue } from "motion/react";
 import {
   Users,
@@ -531,7 +531,7 @@ export default function DashboardPage() {
               <h2 className="section-title text-[#e8eaff]">DNA da Marca</h2>
             </div>
 
-            <DNACard dna={dna} empresaId={empresa.id} />
+            <DNACard dna={dna} empresaId={empresa.id} connected={connected} onDNAGenerated={refresh} />
           </motion.div>
         </div>
       )}
@@ -550,7 +550,7 @@ export default function DashboardPage() {
             </div>
             <h2 className="section-title text-[#e8eaff]">DNA da Marca</h2>
           </div>
-          <DNACard dna={dna} empresaId={empresa.id} />
+          <DNACard dna={dna} empresaId={empresa.id} connected={false} onDNAGenerated={refresh} />
         </motion.div>
       )}
     </div>
@@ -562,10 +562,38 @@ export default function DashboardPage() {
 function DNACard({
   dna,
   empresaId,
+  connected,
+  onDNAGenerated,
 }: {
   dna: import("@/types").MarcaDNA | null;
   empresaId: string;
+  connected?: boolean;
+  onDNAGenerated?: () => void;
 }) {
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
+
+  const handleGenerateDNA = useCallback(async () => {
+    setGenerating(true);
+    setGenError(null);
+    try {
+      const res = await fetch("/api/ai/auto-dna", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ empresa_id: empresaId }),
+      });
+      const result = await res.json();
+      if (!res.ok || result.status === "erro") {
+        throw new Error(result.error || "Erro ao gerar DNA");
+      }
+      onDNAGenerated?.();
+    } catch (err: any) {
+      setGenError(err.message || "Erro ao gerar DNA");
+    } finally {
+      setGenerating(false);
+    }
+  }, [empresaId, onDNAGenerated]);
+
   if (!dna || dna.status === "pendente") {
     return (
       <div className="text-center py-4">
@@ -573,13 +601,36 @@ function DNACard({
           Gere o DNA da sua marca para desbloquear conteudo personalizado pela
           IA.
         </p>
-        <Link
-          href="/configuracoes"
-          className="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-gradient-to-r from-[#6c5ce7] to-[#4ecdc4] rounded-lg hover:shadow-[0_0_20px_rgba(108,92,231,0.3)] transition-all duration-300"
-        >
-          <Sparkles size={14} />
-          Gerar DNA da Marca
-        </Link>
+        {connected ? (
+          <button
+            onClick={handleGenerateDNA}
+            disabled={generating}
+            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-gradient-to-r from-[#6c5ce7] to-[#4ecdc4] rounded-lg hover:shadow-[0_0_20px_rgba(108,92,231,0.3)] transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {generating ? (
+              <>
+                <RefreshCw size={14} className="animate-spin" />
+                Gerando DNA com IA...
+              </>
+            ) : (
+              <>
+                <Sparkles size={14} />
+                Gerar DNA da Marca
+              </>
+            )}
+          </button>
+        ) : (
+          <Link
+            href="/conexoes"
+            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-gradient-to-r from-[#6c5ce7] to-[#4ecdc4] rounded-lg hover:shadow-[0_0_20px_rgba(108,92,231,0.3)] transition-all duration-300"
+          >
+            <Sparkles size={14} />
+            Conecte o Instagram primeiro
+          </Link>
+        )}
+        {genError && (
+          <p className="text-[11px] text-red-400 mt-2">{genError}</p>
+        )}
         <p className="text-[11px] text-text-muted mt-2">DNA pendente</p>
       </div>
     );

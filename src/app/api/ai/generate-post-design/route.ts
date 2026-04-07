@@ -5,8 +5,13 @@ import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import type { PostVisualStyle, EmpresaContext } from "@/types/ai";
 
 export async function POST(request: NextRequest) {
+  console.log("[generate-post-design] OPENAI_API_KEY present:", !!process.env.OPENAI_API_KEY);
+
   if (!isAIConfigured()) {
-    return NextResponse.json({ error: "AI not configured" }, { status: 503 });
+    return NextResponse.json(
+      { error: "OpenAI API nao configurada. Verifique a variavel OPENAI_API_KEY no servidor." },
+      { status: 503 }
+    );
   }
 
   // Rate limiting
@@ -118,6 +123,9 @@ Gere um post visual completo. Para CARROSSEL, gere 5-7 slides. Responda em JSON:
     return NextResponse.json(design);
   } catch (error: any) {
     console.error("Post design generation error:", error);
-    return NextResponse.json({ error: error.message || "Design generation failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || "Falha ao gerar design do post. Tente novamente." },
+      { status: 500 }
+    );
   }
 }

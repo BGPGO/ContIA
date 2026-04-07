@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Brain,
   Target,
@@ -27,9 +27,11 @@ import {
   Loader2,
   FileText,
 } from "lucide-react";
+import Link from "next/link";
 import { useEmpresa } from "@/hooks/useEmpresa";
 import { useMarcaDNA } from "@/hooks/useMarcaDNA";
 import { DNASourcesForm } from "@/components/marca/DNASourcesForm";
+import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 // ─── types (match API route response) ────────────────────────────────────────
@@ -712,6 +714,23 @@ function extractConcorrentes(marcaDNA: MarcaDNAResponse): ConcorrenteInfo[] {
 export default function RelatorioPage() {
   const { empresa, loading: empresaLoading } = useEmpresa();
   const { dna: hookDna, loading: dnaLoading, analyzing, refreshing, error: dnaError, analisar, isStale } = useMarcaDNA(empresa?.id);
+  const [igConnected, setIgConnected] = useState(false);
+
+  // Check if Instagram is connected
+  useEffect(() => {
+    if (!empresa?.id) return;
+    const supabase = createClient();
+    supabase
+      .from("social_connections")
+      .select("id")
+      .eq("empresa_id", empresa.id)
+      .eq("provider", "instagram")
+      .eq("is_active", true)
+      .maybeSingle()
+      .then(({ data }) => {
+        setIgConnected(!!data);
+      });
+  }, [empresa?.id]);
 
   // Derive marcaDNA (MarcaDNAResponse-compatible) from the hook's dna
   const marcaDNA: MarcaDNAResponse | null = hookDna
@@ -827,6 +846,26 @@ export default function RelatorioPage() {
           </div>
         </div>
       </header>
+
+      {/* ── Instagram connection banner ── */}
+      {igConnected ? (
+        <div className="mb-6 p-3 rounded-xl bg-success/10 border border-success/20 flex items-center gap-3 fade-in">
+          <CheckCircle2 size={16} className="text-success shrink-0" />
+          <p className="text-xs text-success font-medium">
+            Instagram conectado — DNA gerado com dados reais
+          </p>
+        </div>
+      ) : !empresaLoading && empresa ? (
+        <div className="mb-6 p-3 rounded-xl bg-warning/10 border border-warning/20 flex items-center gap-3 fade-in">
+          <AlertCircle size={16} className="text-warning shrink-0" />
+          <p className="text-xs text-warning font-medium">
+            Conecte o Instagram para um DNA mais preciso.{" "}
+            <Link href="/conexoes" className="underline hover:text-text-primary transition-colors">
+              Conectar agora
+            </Link>
+          </p>
+        </div>
+      ) : null}
 
       {/* ── ANALYZING STATE ── */}
       {status === "analisando" && <AnalyzingCard />}

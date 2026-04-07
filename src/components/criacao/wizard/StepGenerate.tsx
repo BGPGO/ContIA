@@ -62,6 +62,12 @@ export function StepGenerate({
     setError(null);
     setProgressIndex(0);
 
+    if (!empresa) {
+      setError("Selecione uma empresa primeiro");
+      setField("generating", false);
+      return;
+    }
+
     const context: EmpresaContext = empresaContext || {
       nome: "",
       descricao: "",
@@ -105,7 +111,10 @@ export function StepGenerate({
           }),
         });
 
-        if (!res.ok) throw new Error("Falha ao gerar conteudo visual");
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error || "Falha ao gerar conteudo visual");
+        }
         const data = await res.json();
 
         setVisualResult(
@@ -128,7 +137,10 @@ export function StepGenerate({
           }),
         });
 
-        if (!res.ok) throw new Error("Falha ao gerar conteudo");
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error || "Falha ao gerar conteudo");
+        }
         const data = await res.json();
         setGenerationResult(data);
       }

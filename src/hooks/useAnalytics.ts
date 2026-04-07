@@ -66,6 +66,7 @@ export interface IGAnalyticsData {
   content_breakdown: IGContentBreakdown[];
   posting_frequency: IGPostingFrequency;
   insights: IGInsightTimeSeries[];
+  insights_error?: string | null;
   content_analysis: {
     top_hashtags: IGHashtagStats[];
     avg_caption_length: number;

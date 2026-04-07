@@ -4,8 +4,13 @@ import { imageSchema, formatZodError } from "@/lib/validation";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
+  console.log("[image] OPENAI_API_KEY present:", !!process.env.OPENAI_API_KEY);
+
   if (!isAIConfigured()) {
-    return NextResponse.json({ error: "AI not configured" }, { status: 503 });
+    return NextResponse.json(
+      { error: "OpenAI API nao configurada. Verifique a variavel OPENAI_API_KEY no servidor." },
+      { status: 503 }
+    );
   }
 
   // Rate limiting
@@ -47,7 +52,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error("Image generation error:", error);
     return NextResponse.json(
-      { error: error.message || "Image generation failed" },
+      { error: error.message || "Falha ao gerar imagem. Tente novamente." },
       { status: 500 }
     );
   }

@@ -53,6 +53,7 @@ interface AnalyticsResponse {
   content_breakdown: ContentBreakdown[];
   posting_frequency: PostingFrequency;
   insights: InsightTimeSeries[];
+  insights_error?: string | null;
   content_analysis: {
     top_hashtags: HashtagStats[];
     avg_caption_length: number;
@@ -235,10 +236,15 @@ export async function GET(req: NextRequest) {
 
   try {
     // Fetch all data in parallel
+    let insightsError: string | null = null;
     const [profile, media, insightsDay] = await Promise.all([
       getProfile(provider_user_id, access_token),
       getMedia(provider_user_id, access_token, 30),
-      getInsights(provider_user_id, access_token, "day").catch(() => [] as IGInsight[]),
+      getInsights(provider_user_id, access_token, "day").catch((err) => {
+        console.error("Instagram insights error:", err);
+        insightsError = "Dados de alcance e impressoes ficam disponiveis apos alguns dias de atividade no Instagram. A conta pode precisar de 100+ seguidores ou ter posts recentes.";
+        return [] as IGInsight[];
+      }),
     ]);
 
     const engagement = computeEngagement(media, profile.followers_count);
@@ -259,6 +265,7 @@ export async function GET(req: NextRequest) {
       content_breakdown: contentBreakdown,
       posting_frequency: postingFrequency,
       insights,
+      ...(insightsError ? { insights_error: insightsError } : {}),
       content_analysis: contentAnalysis,
       fetched_at: new Date().toISOString(),
     };
