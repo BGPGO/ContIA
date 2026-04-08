@@ -16,6 +16,7 @@ export async function middleware(request: NextRequest) {
     path.startsWith("/auth/") ||
     path.startsWith("/conexoes") ||
     path.startsWith("/api/instagram") ||
+    path.startsWith("/api/psd-templates") ||
     path.startsWith("/api/video")
   ) {
     return NextResponse.next();

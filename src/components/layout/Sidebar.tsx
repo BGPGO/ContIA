@@ -15,6 +15,7 @@ import {
   Cable,
   Zap,
   Scissors,
+  Palette,
   Settings,
   ChevronDown,
   Check,
@@ -39,6 +40,7 @@ const navLinks = [
   { label: "DNA da Marca", href: "/marca", icon: Brain },
   { label: "Inteligencia", href: "/inteligencia", icon: Zap },
   { label: "Cortes & Video", href: "/cortes", icon: Scissors },
+  { label: "Templates", href: "/templates", icon: Palette },
   { label: "Conexoes", href: "/conexoes", icon: Cable },
   { label: "Configuracoes", href: "/configuracoes", icon: Settings },
 ] as const;

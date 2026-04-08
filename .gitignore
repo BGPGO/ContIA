@@ -40,3 +40,7 @@ next-env.d.ts
 .vscode/
 *.swp
 *.swo
+
+# PSD source files (too large for git)
+/psd-templates/
+*.psd
