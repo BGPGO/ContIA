@@ -64,18 +64,18 @@ interface Template {
 
 const FONT_MAP: Record<string, { css: string; weight: number }> = {
   "Formula1-Display-Bold": {
-    css: "'Oswald', 'Anton', sans-serif",
+    css: "'Formula1 Display', 'Oswald', sans-serif",
     weight: 700,
   },
   "Formula1-Display-Regular": {
-    css: "'Oswald', 'Anton', sans-serif",
+    css: "'Formula1 Display', 'Oswald', sans-serif",
     weight: 400,
   },
   "Poppins-SemiBold": { css: "'Poppins', sans-serif", weight: 600 },
   "Poppins-ExtraLight": { css: "'Poppins', sans-serif", weight: 200 },
   "AlmarenaNeue-Regular": {
-    css: "'Poppins', sans-serif",
-    weight: 300,
+    css: "'Genius Techno', 'Poppins', sans-serif",
+    weight: 400,
   },
 };
 
@@ -203,14 +203,20 @@ export default function TemplateEditorPage() {
   const [error, setError] = useState<string | null>(null);
   const [texts, setTexts] = useState<Record<string, string>>({});
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [fontsReady, setFontsReady] = useState(false);
 
-  // Load Google Fonts
+  // Load Google Fonts + wait for custom fonts
   useEffect(() => {
     const link = document.createElement("link");
     link.href =
-      "https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,200;0,300;0,400;0,600;0,700;1,200;1,300;1,400&family=Oswald:wght@400;500;700&family=Anton&display=swap";
+      "https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,200;0,300;0,400;0,600;0,700;1,200;1,300;1,400&family=Oswald:wght@400;500;700&display=swap";
     link.rel = "stylesheet";
     document.head.appendChild(link);
+
+    // Wait for all fonts (including @font-face from globals.css) to load
+    document.fonts.ready.then(() => {
+      setFontsReady(true);
+    });
   }, []);
 
   // Fetch template data
@@ -301,7 +307,7 @@ export default function TemplateEditorPage() {
       const editedText = texts[layer.id] ?? layer.text;
       drawTextLayer(ctx, layer, editedText);
     });
-  }, [template, texts, getCanvasDimensions, getCurrentLayers]);
+  }, [template, texts, fontsReady, getCanvasDimensions, getCurrentLayers]);
 
   // Load background image and redraw
   useEffect(() => {
@@ -325,10 +331,10 @@ export default function TemplateEditorPage() {
     img.src = url;
   }, [getBackgroundUrl, drawCanvas]);
 
-  // Redraw when texts change (background already loaded)
+  // Redraw when texts change or fonts load
   useEffect(() => {
     drawCanvas();
-  }, [texts, drawCanvas]);
+  }, [texts, fontsReady, drawCanvas]);
 
   // Text change handler
   function handleTextChange(layerId: string, value: string) {

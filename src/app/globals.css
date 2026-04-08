@@ -1,5 +1,46 @@
 @import "tailwindcss";
 
+/* ── Custom fonts from PSD templates ── */
+@font-face {
+  font-family: 'Formula1 Display';
+  src: url('/fonts/Formula1-Bold_web_0.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Formula1 Display';
+  src: url('/fonts/Formula1-Regular_web_0.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Formula1 Wide';
+  src: url('/fonts/Formula1-Wide_web_0.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Genius Techno';
+  src: url('/fonts/GeniusTechno-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Genius Techno';
+  src: url('/fonts/GeniusTechno-Italic.ttf') format('truetype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
 @theme {
   /* ── Core palette — SOLID navy colors, no transparency ── */
   --color-bg-primary: #080b1e;
