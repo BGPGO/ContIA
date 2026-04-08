@@ -15,7 +15,8 @@ export async function middleware(request: NextRequest) {
     path.startsWith("/register") ||
     path.startsWith("/auth/") ||
     path.startsWith("/conexoes") ||
-    path.startsWith("/api/instagram")
+    path.startsWith("/api/instagram") ||
+    path.startsWith("/api/video")
   ) {
     return NextResponse.next();
   }
@@ -48,6 +49,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api/video|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
