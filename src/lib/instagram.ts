@@ -252,16 +252,29 @@ export async function getMedia(
   token: string,
   limit = 12
 ): Promise<IGMedia[]> {
-  const res = await igFetch<{ data: IGMedia[] }>(
-    `/${igUserId}/media`,
-    token,
-    {
-      fields:
-        "id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count",
-      limit: String(limit),
+  // Tentar /me/media primeiro, fallback pra /{userId}/media
+  const endpoints = ["/me/media", `/${igUserId}/media`];
+  const fieldSets = [
+    "id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count",
+    "id,caption,media_type,media_url,permalink,timestamp",
+  ];
+
+  for (const endpoint of endpoints) {
+    for (const fields of fieldSets) {
+      try {
+        const res = await igFetch<{ data: IGMedia[] }>(endpoint, token, {
+          fields,
+          limit: String(limit),
+        });
+        return res.data ?? [];
+      } catch (e) {
+        console.warn(`[IG getMedia] ${endpoint} failed:`, (e as Error).message);
+        continue;
+      }
     }
-  );
-  return res.data ?? [];
+  }
+  console.warn("[IG getMedia] all attempts failed, returning empty");
+  return [];
 }
 
 /* ── Insights ────────────────────────────────────── */
@@ -271,19 +284,28 @@ export async function getInsights(
   token: string,
   period: "day" | "week" | "days_28" = "day"
 ): Promise<IGInsight[]> {
-  const metrics = [
-    "impressions",
-    "reach",
-    "profile_views",
-    "follower_count",
-  ].join(",");
+  const endpoints = ["/me/insights", `/${igUserId}/insights`];
+  const metricSets = [
+    "impressions,reach,profile_views,follower_count",
+    "impressions,reach",
+  ];
 
-  const res = await igFetch<{ data: IGInsight[] }>(
-    `/${igUserId}/insights`,
-    token,
-    { metric: metrics, period }
-  );
-  return res.data ?? [];
+  for (const endpoint of endpoints) {
+    for (const metric of metricSets) {
+      try {
+        const res = await igFetch<{ data: IGInsight[] }>(endpoint, token, {
+          metric,
+          period,
+        });
+        return res.data ?? [];
+      } catch (e) {
+        console.warn(`[IG getInsights] ${endpoint} metric=${metric.slice(0,20)} failed:`, (e as Error).message);
+        continue;
+      }
+    }
+  }
+  console.warn("[IG getInsights] all attempts failed, returning empty");
+  return [];
 }
 
 /* ── Publicar ────────────────────────────────────── */
