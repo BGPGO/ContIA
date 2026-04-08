@@ -18,11 +18,13 @@ import {
   Palette,
   Settings,
   ChevronDown,
+  ChevronRight,
   Check,
   LogOut,
   Plus,
   Menu,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { useEmpresa } from "@/hooks/useEmpresa";
 import { useUser } from "@/hooks/useUser";
@@ -30,20 +32,76 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { EmpresaWizard } from "@/components/empresas/EmpresaWizard";
 import type { Empresa } from "@/types";
 
-const navLinks = [
-  { label: "Gestor de Redes", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Criacao", href: "/criacao", icon: Sparkles },
-  { label: "Analytics", href: "/analytics", icon: BarChart3 },
-  { label: "Calendario", href: "/calendario", icon: CalendarDays },
-  { label: "Concorrentes", href: "/concorrentes", icon: Users },
-  { label: "Noticias", href: "/noticias", icon: Newspaper },
-  { label: "DNA da Marca", href: "/marca", icon: Brain },
-  { label: "Inteligencia", href: "/inteligencia", icon: Zap },
-  { label: "Cortes & Video", href: "/cortes", icon: Scissors },
-  { label: "Templates", href: "/templates", icon: Palette },
-  { label: "Conexoes", href: "/conexoes", icon: Cable },
-  { label: "Configuracoes", href: "/configuracoes", icon: Settings },
-] as const;
+interface NavLink {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+}
+
+interface NavSection {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  collapsible: boolean;
+  links: NavLink[];
+}
+
+const navSections: NavSection[] = [
+  {
+    id: "painel",
+    label: "Painel",
+    icon: LayoutDashboard,
+    collapsible: false,
+    links: [
+      { label: "Gestor de Redes", href: "/dashboard", icon: LayoutDashboard },
+    ],
+  },
+  {
+    id: "criar",
+    label: "Criar",
+    icon: Sparkles,
+    collapsible: true,
+    links: [
+      { label: "Criacao", href: "/criacao", icon: Sparkles },
+      { label: "Templates", href: "/templates", icon: Palette },
+      { label: "Cortes & Video", href: "/cortes", icon: Scissors },
+      { label: "Calendario", href: "/calendario", icon: CalendarDays },
+    ],
+  },
+  {
+    id: "analisar",
+    label: "Analisar",
+    icon: BarChart3,
+    collapsible: true,
+    links: [
+      { label: "Analytics", href: "/analytics", icon: BarChart3 },
+      { label: "Concorrentes", href: "/concorrentes", icon: Users },
+      { label: "Noticias", href: "/noticias", icon: Newspaper },
+    ],
+  },
+  {
+    id: "inteligencia",
+    label: "Inteligencia",
+    icon: Brain,
+    collapsible: true,
+    links: [
+      { label: "DNA da Marca", href: "/marca", icon: Brain },
+      { label: "Inteligencia", href: "/inteligencia", icon: Zap },
+    ],
+  },
+  {
+    id: "sistema",
+    label: "Sistema",
+    icon: Settings,
+    collapsible: true,
+    links: [
+      { label: "Conexoes", href: "/conexoes", icon: Cable },
+      { label: "Configuracoes", href: "/configuracoes", icon: Settings },
+    ],
+  },
+];
+
+const STORAGE_KEY = "contia_sidebar_sections";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -54,6 +112,41 @@ export function Sidebar() {
   const [showWizard, setShowWizard] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Collapsible sections state
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const toggleSection = useCallback((sectionId: string) => {
+    setOpenSections((prev) => {
+      const next = { ...prev, [sectionId]: !prev[sectionId] };
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, []);
+
+  // Check if section has active link
+  const sectionHasActive = useCallback(
+    (section: NavSection) => section.links.some((l) => pathname === l.href || pathname.startsWith(l.href + "/")),
+    [pathname]
+  );
+
+  // Section is open if explicitly toggled open, or has an active link
+  const isSectionOpen = useCallback(
+    (section: NavSection) => {
+      if (!section.collapsible) return true;
+      if (sectionHasActive(section)) return true;
+      return openSections[section.id] ?? false;
+    },
+    [openSections, sectionHasActive]
+  );
 
   const handleWizardCreated = (empresa: Empresa) => {
     setShowWizard(false);
@@ -182,39 +275,76 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-3 flex flex-col gap-0.5 overflow-y-auto">
-        {navLinks.map((link, index) => {
-          const { label, href, icon: Icon } = link;
-          const active = pathname === href || pathname.startsWith(href + "/");
+      <nav className="flex-1 px-3 py-3 flex flex-col gap-1 overflow-y-auto">
+        {navSections.map((section) => {
+          const open = isSectionOpen(section);
+          const hasActive = sectionHasActive(section);
+
           return (
-            <motion.div
-              key={href}
-              initial={{ opacity: 0, x: -12 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.05, duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-            >
-              <Link
-                href={href}
-                onClick={closeMobile}
-                className={`relative flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-[13px] font-medium transition-all duration-200 ${
-                  active
-                    ? "text-text-primary bg-gradient-to-r from-[#4ecdc4]/15 to-transparent"
-                    : "text-text-secondary hover:text-text-primary hover:bg-[#4ecdc4]/5"
-                }`}
-              >
-                {active && (
-                  <motion.span
-                    layoutId="activeNav"
-                    className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full bg-gradient-to-b from-[#4ecdc4] to-[#6c5ce7] shadow-[0_0_8px_rgba(78,205,196,0.4)]"
-                    transition={{ type: "spring", stiffness: 350, damping: 30 }}
+            <div key={section.id}>
+              {/* Section header */}
+              {section.collapsible ? (
+                <button
+                  onClick={() => toggleSection(section.id)}
+                  className={`w-full flex items-center gap-2 px-2.5 h-8 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition-colors duration-150 ${
+                    hasActive
+                      ? "text-accent"
+                      : "text-text-muted hover:text-text-secondary"
+                  }`}
+                >
+                  <section.icon className="w-3.5 h-3.5 shrink-0" />
+                  <span className="flex-1 text-left">{section.label}</span>
+                  <ChevronRight
+                    className={`w-3 h-3 transition-transform duration-200 ${
+                      open ? "rotate-90" : ""
+                    }`}
                   />
+                </button>
+              ) : null}
+
+              {/* Section links */}
+              <AnimatePresence initial={false}>
+                {open && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+                    className="overflow-hidden"
+                  >
+                    <div className={`flex flex-col gap-0.5 ${section.collapsible ? "ml-1 pl-2 border-l border-border/50" : ""}`}>
+                      {section.links.map((link) => {
+                        const active = pathname === link.href || pathname.startsWith(link.href + "/");
+                        return (
+                          <Link
+                            key={link.href}
+                            href={link.href}
+                            onClick={closeMobile}
+                            className={`relative flex items-center gap-2.5 px-2.5 h-8 rounded-lg text-[13px] font-medium transition-all duration-200 ${
+                              active
+                                ? "text-text-primary bg-gradient-to-r from-[#4ecdc4]/15 to-transparent"
+                                : "text-text-secondary hover:text-text-primary hover:bg-[#4ecdc4]/5"
+                            }`}
+                          >
+                            {active && (
+                              <motion.span
+                                layoutId="activeNav"
+                                className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full bg-gradient-to-b from-[#4ecdc4] to-[#6c5ce7] shadow-[0_0_8px_rgba(78,205,196,0.4)]"
+                                transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                              />
+                            )}
+                            <link.icon
+                              className={`w-4 h-4 shrink-0 ${active ? "text-accent-light" : ""}`}
+                            />
+                            {link.label}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
                 )}
-                <Icon
-                  className={`w-4 h-4 shrink-0 ${active ? "text-accent-light" : ""}`}
-                />
-                {label}
-              </Link>
-            </motion.div>
+              </AnimatePresence>
+            </div>
           );
         })}
       </nav>
