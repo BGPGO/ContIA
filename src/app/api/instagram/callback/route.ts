@@ -121,10 +121,12 @@ export async function GET(req: NextRequest) {
         origin
       )
     );
-  } catch (err) {
-    console.error("Erro no callback Instagram:", err);
+  } catch (err: any) {
+    const msg = err?.message || String(err);
+    console.error("Erro no callback Instagram:", msg, err);
+    const errorDetail = encodeURIComponent(msg.slice(0, 200));
     return NextResponse.redirect(
-      new URL("/conexoes?error=auth_failed", origin)
+      new URL(`/conexoes?error=auth_failed&detail=${errorDetail}`, origin)
     );
   }
 }
