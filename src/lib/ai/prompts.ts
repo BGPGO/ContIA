@@ -192,6 +192,56 @@ function buildDNABlock(ctx: EmpresaContext): string {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// STYLE PROFILE BLOCK — padrões extraídos dos posts reais da marca
+// ═══════════════════════════════════════════════════════════════════════
+
+function buildStyleProfileBlock(ctx: EmpresaContext): string {
+  if (!ctx.styleProfile) return "";
+
+  try {
+    const sp = JSON.parse(ctx.styleProfile);
+    let block = `\n\n🎯 ESTILO REAL DA MARCA (baseado nos últimos ${sp.analyzed_posts_count || "?"} posts):`;
+
+    if (sp.tone_description) {
+      block += `\n• Tom REAL das legendas: "${sp.tone_description}"`;
+    }
+    if (sp.caption_structure) {
+      block += `\n• Estrutura típica: ${sp.caption_structure}`;
+    }
+    if (sp.emoji_usage) {
+      block += `\n• Uso de emojis: ${sp.emoji_usage}${sp.emoji_examples?.length ? ` (favoritos: ${sp.emoji_examples.join(" ")})` : ""}`;
+    }
+    if (sp.line_break_style) {
+      block += `\n• Estilo de quebra de linha: ${sp.line_break_style}`;
+    }
+    if (sp.opening_patterns?.length) {
+      block += `\n• Como a marca geralmente ABRE posts: ${sp.opening_patterns.join(" | ")}`;
+    }
+    if (sp.cta_patterns?.length) {
+      block += `\n• CTAs que a marca usa: ${sp.cta_patterns.join(" | ")}`;
+    }
+    if (sp.vocabulary_signature?.length) {
+      block += `\n• Palavras/expressões CARACTERÍSTICAS da marca: ${sp.vocabulary_signature.join(", ")}`;
+    }
+    if (sp.top_hashtags?.length) {
+      block += `\n• Hashtags reais da marca (incluir pelo menos 3): ${sp.top_hashtags.slice(0, 10).join(" ")}`;
+    }
+    if (sp.example_captions?.length) {
+      block += `\n\n📝 LEGENDAS REAIS DA MARCA (replique este estilo, NÃO copie o conteúdo):`;
+      sp.example_captions.forEach((cap: string, i: number) => {
+        block += `\n--- Exemplo ${i + 1} ---\n${cap.slice(0, 500)}`;
+      });
+    }
+
+    block += `\n\n⚡ REGRA: O conteúdo gerado DEVE parecer que foi escrito pela mesma pessoa que escreveu os exemplos acima. Mesmo comprimento, mesmo ritmo, mesmos padrões de emojis, mesma estrutura.`;
+
+    return block;
+  } catch {
+    return "";
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // PLATFORM CONSTRAINTS BUILDER — restrições numéricas por plataforma
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -380,6 +430,7 @@ export function buildPostPrompt(
 
 ${buildContextBlock(ctx)}
 ${buildDNABlock(ctx)}
+${buildStyleProfileBlock(ctx)}
 ${buildPlatformConstraints(plataformas)}
 
 ══════ DIRETRIZES DE TOM ══════
@@ -432,6 +483,7 @@ export function buildCarouselPrompt(
 
 ${buildContextBlock(ctx)}
 ${buildDNABlock(ctx)}
+${buildStyleProfileBlock(ctx)}
 ${buildPlatformConstraints(["instagram"])}
 
 ══════ DIRETRIZES DE TOM ══════
@@ -489,6 +541,7 @@ export function buildReelsPrompt(
 
 ${buildContextBlock(ctx)}
 ${buildDNABlock(ctx)}
+${buildStyleProfileBlock(ctx)}
 ${buildPlatformConstraints(["instagram", "tiktok"])}
 
 ══════ DIRETRIZES DE TOM ══════
@@ -538,6 +591,7 @@ export function buildEmailPrompt(
 
 ${buildContextBlock(ctx)}
 ${buildDNABlock(ctx)}
+${buildStyleProfileBlock(ctx)}
 
 ══════ DIRETRIZES DE TOM ══════
 TOM ESCOLHIDO: ${tone.toUpperCase()}
@@ -583,6 +637,7 @@ export function buildCopyPrompt(
 
 ${buildContextBlock(ctx)}
 ${buildDNABlock(ctx)}
+${buildStyleProfileBlock(ctx)}
 
 ══════ DIRETRIZES DE TOM ══════
 TOM ESCOLHIDO: ${tone.toUpperCase()}

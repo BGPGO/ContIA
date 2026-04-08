@@ -10,6 +10,7 @@ export interface EmpresaContext {
   instagramAnalysis?: string;
   tom?: ContentTone;
   dnaMarca?: string; // JSON stringified DNASintetizado
+  styleProfile?: string; // JSON stringified StyleProfile
 }
 
 export interface GenerationRequest {
@@ -20,6 +21,7 @@ export interface GenerationRequest {
   tone: ContentTone;
   language?: string;
   additionalInstructions?: string;
+  styleProfile?: string; // JSON stringified StyleProfile (added by frontend)
 }
 
 export interface GeneratedContent {

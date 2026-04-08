@@ -39,10 +39,24 @@ export async function POST(request: NextRequest) {
 
     const { format, topic, empresaContext, plataformas, tone } = parsed.data as GenerationRequest;
 
-    const openai = getOpenAIClient();
-    const prompt = getPromptForFormat(format, empresaContext, topic, tone, plataformas);
+    // Fetch style profile if available
+    let enrichedContext = { ...empresaContext };
+    try {
+      const { analyzePostPatterns } = await import("@/lib/ai/pattern-analyzer");
+      const empresaIdParam = body.empresa_id || body.empresaContext?.nome;
+      if (empresaIdParam) {
+        const styleProfile = await analyzePostPatterns(empresaIdParam);
+        enrichedContext.styleProfile = JSON.stringify(styleProfile);
+      }
+    } catch (err) {
+      // Style profile is optional — continue without it
+      console.warn("[generate] Style profile not available:", (err as Error).message);
+    }
 
-    const hasDNA = !!empresaContext?.dnaMarca;
+    const openai = getOpenAIClient();
+    const prompt = getPromptForFormat(format, enrichedContext, topic, tone, plataformas);
+
+    const hasDNA = !!enrichedContext?.dnaMarca;
     const systemPrompt = getSystemPrompt(hasDNA);
     const temperature = getTemperature(format, tone);
     const maxTokens = getMaxTokens(format);

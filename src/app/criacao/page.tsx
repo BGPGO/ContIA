@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Settings, LayoutTemplate } from "lucide-react";
+import { Settings, LayoutTemplate, Lightbulb } from "lucide-react";
 import { useEmpresa } from "@/hooks/useEmpresa";
 import { usePosts } from "@/hooks/usePosts";
 import { useTemplates } from "@/hooks/useTemplates";
 import { useCreationWizard } from "@/hooks/useCreationWizard";
+import { useSuggestions } from "@/hooks/useSuggestions";
+import { usePatterns } from "@/hooks/usePatterns";
 import { WizardShell } from "@/components/criacao/wizard/WizardShell";
 import { StepTemplate } from "@/components/criacao/wizard/StepTemplate";
 import { StepAnalysis } from "@/components/criacao/wizard/StepAnalysis";
@@ -13,6 +15,8 @@ import { StepFormat } from "@/components/criacao/wizard/StepFormat";
 import { StepGenerate } from "@/components/criacao/wizard/StepGenerate";
 import { StepVisualizar } from "@/components/criacao/wizard/StepVisualizar";
 import { StepExport } from "@/components/criacao/wizard/StepExport";
+import { SuggestionsPanel } from "@/components/criacao/SuggestionsPanel";
+import { PatternInsights } from "@/components/criacao/PatternInsights";
 import type { EmpresaContext } from "@/types/ai";
 
 export default function CriacaoPage() {
@@ -23,6 +27,10 @@ export default function CriacaoPage() {
 
   const wizard = useCreationWizard();
   const { state, dispatch } = wizard;
+
+  const { suggestions, loading: suggestionsLoading, error: suggestionsError, context: suggestionsContext, fetchSuggestions, refetch: refetchSuggestions } = useSuggestions(empresaId || undefined);
+  const { styleProfile, loading: patternsLoading, refetch: refetchPatterns } = usePatterns(empresaId || undefined);
+  const [activeTab, setActiveTab] = useState<"criar" | "sugestoes">("criar");
 
   // Show config panel (templates + analysis) as overlay
   const [showConfig, setShowConfig] = useState(false);
@@ -258,18 +266,77 @@ export default function CriacaoPage() {
         </div>
       </div>
 
-      <WizardShell
-        currentStep={mappedStep >= 0 ? mappedStep : 0}
-        onBack={handleBack}
-        onNext={handleNext}
-        nextLabel={nextConfig.label}
-        nextDisabled={nextConfig.disabled}
-        showBack={state.currentStep > 2 && state.currentStep !== 3}
-        showNext={nextConfig.show}
-        loading={state.generating}
-      >
-        {renderStep()}
-      </WizardShell>
+      {/* Tab switcher */}
+      <div className="flex gap-1 px-6 max-w-4xl mx-auto mt-2">
+        <button
+          onClick={() => setActiveTab("criar")}
+          className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg transition-colors ${
+            activeTab === "criar"
+              ? "bg-bg-card border border-border-light text-text-primary"
+              : "text-text-secondary hover:text-text-primary hover:bg-bg-card/50"
+          }`}
+        >
+          <Settings size={13} />
+          Criar
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab("sugestoes");
+            if (!suggestions.length && !suggestionsLoading) fetchSuggestions();
+          }}
+          className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg transition-colors ${
+            activeTab === "sugestoes"
+              ? "bg-bg-card border border-border-light text-text-primary"
+              : "text-text-secondary hover:text-text-primary hover:bg-bg-card/50"
+          }`}
+        >
+          <Lightbulb size={13} />
+          Sugestões
+          {suggestions.length > 0 && (
+            <span className="ml-1 w-5 h-5 rounded-full bg-accent/20 text-accent-light text-[10px] flex items-center justify-center font-bold">
+              {suggestions.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Main content — conditional on active tab */}
+      {activeTab === "criar" && (
+        <WizardShell
+          currentStep={mappedStep >= 0 ? mappedStep : 0}
+          onBack={handleBack}
+          onNext={handleNext}
+          nextLabel={nextConfig.label}
+          nextDisabled={nextConfig.disabled}
+          showBack={state.currentStep > 2 && state.currentStep !== 3}
+          showNext={nextConfig.show}
+          loading={state.generating}
+        >
+          {renderStep()}
+        </WizardShell>
+      )}
+
+      {activeTab === "sugestoes" && (
+        <div className="fade-in space-y-4 p-6 max-w-4xl mx-auto">
+          <PatternInsights
+            styleProfile={styleProfile}
+            loading={patternsLoading}
+            onRefresh={refetchPatterns}
+          />
+          <SuggestionsPanel
+            suggestions={suggestions}
+            loading={suggestionsLoading}
+            error={suggestionsError}
+            context={suggestionsContext}
+            onSelect={(suggestion) => {
+              wizard.selectSuggestion(suggestion);
+              setActiveTab("criar");
+              wizard.setStep(2);
+            }}
+            onRefresh={refetchSuggestions}
+          />
+        </div>
+      )}
     </div>
   );
 }
