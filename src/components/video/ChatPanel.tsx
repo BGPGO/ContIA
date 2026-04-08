@@ -223,7 +223,7 @@ export function ChatPanel({
   };
 
   return (
-    <div className="flex flex-col h-full bg-bg-secondary rounded-xl border border-border overflow-hidden">
+    <div className="flex flex-col h-full max-h-[500px] lg:max-h-none bg-bg-secondary rounded-b-xl border border-t-0 border-border overflow-hidden">
       {/* Header */}
       <div className="px-4 py-3 border-b border-border flex items-center gap-2">
         <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-secondary to-accent flex items-center justify-center">

@@ -6,6 +6,7 @@ import type {
   VideoProjectStatus,
   VideoCut,
   VideoEdit,
+  VideoAnalysis,
   TranscriptionSegment,
 } from "@/types/video";
 
@@ -152,11 +153,49 @@ export function useVideoProject() {
           aiSummary = `Video "${proj.title}" com ${Math.round(proj.duration)}s. Transcrição automática não disponível — usando legendas de exemplo.`;
         }
 
-        // Step 3: Generate cuts
+        // Step 3: AI-powered cut analysis
         setProcessingStep(2);
-        setProgress(90);
+        setProgress(80);
 
-        const cuts = generateSmartCuts(transcription);
+        let cuts: VideoCut[] = [];
+        let videoAnalysis: VideoAnalysis | null = null;
+
+        try {
+          const analyzeRes = await fetch("/api/video/analyze-cuts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              transcription: transcription.map(s => ({ start: s.start, end: s.end, text: s.text })),
+              duration: proj.duration,
+              title: proj.title,
+            }),
+          });
+
+          if (analyzeRes.ok) {
+            videoAnalysis = await analyzeRes.json();
+            if (videoAnalysis?.cuts) {
+              cuts = videoAnalysis.cuts.map((c: any, i: number) => ({
+                id: `cut-${i}`,
+                title: c.title,
+                startTime: c.startTime,
+                endTime: c.endTime,
+                description: c.description,
+                accepted: false,
+              }));
+            }
+            if (videoAnalysis?.summary) {
+              aiSummary = videoAnalysis.summary;
+            }
+            console.log(`[process] AI analysis OK: ${cuts.length} cuts, type: ${videoAnalysis?.type}`);
+          }
+        } catch (err) {
+          console.warn("[process] AI analysis failed:", err);
+        }
+
+        // Fallback cuts if AI analysis failed
+        if (cuts.length === 0) {
+          cuts = generateSmartCuts(transcription);
+        }
 
         setProcessingStep(3);
         setProgress(100);
@@ -166,6 +205,7 @@ export function useVideoProject() {
           transcription,
           aiSummary,
           cuts,
+          analysis: videoAnalysis,
           edits: [
             { type: "subtitle", enabled: true, config: {} },
             { type: "logo", enabled: false, config: { position: "bottom-right" } },
@@ -297,6 +337,7 @@ export function useVideoProject() {
     progress,
     processingStep,
     error,
+    analysis: project?.analysis ?? null,
     cuts: project?.cuts ?? [],
     edits: project?.edits ?? [],
     upload,

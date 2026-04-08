@@ -10,8 +10,17 @@ export interface VideoProject {
   cuts: VideoCut[];
   edits: VideoEdit[];
   status: VideoProjectStatus;
+  analysis?: VideoAnalysis | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface VideoAnalysis {
+  summary: string;
+  type: string;
+  viral_potential: { score: number; reason: string };
+  strengths: string[];
+  cuts: { title: string; startTime: number; endTime: number; description: string; viral_score: number }[];
 }
 
 export type VideoProjectStatus =

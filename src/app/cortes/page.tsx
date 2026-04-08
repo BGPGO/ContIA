@@ -404,6 +404,39 @@ export default function CortesPage() {
                   activeCut={activeCut}
                   onTimeUpdate={(t) => setCurrentTime(t)}
                 />
+
+                {/* Video Analysis Summary */}
+                {project.analysis && (
+                  <div className="bg-bg-secondary border border-border rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-accent" />
+                        <span className="text-sm font-semibold text-text-primary">Análise do Vídeo</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-full bg-secondary/15 text-secondary-light text-[11px] font-medium">
+                          {project.analysis.type}
+                        </span>
+                        <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/15 text-accent text-[11px] font-medium">
+                          🔥 {project.analysis.viral_potential.score}/10
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-[13px] text-text-secondary leading-relaxed">
+                      {project.analysis.summary}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {project.analysis.strengths.map((s, i) => (
+                        <span key={i} className="px-2 py-1 rounded-lg bg-success/10 text-success text-[11px]">
+                          ✓ {s}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-text-muted">
+                      {project.analysis.viral_potential.reason}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Right: Tabbed Panel (40%) */}
