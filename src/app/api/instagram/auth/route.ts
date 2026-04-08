@@ -37,11 +37,9 @@ export async function GET(req: NextRequest) {
     })
   ).toString("base64url");
 
-  // Em produção atrás de proxy reverso, req.nextUrl.origin pode retornar http://localhost:3000
-  // Usar o header X-Forwarded-Host/Host para montar a URL correta
-  const proto = req.headers.get("x-forwarded-proto") || "https";
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || req.nextUrl.host;
-  const origin = `${proto}://${host}`;
+  // APP_URL garante que o redirect URI seja sempre o correto em produção
+  const origin = process.env.APP_URL
+    || `${req.headers.get("x-forwarded-proto") || "https"}://${req.headers.get("x-forwarded-host") || req.headers.get("host") || req.nextUrl.host}`;
   const redirectUri = `${origin}/api/instagram/callback`;
   const oauthUrl = getOAuthURL(appId, redirectUri, state);
 

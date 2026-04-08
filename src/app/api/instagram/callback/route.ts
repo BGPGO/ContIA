@@ -12,10 +12,9 @@ import { createClient } from "@/lib/supabase/server";
  * Troca code por token e salva a conexão
  */
 export async function GET(req: NextRequest) {
-  // Em produção atrás de proxy reverso, origin retorna http://0.0.0.0:3000
-  const proto = req.headers.get("x-forwarded-proto") || "https";
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || req.nextUrl.host;
-  const origin = `${proto}://${host}`;
+  // APP_URL garante consistência entre auth e callback (evita redirect_uri mismatch)
+  const origin = process.env.APP_URL
+    || `${req.headers.get("x-forwarded-proto") || "https"}://${req.headers.get("x-forwarded-host") || req.headers.get("host") || req.nextUrl.host}`;
 
   const code = req.nextUrl.searchParams.get("code");
   const stateParam = req.nextUrl.searchParams.get("state");
