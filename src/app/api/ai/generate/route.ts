@@ -38,19 +38,52 @@ export async function POST(request: NextRequest) {
     }
 
     const { format, topic, empresaContext, plataformas, tone } = parsed.data as GenerationRequest;
+    const empresaId: string | undefined = body.empresa_id;
 
-    // Fetch style profile if available
+    // Enrich context with style profile + real Instagram captions
     let enrichedContext = { ...empresaContext };
-    try {
-      const { analyzePostPatterns } = await import("@/lib/ai/pattern-analyzer");
-      const empresaIdParam = body.empresa_id || body.empresaContext?.nome;
-      if (empresaIdParam) {
-        const styleProfile = await analyzePostPatterns(empresaIdParam);
+
+    if (empresaId) {
+      // 1. Fetch style profile (pattern analysis from real posts)
+      try {
+        const { analyzePostPatterns } = await import("@/lib/ai/pattern-analyzer");
+        const styleProfile = await analyzePostPatterns(empresaId);
         enrichedContext.styleProfile = JSON.stringify(styleProfile);
+        console.log("[generate] Style profile loaded:", styleProfile.analyzed_posts_count, "posts analyzed");
+      } catch (err) {
+        console.warn("[generate] Style profile not available:", (err as Error).message);
       }
-    } catch (err) {
-      // Style profile is optional — continue without it
-      console.warn("[generate] Style profile not available:", (err as Error).message);
+
+      // 2. Fetch real Instagram captions directly for injection
+      try {
+        const { createClient } = await import("@/lib/supabase/server");
+        const supabase = await createClient();
+        const { data: realPosts } = await supabase
+          .from("instagram_media_cache")
+          .select("caption, media_type, like_count, comments_count")
+          .eq("empresa_id", empresaId)
+          .order("like_count", { ascending: false })
+          .limit(10);
+
+        if (realPosts?.length) {
+          const captions = realPosts
+            .filter((p: any) => p.caption && p.caption.length > 30)
+            .slice(0, 7)
+            .map((p: any) => p.caption);
+
+          if (captions.length > 0) {
+            // Inject real captions into the context as instagramAnalysis override
+            enrichedContext.instagramAnalysis = JSON.stringify({
+              _realCaptions: captions,
+              _source: "instagram_media_cache",
+              _count: captions.length,
+            });
+            console.log("[generate] Injected", captions.length, "real Instagram captions");
+          }
+        }
+      } catch (err) {
+        console.warn("[generate] Could not fetch real captions:", (err as Error).message);
+      }
     }
 
     const openai = getOpenAIClient();
@@ -82,12 +115,12 @@ export async function POST(request: NextRequest) {
     const generated: GeneratedContent = JSON.parse(cleanJson);
 
     // Anti-duplicidade: verificar similaridade com posts anteriores
-    const empresaId = body.empresaContext?.nome || "unknown";
+    const empresaKey = body.empresaContext?.nome || "unknown";
     const contentToCheck = generated.conteudo || generated.titulo || "";
     let duplicidade: { alerta: boolean; similaridade: string; postSimilar?: string } | undefined;
 
     if (contentToCheck) {
-      const dupResult = checkDuplicate(empresaId, contentToCheck);
+      const dupResult = checkDuplicate(empresaKey, contentToCheck);
       if (dupResult.isDuplicate) {
         duplicidade = {
           alerta: true,
@@ -96,7 +129,7 @@ export async function POST(request: NextRequest) {
         };
       }
       // Registrar no histórico independente de ser duplicado ou não
-      addToHistory(empresaId, contentToCheck);
+      addToHistory(empresaKey, contentToCheck);
     }
 
     return NextResponse.json({

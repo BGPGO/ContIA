@@ -108,6 +108,7 @@ export function StepGenerate({
             tone: state.tone,
             additionalInstructions: state.additionalInstructions || undefined,
             visualStyle: state.fullIgAnalysis.visual_style,
+            empresa_id: empresa.id,
           }),
         });
 
@@ -134,6 +135,7 @@ export function StepGenerate({
             plataformas: state.platforms,
             tone: state.tone,
             additionalInstructions: state.additionalInstructions || undefined,
+            empresa_id: empresa.id,
           }),
         });
 

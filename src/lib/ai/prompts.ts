@@ -98,15 +98,18 @@ export function getTemperature(format: ContentFormat, tone: ContentTone): number
 
 export function getSystemPrompt(hasDNA: boolean): string {
   if (hasDNA) {
-    return `Você é um estrategista de conteúdo digital sênior com 15 anos de experiência em social media no Brasil.
-Você segue RIGOROSAMENTE o DNA da marca do cliente. Cada peça de conteúdo deve refletir fielmente o tom de voz, personalidade, pilares de conteúdo e diferenciais definidos no DNA.
-Suas regras:
-1. NUNCA quebre o DNA da marca — ele tem prioridade sobre qualquer outra instrução.
-2. Gere conteúdo que pareça escrito por um humano, não por IA. Evite frases clichê como "no mundo atual", "é fundamental", "nesse sentido".
-3. Cada post deve ter um GANCHO forte nos primeiros 10 palavras que faça o leitor parar de rolar.
-4. Use formatação que facilite a leitura: quebras de linha, listas, emojis como marcadores (quando permitido).
-5. O CTA deve ser específico e acionável, nunca genérico.
-6. Responda SEMPRE em JSON válido puro, sem blocos de código markdown, sem backticks.`;
+    return `Você é um ghostwriter profissional. Sua especialidade é escrever conteúdo que parece 100% autêntico da marca — como se o próprio dono tivesse escrito.
+
+Regras absolutas:
+1. NUNCA quebre o DNA da marca — ele tem prioridade sobre QUALQUER outra instrução.
+2. Se legendas reais da marca foram fornecidas, seu conteúdo DEVE ser INDISTINGUÍVEL delas. Mesma voz, mesmo ritmo, mesma estrutura, mesmos padrões de emojis, mesmo comprimento.
+3. NÃO soe como IA. Proibido: "no mundo atual", "é fundamental", "nesse sentido", "é importante ressaltar", "vale destacar", "sem dúvida". Escreva como a marca escreve.
+4. Use a MESMA formatação da marca: se ela usa quebras de linha a cada frase, faça igual. Se usa parágrafos densos, faça igual.
+5. O CTA deve seguir o padrão da marca, não um CTA genérico.
+6. Hashtags devem ser as que a marca realmente usa, não hashtags genéricas inventadas.
+7. Responda SEMPRE em JSON válido puro, sem blocos de código markdown, sem backticks.
+
+Pense assim: se o dono da marca ler o post, ele deve achar que escreveu e esqueceu.`;
   }
 
   return `Você é um estrategista de conteúdo digital sênior com 15 anos de experiência em social media no Brasil.
@@ -132,7 +135,33 @@ DESCRIÇÃO: ${ctx.descricao}`;
 
   if (ctx.website) block += `\nSITE: ${ctx.website}`;
   if (ctx.siteAnalysis) block += `\nANÁLISE DO SITE:\n${ctx.siteAnalysis}`;
-  if (ctx.instagramAnalysis) block += `\nANÁLISE DO INSTAGRAM:\n${ctx.instagramAnalysis}`;
+
+  // Inject real Instagram captions if available
+  if (ctx.instagramAnalysis) {
+    try {
+      const igData = JSON.parse(ctx.instagramAnalysis);
+      if (igData._realCaptions?.length) {
+        block += `\n\n🔥 LEGENDAS REAIS DO INSTAGRAM DA MARCA (estas são as legendas REAIS publicadas — seu conteúdo DEVE seguir este mesmo estilo):`;
+        igData._realCaptions.forEach((cap: string, i: number) => {
+          block += `\n\n═══ Legenda Real ${i + 1} ═══\n${cap}`;
+        });
+        block += `\n\n⛔ INSTRUÇÃO CRÍTICA: Analise as legendas acima com atenção. Observe:
+- O comprimento médio das legendas
+- Como começam (gancho, pergunta, afirmação?)
+- O uso de emojis (quais, onde, frequência)
+- Quebras de linha e espaçamento
+- O tom (formal? casual? técnico? descontraído?)
+- Como terminam (CTA, pergunta, hashtags?)
+- O vocabulário e expressões usadas
+- A estrutura (hook → corpo → CTA? lista? storytelling?)
+Seu conteúdo gerado DEVE ser INDISTINGUÍVEL das legendas acima. Se alguém colocar seu texto ao lado dessas legendas, deve parecer que foi escrito pela MESMA pessoa.`;
+      } else {
+        block += `\nANÁLISE DO INSTAGRAM:\n${ctx.instagramAnalysis}`;
+      }
+    } catch {
+      block += `\nANÁLISE DO INSTAGRAM:\n${ctx.instagramAnalysis}`;
+    }
+  }
 
   return block;
 }
@@ -200,40 +229,58 @@ function buildStyleProfileBlock(ctx: EmpresaContext): string {
 
   try {
     const sp = JSON.parse(ctx.styleProfile);
-    let block = `\n\n🎯 ESTILO REAL DA MARCA (baseado nos últimos ${sp.analyzed_posts_count || "?"} posts):`;
+    let block = `\n\n══════ ANÁLISE DE ESTILO DA MARCA (${sp.analyzed_posts_count || "?"} posts analisados) ══════`;
+    block += `\nEstas são as REGRAS DE ESTILO extraídas dos posts REAIS. Siga-as à risca:`;
 
     if (sp.tone_description) {
-      block += `\n• Tom REAL das legendas: "${sp.tone_description}"`;
+      block += `\n\n📌 TOM DE VOZ REAL: ${sp.tone_description}`;
     }
     if (sp.caption_structure) {
-      block += `\n• Estrutura típica: ${sp.caption_structure}`;
+      block += `\n📌 ESTRUTURA DAS LEGENDAS: ${sp.caption_structure}`;
+      block += `\n   → Siga EXATAMENTE esta estrutura no conteúdo gerado.`;
+    }
+    if (sp.caption_avg_length) {
+      block += `\n📌 COMPRIMENTO: A legenda média tem ${sp.caption_avg_length} caracteres. Gere com comprimento SIMILAR.`;
     }
     if (sp.emoji_usage) {
-      block += `\n• Uso de emojis: ${sp.emoji_usage}${sp.emoji_examples?.length ? ` (favoritos: ${sp.emoji_examples.join(" ")})` : ""}`;
+      block += `\n📌 EMOJIS: Uso "${sp.emoji_usage}"`;
+      if (sp.emoji_usage === "heavy") block += ` — use emojis em quase toda frase, como a marca faz.`;
+      else if (sp.emoji_usage === "moderate") block += ` — use emojis com moderação, nos pontos de destaque.`;
+      else if (sp.emoji_usage === "minimal") block += ` — use pouquíssimos emojis, apenas onde essencial.`;
+      else block += ` — NÃO use emojis, a marca não usa.`;
+      if (sp.emoji_examples?.length) {
+        block += `\n   Emojis preferidos da marca: ${sp.emoji_examples.join(" ")}`;
+      }
     }
     if (sp.line_break_style) {
-      block += `\n• Estilo de quebra de linha: ${sp.line_break_style}`;
+      block += `\n📌 FORMATAÇÃO: ${sp.line_break_style}`;
     }
     if (sp.opening_patterns?.length) {
-      block += `\n• Como a marca geralmente ABRE posts: ${sp.opening_patterns.join(" | ")}`;
+      block += `\n📌 ABERTURAS DA MARCA (use uma variação desses padrões):`;
+      sp.opening_patterns.forEach((p: string) => { block += `\n   → "${p}"`; });
     }
     if (sp.cta_patterns?.length) {
-      block += `\n• CTAs que a marca usa: ${sp.cta_patterns.join(" | ")}`;
+      block += `\n📌 CTAs DA MARCA (use o estilo destes):`;
+      sp.cta_patterns.forEach((p: string) => { block += `\n   → "${p}"`; });
     }
     if (sp.vocabulary_signature?.length) {
-      block += `\n• Palavras/expressões CARACTERÍSTICAS da marca: ${sp.vocabulary_signature.join(", ")}`;
+      block += `\n📌 VOCABULÁRIO CARACTERÍSTICO (incorpore estas palavras/expressões): ${sp.vocabulary_signature.join(", ")}`;
     }
     if (sp.top_hashtags?.length) {
-      block += `\n• Hashtags reais da marca (incluir pelo menos 3): ${sp.top_hashtags.slice(0, 10).join(" ")}`;
+      block += `\n📌 HASHTAGS REAIS (use pelo menos 4 destas): ${sp.top_hashtags.slice(0, 12).join(" ")}`;
     }
+
     if (sp.example_captions?.length) {
-      block += `\n\n📝 LEGENDAS REAIS DA MARCA (replique este estilo, NÃO copie o conteúdo):`;
+      block += `\n\n══════ LEGENDAS DE REFERÊNCIA (copie o ESTILO, não o conteúdo) ══════`;
       sp.example_captions.forEach((cap: string, i: number) => {
-        block += `\n--- Exemplo ${i + 1} ---\n${cap.slice(0, 500)}`;
+        block += `\n\n--- Referência ${i + 1} ---\n${cap.slice(0, 600)}`;
       });
     }
 
-    block += `\n\n⚡ REGRA: O conteúdo gerado DEVE parecer que foi escrito pela mesma pessoa que escreveu os exemplos acima. Mesmo comprimento, mesmo ritmo, mesmos padrões de emojis, mesma estrutura.`;
+    block += `\n\n⛔ REGRA INVIOLÁVEL: O conteúdo gerado deve ser INDISTINGUÍVEL de um post real da marca.`;
+    block += `\nSe a marca usa frases curtas, use frases curtas. Se usa parágrafos longos, use parágrafos longos.`;
+    block += `\nSe começa com emoji, comece com emoji. Se nunca usa emoji no início, não use.`;
+    block += `\nVocê está IMITANDO a voz desta marca, não criando um estilo novo.`;
 
     return block;
   } catch {
