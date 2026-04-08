@@ -11,16 +11,20 @@ import {
   Image,
   Gauge,
   Check,
-  X,
+  Palette,
+  Loader2,
 } from "lucide-react";
-import type { ChatMessage, ChatAction, VideoCut } from "@/types/video";
+import type { ChatMessage, ChatAction, VideoCut, SubtitleStyle, TranscriptionSegment } from "@/types/video";
 
 interface ChatPanelProps {
   videoSummary: string;
+  transcription?: TranscriptionSegment[];
   cuts: VideoCut[];
+  subtitleStyle?: SubtitleStyle;
   onAcceptCut: (cut: VideoCut) => void;
   onAdjustCut: (index: number, changes: Partial<VideoCut>) => void;
   onToggleSubtitles: (enabled: boolean) => void;
+  onUpdateSubtitleStyle?: (style: Partial<SubtitleStyle>) => void;
   subtitlesEnabled: boolean;
 }
 
@@ -32,90 +36,19 @@ const quickSuggestions = [
   { label: "Sugerir cortes virais", icon: Scissors },
   { label: "Adicionar legendas", icon: Type },
   { label: "Adicionar logo", icon: Image },
+  { label: "Estilo viral na legenda", icon: Palette },
   { label: "Alterar velocidade", icon: Gauge },
 ];
 
-// Simulated AI responses
-function getAIResponse(
-  input: string,
-  cuts: VideoCut[]
-): { content: string; actions?: ChatAction[] } {
-  const lower = input.toLowerCase();
-
-  if (lower.includes("corte") || lower.includes("viral") || lower.includes("sugerir")) {
-    return {
-      content:
-        "Analisei o video e identifiquei os melhores momentos para cortes virais. Cada corte foi selecionado com base no engajamento potencial, ritmo e gancho do conteudo.",
-      actions: cuts.map((c, i) => ({
-        type: "cut_suggestion" as const,
-        label: c.title,
-        data: {
-          index: i,
-          startTime: c.startTime,
-          endTime: c.endTime,
-          description: c.description,
-        },
-        status: c.accepted ? ("accepted" as const) : ("pending" as const),
-      })),
-    };
-  }
-
-  if (lower.includes("legenda") || lower.includes("subtitle")) {
-    return {
-      content:
-        "As legendas foram geradas automaticamente a partir da transcricao do audio. Voce pode ativar/desativar abaixo.",
-      actions: [
-        {
-          type: "subtitle_toggle",
-          label: "Legendas",
-          data: {},
-          status: "pending",
-        },
-      ],
-    };
-  }
-
-  if (lower.includes("logo")) {
-    return {
-      content:
-        "Posso adicionar o logo da sua empresa no video. Escolha a posicao preferida no player. Por enquanto, use a configuracao na pagina de marca para definir seu logo.",
-      actions: [
-        {
-          type: "logo_position",
-          label: "Posicao do logo",
-          data: { position: "bottom-right" },
-          status: "pending",
-        },
-      ],
-    };
-  }
-
-  if (lower.includes("velocidade") || lower.includes("speed")) {
-    return {
-      content:
-        "Voce pode ajustar a velocidade diretamente no player (0.5x, 1x, 1.5x, 2x). Para cortes especificos, recomendo 1x para conteudo falado e 1.5x para transicoes.",
-    };
-  }
-
-  if (lower.includes("exportar") || lower.includes("download")) {
-    return {
-      content:
-        "A funcao de exportacao estara disponivel em breve! Por enquanto, voce pode pre-visualizar os cortes e definir os pontos exatos. Quando a exportacao estiver pronta, basta clicar em 'Exportar' em cada corte.",
-    };
-  }
-
-  return {
-    content:
-      "Entendi! Posso ajudar com varias coisas: sugerir cortes virais, adicionar legendas, posicionar o logo, ou ajustar a velocidade. O que deseja fazer?",
-  };
-}
-
 export function ChatPanel({
   videoSummary,
+  transcription = [],
   cuts,
+  subtitleStyle,
   onAcceptCut,
   onAdjustCut,
   onToggleSubtitles,
+  onUpdateSubtitleStyle,
   subtitlesEnabled,
 }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -124,6 +57,15 @@ export function ChatPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Build transcription text for context
+  const transcriptionText = transcription
+    .map((s) => {
+      const m = Math.floor(s.start / 60);
+      const sec = Math.floor(s.start % 60);
+      return `[${m}:${sec.toString().padStart(2, "0")}] ${s.text}`;
+    })
+    .join("\n");
+
   // Initial AI message
   useEffect(() => {
     if (messages.length === 0 && videoSummary) {
@@ -131,7 +73,7 @@ export function ChatPanel({
         {
           id: generateId(),
           role: "assistant",
-          content: `${videoSummary}\n\nO que deseja fazer? Posso sugerir cortes virais, adicionar legendas ou ajudar com a edicao.`,
+          content: `${videoSummary}\n\nO que deseja fazer? Posso sugerir cortes virais, adicionar legendas, mudar o estilo ou ajudar com a edicao.`,
           timestamp: new Date().toISOString(),
         },
       ]);
@@ -147,7 +89,7 @@ export function ChatPanel({
 
   const sendMessage = useCallback(
     async (text: string) => {
-      if (!text.trim()) return;
+      if (!text.trim() || isTyping) return;
 
       const userMsg: ChatMessage = {
         id: generateId(),
@@ -160,22 +102,115 @@ export function ChatPanel({
       setInput("");
       setIsTyping(true);
 
-      // Simulate AI thinking
-      await new Promise((r) => setTimeout(r, 800 + Math.random() * 1200));
+      try {
+        // Build history for API (just role + content)
+        const history = messages.map((m) => ({
+          role: m.role,
+          content: m.content,
+        }));
 
-      const response = getAIResponse(text, cuts);
-      const aiMsg: ChatMessage = {
-        id: generateId(),
-        role: "assistant",
-        content: response.content,
-        timestamp: new Date().toISOString(),
-        actions: response.actions,
-      };
+        const res = await fetch("/api/video/chat-simple", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: text.trim(),
+            transcription: transcriptionText,
+            videoSummary,
+            subtitleConfig: subtitleStyle,
+            history,
+          }),
+        });
 
-      setMessages((prev) => [...prev, aiMsg]);
-      setIsTyping(false);
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Erro ${res.status}`);
+        }
+
+        const data = await res.json();
+
+        // Convert API action to ChatAction format for display
+        const actions: ChatAction[] = [];
+        if (data.action) {
+          const actionType = data.action.type;
+          if (actionType === "SUGGEST_CUTS" && data.action.payload?.suggestions) {
+            for (const sug of data.action.payload.suggestions) {
+              actions.push({
+                type: "cut_suggestion",
+                label: sug.label || `Corte ${sug.start}s - ${sug.end}s`,
+                data: {
+                  startTime: sug.start,
+                  endTime: sug.end,
+                  description: sug.reason || sug.label || "",
+                },
+                status: "pending",
+              });
+            }
+          } else if (actionType === "ADD_CUT" && data.action.payload) {
+            actions.push({
+              type: "cut_suggestion",
+              label: data.action.payload.label || "Novo corte",
+              data: {
+                startTime: data.action.payload.start,
+                endTime: data.action.payload.end,
+                description: data.action.payload.label || "",
+              },
+              status: "pending",
+            });
+          } else if (actionType === "ADD_SUBTITLES") {
+            actions.push({
+              type: "subtitle_toggle",
+              label: "Legendas",
+              data: {},
+              status: "pending",
+            });
+            onToggleSubtitles(true);
+          } else if (actionType === "REMOVE_SUBTITLES") {
+            onToggleSubtitles(false);
+          } else if (actionType === "UPDATE_SUBTITLE_STYLE" && data.action.payload) {
+            // Apply subtitle style update
+            if (onUpdateSubtitleStyle) {
+              onUpdateSubtitleStyle(data.action.payload);
+            }
+            actions.push({
+              type: "subtitle_toggle",
+              label: "Estilo da legenda atualizado",
+              data: { styleUpdate: data.action.payload },
+              status: "accepted",
+            });
+          } else if (actionType === "ADD_LOGO") {
+            actions.push({
+              type: "logo_position",
+              label: "Posicao do logo",
+              data: { position: data.action.payload?.position || "bottom-right" },
+              status: "pending",
+            });
+          }
+        }
+
+        const aiMsg: ChatMessage = {
+          id: generateId(),
+          role: "assistant",
+          content: data.message,
+          timestamp: new Date().toISOString(),
+          actions: actions.length > 0 ? actions : undefined,
+        };
+
+        setMessages((prev) => [...prev, aiMsg]);
+      } catch (err) {
+        const errorMsg =
+          err instanceof Error ? err.message : "Erro desconhecido";
+        const aiMsg: ChatMessage = {
+          id: generateId(),
+          role: "assistant",
+          content: `Desculpe, ocorreu um erro: ${errorMsg}`,
+          timestamp: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, aiMsg]);
+      } finally {
+        setIsTyping(false);
+      }
     },
-    [cuts]
+    [messages, isTyping, transcriptionText, videoSummary, subtitleStyle, onToggleSubtitles, onUpdateSubtitleStyle]
   );
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -255,8 +290,19 @@ export function ChatPanel({
                     key={i}
                     action={action}
                     onAcceptCut={() => {
-                      const idx = action.data.index as number;
-                      if (cuts[idx]) onAcceptCut(cuts[idx]);
+                      const startTime = action.data.startTime as number;
+                      const endTime = action.data.endTime as number;
+                      const desc = action.data.description as string;
+                      if (startTime !== undefined && endTime !== undefined) {
+                        onAcceptCut({
+                          id: generateId(),
+                          title: action.label,
+                          startTime,
+                          endTime,
+                          description: desc || action.label,
+                          accepted: true,
+                        });
+                      }
                     }}
                     onToggleSubtitles={onToggleSubtitles}
                     subtitlesEnabled={subtitlesEnabled}
@@ -292,7 +338,8 @@ export function ChatPanel({
           <button
             key={s.label}
             onClick={() => handleQuickAction(s.label)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-bg-card hover:bg-bg-card-hover border border-border text-[11px] text-text-secondary hover:text-text-primary whitespace-nowrap transition-all duration-200 shrink-0"
+            disabled={isTyping}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-bg-card hover:bg-bg-card-hover border border-border text-[11px] text-text-secondary hover:text-text-primary whitespace-nowrap transition-all duration-200 shrink-0 disabled:opacity-40"
           >
             <s.icon className="w-3 h-3" />
             {s.label}
@@ -301,10 +348,7 @@ export function ChatPanel({
       </div>
 
       {/* Input */}
-      <form
-        onSubmit={handleSubmit}
-        className="px-3 pb-3 pt-1"
-      >
+      <form onSubmit={handleSubmit} className="px-3 pb-3 pt-1">
         <div className="flex items-center gap-2 bg-bg-input border border-border rounded-xl px-3 py-2 focus-within:border-accent/40 transition-colors">
           <input
             ref={inputRef}
@@ -313,13 +357,18 @@ export function ChatPanel({
             onChange={(e) => setInput(e.target.value)}
             placeholder="Diga ao editor o que deseja..."
             className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-muted outline-none"
+            disabled={isTyping}
           />
           <button
             type="submit"
             disabled={!input.trim() || isTyping}
             className="p-1.5 rounded-lg bg-accent/20 text-accent hover:bg-accent/30 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
           >
-            <Send className="w-4 h-4" />
+            {isTyping ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
           </button>
         </div>
       </form>
@@ -364,11 +413,13 @@ function ActionCard({
               {action.label}
             </span>
           </div>
-          <span className="text-[10px] text-text-muted font-mono">
-            {formatT(startTime)} - {formatT(endTime)}
-          </span>
+          {startTime !== undefined && endTime !== undefined && (
+            <span className="text-[10px] text-text-muted font-mono">
+              {formatT(startTime)} - {formatT(endTime)}
+            </span>
+          )}
         </div>
-        <p className="text-[11px] text-text-secondary mb-2">{desc}</p>
+        {desc && <p className="text-[11px] text-text-secondary mb-2">{desc}</p>}
         <div className="flex gap-2">
           <button
             onClick={onAcceptCut}
@@ -391,6 +442,25 @@ function ActionCard({
   }
 
   if (action.type === "subtitle_toggle") {
+    // If it's a style update action, show as confirmed
+    if (action.data.styleUpdate) {
+      return (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-bg-card border border-border rounded-lg p-3 text-left"
+        >
+          <div className="flex items-center gap-1.5">
+            <Palette className="w-3.5 h-3.5 text-accent" />
+            <span className="text-[12px] font-medium text-text-primary">
+              {action.label}
+            </span>
+            <Check className="w-3 h-3 text-success ml-auto" />
+          </div>
+        </motion.div>
+      );
+    }
+
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}

@@ -12,13 +12,19 @@ import {
   ArrowLeft,
   AlertCircle,
   Sparkles,
+  MessageSquare,
+  FileText,
+  Palette,
 } from "lucide-react";
 import { useEmpresa } from "@/hooks/useEmpresa";
 import { useVideoProject } from "@/hooks/useVideoProject";
 import { VideoPlayer } from "@/components/video/VideoPlayer";
 import { ChatPanel } from "@/components/video/ChatPanel";
 import { CutsPanel } from "@/components/video/CutsPanel";
-import type { VideoCut } from "@/types/video";
+import { SubtitleStylePanel } from "@/components/video/SubtitleStylePanel";
+import { TranscriptionPanel } from "@/components/video/TranscriptionPanel";
+import type { VideoCut, SubtitleStyle } from "@/types/video";
+import { DEFAULT_SUBTITLE_STYLE } from "@/types/video";
 
 /* ── Processing step labels ── */
 const processingSteps = [
@@ -26,6 +32,8 @@ const processingSteps = [
   "Transcrevendo audio...",
   "Analisando conteudo com IA...",
 ];
+
+type RightPanelTab = "chat" | "transcricao" | "estilo";
 
 export default function CortesPage() {
   const { empresa } = useEmpresa();
@@ -50,6 +58,10 @@ export default function CortesPage() {
   const [dragActive, setDragActive] = useState(false);
   const [activeCut, setActiveCut] = useState<VideoCut | null>(null);
   const [showExportToast, setShowExportToast] = useState(false);
+  const [activeTab, setActiveTab] = useState<RightPanelTab>("chat");
+  const [subtitleStyle, setSubtitleStyle] = useState<SubtitleStyle>(DEFAULT_SUBTITLE_STYLE);
+  const [currentTime, setCurrentTime] = useState(0);
+  const videoSeekRef = useRef<((time: number) => void) | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const subtitlesEnabled = edits.find((e) => e.type === "subtitle")?.enabled ?? true;
@@ -91,7 +103,30 @@ export default function CortesPage() {
     [empresa, urlInput, uploadFromUrl]
   );
 
-  /* ── Processing is auto-triggered by the hook after upload ── */
+  /* ── Subtitle style update (from AI or panel) ── */
+  const handleSubtitleStyleUpdate = useCallback(
+    (partial: Partial<SubtitleStyle>) => {
+      setSubtitleStyle((prev) => ({ ...prev, ...partial }));
+    },
+    []
+  );
+
+  /* ── Transcription segment edit ── */
+  const handleUpdateSegment = useCallback(
+    (index: number, text: string) => {
+      // Note: This updates project in local state only.
+      // The useVideoProject hook doesn't expose setProject directly,
+      // but transcription is used from the project object.
+      // For now we update via a workaround — the segments are passed by reference.
+      if (project && project.transcription[index]) {
+        project.transcription[index] = {
+          ...project.transcription[index],
+          text,
+        };
+      }
+    },
+    [project]
+  );
 
   /* ── Export toast ── */
   const showExportMessage = () => {
@@ -354,7 +389,7 @@ export default function CortesPage() {
               </div>
             </div>
 
-            {/* Split layout: Video + Chat */}
+            {/* Split layout: Video + Right Panel */}
             <div className="flex flex-col lg:flex-row gap-4">
               {/* Left: Video Player (60%) */}
               <div className="w-full lg:w-[60%] space-y-3">
@@ -362,28 +397,86 @@ export default function CortesPage() {
                   src={project.videoUrl}
                   subtitles={project.transcription}
                   showSubtitles={subtitlesEnabled}
+                  subtitleStyle={subtitleStyle}
                   logo={empresa?.logo_url ?? undefined}
                   logoPosition="bottom-right"
                   cuts={cuts}
                   activeCut={activeCut}
-                  onTimeUpdate={() => {
-                    // Could track position for subtitle sync
-                  }}
+                  onTimeUpdate={(t) => setCurrentTime(t)}
                 />
               </div>
 
-              {/* Right: Chat Panel (40%) */}
-              <div className="w-full lg:w-[40%] h-[500px] lg:h-auto lg:min-h-[500px]">
-                <ChatPanel
-                  videoSummary={project.aiSummary}
-                  cuts={cuts}
-                  onAcceptCut={(cut) => acceptCut(cut)}
-                  onAdjustCut={(index, changes) => adjustCut(index, changes)}
-                  onToggleSubtitles={(enabled) =>
-                    toggleEdit("subtitle", enabled)
-                  }
-                  subtitlesEnabled={subtitlesEnabled}
-                />
+              {/* Right: Tabbed Panel (40%) */}
+              <div className="w-full lg:w-[40%] h-[500px] lg:h-auto lg:min-h-[500px] flex flex-col">
+                {/* Tab bar */}
+                <div className="flex bg-bg-secondary rounded-t-xl border border-b-0 border-border overflow-hidden">
+                  {(
+                    [
+                      { key: "chat", label: "Chat", icon: MessageSquare },
+                      { key: "transcricao", label: "Transcricao", icon: FileText },
+                      { key: "estilo", label: "Estilo", icon: Palette },
+                    ] as const
+                  ).map((tab) => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActiveTab(tab.key)}
+                      className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-[12px] font-medium transition-all border-b-2 ${
+                        activeTab === tab.key
+                          ? "border-accent text-accent bg-accent/5"
+                          : "border-transparent text-text-muted hover:text-text-secondary hover:bg-white/[0.02]"
+                      }`}
+                    >
+                      <tab.icon className="w-3.5 h-3.5" />
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Tab content */}
+                <div className="flex-1 min-h-0">
+                  {activeTab === "chat" && (
+                    <ChatPanel
+                      videoSummary={project.aiSummary}
+                      transcription={project.transcription}
+                      cuts={cuts}
+                      subtitleStyle={subtitleStyle}
+                      onAcceptCut={(cut) => acceptCut(cut)}
+                      onAdjustCut={(index, changes) => adjustCut(index, changes)}
+                      onToggleSubtitles={(enabled) =>
+                        toggleEdit("subtitle", enabled)
+                      }
+                      onUpdateSubtitleStyle={handleSubtitleStyleUpdate}
+                      subtitlesEnabled={subtitlesEnabled}
+                    />
+                  )}
+                  {activeTab === "transcricao" && (
+                    <TranscriptionPanel
+                      segments={project.transcription}
+                      currentTime={currentTime}
+                      onSeek={(time) => {
+                        // The VideoPlayer listens to activeCut for seeking.
+                        // We create a temporary "seek cut" to trigger it.
+                        setActiveCut({
+                          id: "seek-temp",
+                          title: "seek",
+                          startTime: time,
+                          endTime: time + 9999,
+                          description: "",
+                          accepted: false,
+                        });
+                        // Clear after a tick so it doesn't lock playback
+                        setTimeout(() => setActiveCut(null), 100);
+                      }}
+                      onUpdateSegment={handleUpdateSegment}
+                    />
+                  )}
+                  {activeTab === "estilo" && (
+                    <SubtitleStylePanel
+                      style={subtitleStyle}
+                      onChange={setSubtitleStyle}
+                    />
+                  )}
+                </div>
               </div>
             </div>
 
@@ -392,7 +485,6 @@ export default function CortesPage() {
               cuts={cuts}
               onPreview={(cut) => setActiveCut(cut)}
               onEdit={(index) => {
-                // Focus on the cut in the chat
                 setActiveCut(cuts[index]);
               }}
               onExport={() => showExportMessage()}

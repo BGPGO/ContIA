@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import {
   Play,
   Pause,
@@ -10,12 +10,19 @@ import {
   VolumeX,
   Maximize,
 } from "lucide-react";
-import type { TranscriptionSegment, VideoCut, LogoPosition } from "@/types/video";
+import type {
+  TranscriptionSegment,
+  VideoCut,
+  LogoPosition,
+  SubtitleStyle,
+} from "@/types/video";
+import { DEFAULT_SUBTITLE_STYLE } from "@/types/video";
 
 interface VideoPlayerProps {
   src: string;
   subtitles?: TranscriptionSegment[];
   showSubtitles?: boolean;
+  subtitleStyle?: SubtitleStyle;
   logo?: string;
   logoPosition?: LogoPosition;
   cuts?: VideoCut[];
@@ -31,16 +38,43 @@ function formatTime(seconds: number): string {
 
 const speedOptions = [0.5, 1, 1.5, 2];
 
+const fontSizeMap: Record<SubtitleStyle["fontSize"], string> = {
+  sm: "text-sm md:text-base",
+  md: "text-base md:text-lg",
+  lg: "text-lg md:text-xl",
+  xl: "text-xl md:text-2xl",
+};
+
+const fontWeightMap: Record<SubtitleStyle["fontWeight"], string> = {
+  normal: "font-normal",
+  bold: "font-bold",
+  extrabold: "font-extrabold",
+};
+
+const fontFamilyMap: Record<SubtitleStyle["fontFamily"], string> = {
+  sans: "font-sans",
+  mono: "font-mono",
+  serif: "font-serif",
+};
+
+const positionMap: Record<SubtitleStyle["position"], string> = {
+  bottom: "bottom-16",
+  center: "top-1/2 -translate-y-1/2",
+  top: "top-8",
+};
+
 export function VideoPlayer({
   src,
   subtitles = [],
   showSubtitles = true,
+  subtitleStyle,
   logo,
   logoPosition = "bottom-right",
   cuts = [],
   onTimeUpdate,
   activeCut,
 }: VideoPlayerProps) {
+  const style = subtitleStyle ?? DEFAULT_SUBTITLE_STYLE;
   const videoRef = useRef<HTMLVideoElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(false);
@@ -48,7 +82,7 @@ export function VideoPlayer({
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(false);
   const [speed, setSpeed] = useState(1);
-  const [currentSubtitle, setCurrentSubtitle] = useState("");
+  const [currentSegment, setCurrentSegment] = useState<TranscriptionSegment | null>(null);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
 
   const togglePlay = useCallback(() => {
@@ -98,14 +132,14 @@ export function VideoPlayer({
     setCurrentTime(v.currentTime);
     onTimeUpdate?.(v.currentTime);
 
-    // Update subtitle
+    // Update subtitle segment
     if (showSubtitles && subtitles.length > 0) {
       const seg = subtitles.find(
         (s) => v.currentTime >= s.start && v.currentTime <= s.end
       );
-      setCurrentSubtitle(seg?.text ?? "");
+      setCurrentSegment(seg ?? null);
     } else {
-      setCurrentSubtitle("");
+      setCurrentSegment(null);
     }
   }, [onTimeUpdate, subtitles, showSubtitles]);
 
@@ -121,15 +155,12 @@ export function VideoPlayer({
     []
   );
 
-  const changeSpeed = useCallback(
-    (s: number) => {
-      const v = videoRef.current;
-      if (v) v.playbackRate = s;
-      setSpeed(s);
-      setShowSpeedMenu(false);
-    },
-    []
-  );
+  const changeSpeed = useCallback((s: number) => {
+    const v = videoRef.current;
+    if (v) v.playbackRate = s;
+    setSpeed(s);
+    setShowSpeedMenu(false);
+  }, []);
 
   const toggleMute = useCallback(() => {
     const v = videoRef.current;
@@ -157,6 +188,25 @@ export function VideoPlayer({
 
   const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
 
+  // Build word-by-word rendering for "pop" animation
+  const subtitleWords = useMemo(() => {
+    if (!currentSegment) return [];
+    const words = currentSegment.text.split(/\s+/);
+    const segDuration = currentSegment.end - currentSegment.start;
+    const wordDuration = segDuration / words.length;
+    return words.map((word, i) => ({
+      word,
+      start: currentSegment.start + i * wordDuration,
+      end: currentSegment.start + (i + 1) * wordDuration,
+    }));
+  }, [currentSegment]);
+
+  // Text shadow for outline effect (viral style)
+  const textShadow =
+    style.bgColor === "transparent"
+      ? "0 0 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.7), 2px 2px 0 rgba(0,0,0,0.8), -2px -2px 0 rgba(0,0,0,0.8), 2px -2px 0 rgba(0,0,0,0.8), -2px 2px 0 rgba(0,0,0,0.8)"
+      : "none";
+
   return (
     <div className="relative w-full bg-black rounded-xl overflow-hidden group">
       {/* Video */}
@@ -174,10 +224,51 @@ export function VideoPlayer({
       />
 
       {/* Subtitle overlay */}
-      {showSubtitles && currentSubtitle && (
-        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 max-w-[80%] text-center pointer-events-none">
-          <span className="inline-block px-4 py-2 rounded-lg bg-black/75 text-white text-sm md:text-base font-medium backdrop-blur-sm">
-            {currentSubtitle}
+      {showSubtitles && currentSegment && (
+        <div
+          className={`absolute left-1/2 -translate-x-1/2 max-w-[90%] text-center pointer-events-none z-10 ${positionMap[style.position]}`}
+        >
+          <span
+            className={`inline-block px-4 py-2 rounded-lg ${fontSizeMap[style.fontSize]} ${fontWeightMap[style.fontWeight]} ${fontFamilyMap[style.fontFamily]} leading-tight`}
+            style={{
+              color: style.color,
+              backgroundColor:
+                style.bgColor === "transparent" ? "transparent" : style.bgColor,
+              textShadow,
+            }}
+          >
+            {style.animation === "pop" ? (
+              // Word-by-word pop: current word highlighted
+              subtitleWords.map((w, i) => {
+                const isActive = currentTime >= w.start && currentTime < w.end;
+                const isPast = currentTime >= w.end;
+                return (
+                  <span
+                    key={i}
+                    className="transition-all duration-150"
+                    style={{
+                      color: isActive
+                        ? style.color
+                        : isPast
+                        ? style.color
+                        : `${style.color}88`,
+                      transform: isActive ? "scale(1.1)" : "scale(1)",
+                      display: "inline-block",
+                      marginRight: "0.25em",
+                      fontWeight: isActive ? 800 : undefined,
+                    }}
+                  >
+                    {w.word}
+                  </span>
+                );
+              })
+            ) : style.animation === "fade" ? (
+              <span className="animate-[fadeIn_0.3s_ease-in-out]">
+                {currentSegment.text}
+              </span>
+            ) : (
+              currentSegment.text
+            )}
           </span>
         </div>
       )}
@@ -266,7 +357,7 @@ export function VideoPlayer({
           <button
             onClick={() => skip(5)}
             className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
-            title="Avançar 5s"
+            title="Avancar 5s"
           >
             <SkipForward className="w-4 h-4 text-white" />
           </button>

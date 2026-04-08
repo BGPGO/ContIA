@@ -63,3 +63,74 @@ export type LogoPosition =
   | "top-right"
   | "bottom-left"
   | "bottom-right";
+
+export interface SubtitleStyle {
+  fontSize: "sm" | "md" | "lg" | "xl";
+  color: string;
+  bgColor: string;
+  fontWeight: "normal" | "bold" | "extrabold";
+  position: "bottom" | "center" | "top";
+  animation: "none" | "fade" | "pop";
+  fontFamily: "sans" | "mono" | "serif";
+}
+
+export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
+  fontSize: "lg",
+  color: "#FFFFFF",
+  bgColor: "transparent",
+  fontWeight: "extrabold",
+  position: "bottom",
+  animation: "pop",
+  fontFamily: "sans",
+};
+
+export const SUBTITLE_PRESETS: Record<string, { label: string; style: SubtitleStyle }> = {
+  viral: {
+    label: "Viral",
+    style: {
+      fontSize: "xl",
+      color: "#FFFFFF",
+      bgColor: "transparent",
+      fontWeight: "extrabold",
+      position: "center",
+      animation: "pop",
+      fontFamily: "sans",
+    },
+  },
+  classico: {
+    label: "Classico",
+    style: {
+      fontSize: "md",
+      color: "#FFFFFF",
+      bgColor: "#000000CC",
+      fontWeight: "normal",
+      position: "bottom",
+      animation: "fade",
+      fontFamily: "sans",
+    },
+  },
+  minimalista: {
+    label: "Minimalista",
+    style: {
+      fontSize: "sm",
+      color: "#E5E7EB",
+      bgColor: "transparent",
+      fontWeight: "normal",
+      position: "bottom",
+      animation: "none",
+      fontFamily: "sans",
+    },
+  },
+  neon: {
+    label: "Neon",
+    style: {
+      fontSize: "lg",
+      color: "#00FF88",
+      bgColor: "transparent",
+      fontWeight: "bold",
+      position: "bottom",
+      animation: "pop",
+      fontFamily: "mono",
+    },
+  },
+};
