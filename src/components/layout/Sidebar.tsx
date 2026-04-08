@@ -138,12 +138,14 @@ export function Sidebar() {
     [pathname]
   );
 
-  // Section is open if explicitly toggled open, or has an active link
+  // Section is open if explicitly toggled open (or default open on first visit if active)
   const isSectionOpen = useCallback(
     (section: NavSection) => {
       if (!section.collapsible) return true;
-      if (sectionHasActive(section)) return true;
-      return openSections[section.id] ?? false;
+      // If user has explicitly set a state, respect it
+      if (section.id in openSections) return openSections[section.id];
+      // Default: open if has active link
+      return sectionHasActive(section);
     },
     [openSections, sectionHasActive]
   );
