@@ -104,10 +104,11 @@ export class InstagramAPIError extends Error {
 /* ── OAuth (Business Login for Instagram) ────────── */
 
 export function getOAuthURL(appId: string, redirectUri: string, state: string): string {
+  // Em dev mode, manage_messages pode causar erro se não aprovado
+  // Pedir só os scopes essenciais primeiro
   const scopes = [
     "instagram_business_basic",
     "instagram_business_content_publish",
-    "instagram_business_manage_messages",
     "instagram_business_manage_comments",
     "instagram_business_manage_insights",
   ].join(",");
