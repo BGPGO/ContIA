@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
       const openai = new OpenAI({ apiKey });
 
       // Use Whisper with verbose JSON for timestamps
+      // prompt helps Whisper handle background music and fast speech
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const transcription = await openai.audio.transcriptions.create({
         file: createReadStream(tmpPath) as any,
@@ -46,16 +47,49 @@ export async function POST(req: NextRequest) {
         response_format: "verbose_json",
         timestamp_granularities: ["word", "segment"],
         language: "pt",
+        temperature: 0.2,
+        prompt: "Transcreva a fala com precisão, ignorando música de fundo e efeitos sonoros. Mantenha pontuação correta e frases completas.",
       });
 
-      const segments = (transcription as any).segments?.map((s: any, i: number) => ({
+      let segments = (transcription as any).segments?.map((s: any, i: number) => ({
         id: `seg-${i}`,
         start: s.start,
         end: s.end,
         text: s.text.trim(),
       })) || [];
 
-      const words = (transcription as any).words || [];
+      let words = (transcription as any).words || [];
+      let finalText = transcription.text || "";
+
+      // If Whisper returned very little text, retry with higher temperature
+      // This helps with noisy audio / background music
+      if (finalText.length < 20 && (file.size / 1024 / 1024) > 0.5) {
+        console.log("[transcribe] Low quality result, retrying with temperature 0.6...");
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const retry = await openai.audio.transcriptions.create({
+          file: createReadStream(tmpPath) as any,
+          model: "whisper-1",
+          response_format: "verbose_json",
+          timestamp_granularities: ["word", "segment"],
+          temperature: 0.6,
+          prompt: "Este áudio tem música de fundo. Foque apenas na voz humana falando. Transcreva todas as palavras ditas, mesmo que difíceis de ouvir.",
+        });
+
+        const retrySegments = (retry as any).segments?.map((s: any, i: number) => ({
+          id: `seg-${i}`,
+          start: s.start,
+          end: s.end,
+          text: s.text.trim(),
+        })) || [];
+
+        // Use retry if it got more text
+        if ((retry.text || "").length > finalText.length) {
+          console.log("[transcribe] Retry got better results");
+          segments = retrySegments;
+          words = (retry as any).words || [];
+          finalText = retry.text || "";
+        }
+      }
 
       // Generate SRT
       const srt = segments.map((s: any, i: number) => {
@@ -67,7 +101,7 @@ export async function POST(req: NextRequest) {
       console.log(`[transcribe] Done: ${segments.length} segments, ${words.length} words`);
 
       return NextResponse.json({
-        text: transcription.text || "",
+        text: finalText,
         segments,
         words,
         srt,
