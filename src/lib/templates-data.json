@@ -33,30 +33,9 @@
         "height": 51,
         "opacity": 1.0,
         "fontFamily": "Poppins-SemiBold",
-        "fontSize": 22.2,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 25.5,
-        "numLines": 2,
-        "styleRuns": [
-          {
-            "fontFamily": "Poppins-SemiBold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 32.1,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          },
-          {
-            "fontFamily": "Poppins-SemiBold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 37.8,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": true
-          }
-        ],
         "slide": 0,
         "slideX": 781
       },
@@ -70,31 +49,10 @@
         "height": 307,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 133.5,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 153.5,
-        "numLines": 2,
         "fauxItalic": true,
-        "styleRuns": [
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 22.0,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": true
-          },
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 28.5,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          }
-        ],
         "slide": 0,
         "slideX": 93
       },
@@ -108,12 +66,9 @@
         "height": 31,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Regular",
-        "fontSize": 27.0,
         "fontColor": "#ffffff",
         "alignment": "center",
         "tracking": -40,
-        "lineHeight": 31,
-        "numLines": 1,
         "slide": 0,
         "slideX": 107
       },
@@ -127,30 +82,9 @@
         "height": 284,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 123.5,
         "fontColor": "#295d6f",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 142.0,
-        "numLines": 2,
-        "styleRuns": [
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#295d6f",
-            "psdFontSize": 22.0,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          },
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#295d6f",
-            "psdFontSize": 31.7,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          }
-        ],
         "slide": 1,
         "slideX": 126
       },
@@ -164,12 +98,9 @@
         "height": 38,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 33.0,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 38,
-        "numLines": 1,
         "fauxItalic": true,
         "slide": 1,
         "slideX": 123
@@ -184,12 +115,9 @@
         "height": 101,
         "opacity": 1.0,
         "fontFamily": "AlmarenaNeue-Regular",
-        "fontSize": 87.8,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 101,
-        "numLines": 1,
         "slide": 2,
         "slideX": 89
       },
@@ -203,38 +131,9 @@
         "height": 312,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 67.8,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 78.0,
-        "numLines": 4,
-        "styleRuns": [
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 22.0,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          },
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 22.0,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": true
-          },
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 22.0,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          }
-        ],
         "slide": 2,
         "slideX": 90
       },
@@ -248,12 +147,9 @@
         "height": 110,
         "opacity": 1.0,
         "fontFamily": "AlmarenaNeue-Regular",
-        "fontSize": 47.8,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 55.0,
-        "numLines": 2,
         "slide": 3,
         "slideX": 106
       },
@@ -267,30 +163,9 @@
         "height": 284,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 123.5,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 142.0,
-        "numLines": 2,
-        "styleRuns": [
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 22.0,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          },
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 22.0,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": true
-          }
-        ],
         "slide": 3,
         "slideX": 107
       },
@@ -304,39 +179,10 @@
         "height": 329,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 95.4,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 109.7,
-        "numLines": 3,
         "fauxItalic": true,
-        "styleRuns": [
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 22.0,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": true
-          },
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 22.0,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          },
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 22.0,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          }
-        ],
         "slide": 4,
         "slideX": 103
       },
@@ -350,12 +196,9 @@
         "height": 33,
         "opacity": 1.0,
         "fontFamily": "AlmarenaNeue-Regular",
-        "fontSize": 28.7,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 33,
-        "numLines": 1,
         "slide": 4,
         "slideX": 101
       }
@@ -410,30 +253,9 @@
         "height": 51,
         "opacity": 1.0,
         "fontFamily": "Poppins-SemiBold",
-        "fontSize": 22.2,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 25.5,
-        "numLines": 2,
-        "styleRuns": [
-          {
-            "fontFamily": "Poppins-SemiBold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 32.1,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          },
-          {
-            "fontFamily": "Poppins-SemiBold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 37.8,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": true
-          }
-        ],
         "slide": 0,
         "slideX": 796
       },
@@ -447,12 +269,9 @@
         "height": 127,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 110.4,
         "fontColor": "#295d6f",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 127,
-        "numLines": 1,
         "slide": 0,
         "slideX": 117
       },
@@ -466,12 +285,9 @@
         "height": 58,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 50.4,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 58,
-        "numLines": 1,
         "slide": 0,
         "slideX": 113
       },
@@ -485,31 +301,10 @@
         "height": 190,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 82.6,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 95.0,
-        "numLines": 2,
         "fauxItalic": true,
-        "styleRuns": [
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 20.1,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": true
-          },
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 10.8,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          }
-        ],
         "slide": 1,
         "slideX": 107
       },
@@ -523,12 +318,9 @@
         "height": 66,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 57.4,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 66,
-        "numLines": 1,
         "slide": 0,
         "slideX": 113
       },
@@ -542,12 +334,9 @@
         "height": 38,
         "opacity": 1.0,
         "fontFamily": "Poppins-ExtraLight",
-        "fontSize": 33.0,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 38,
-        "numLines": 1,
         "slide": 1,
         "slideX": 109
       }
@@ -596,30 +385,9 @@
         "height": 250,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 108.7,
         "fontColor": "#295d6f",
         "alignment": "center",
         "tracking": -40,
-        "lineHeight": 125.0,
-        "numLines": 2,
-        "styleRuns": [
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#295d6f",
-            "psdFontSize": 32.0,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          },
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#295d6f",
-            "psdFontSize": 22.0,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          }
-        ],
         "slide": 0,
         "slideX": 115
       },
@@ -633,12 +401,9 @@
         "height": 211,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 91.7,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 105.5,
-        "numLines": 2,
         "slide": 1,
         "slideX": 90
       },
@@ -652,12 +417,9 @@
         "height": 227,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 98.7,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 113.5,
-        "numLines": 2,
         "slide": 3,
         "slideX": 82
       },
@@ -671,12 +433,9 @@
         "height": 167,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 72.6,
         "fontColor": "#ffffff",
         "alignment": "right",
         "tracking": -40,
-        "lineHeight": 83.5,
-        "numLines": 2,
         "slide": 2,
         "slideX": 490
       },
@@ -690,12 +449,9 @@
         "height": 192,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 167.0,
         "fontColor": "#295d6f",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 192,
-        "numLines": 1,
         "slide": 1,
         "slideX": 91
       },
@@ -709,12 +465,9 @@
         "height": 165,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 143.5,
         "fontColor": "#295d6f",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 165,
-        "numLines": 1,
         "slide": 3,
         "slideX": 86
       },
@@ -728,12 +481,9 @@
         "height": 283,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 246.1,
         "fontColor": "#295d6f",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 283,
-        "numLines": 1,
         "slide": 4,
         "slideX": 103
       },
@@ -747,12 +497,9 @@
         "height": 244,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 212.2,
         "fontColor": "#295d6f",
         "alignment": "right",
         "tracking": -40,
-        "lineHeight": 244,
-        "numLines": 1,
         "slide": 2,
         "slideX": 401
       },
@@ -766,12 +513,9 @@
         "height": 16,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 13.9,
         "fontColor": "#295d6f",
         "alignment": "center",
         "tracking": -40,
-        "lineHeight": 16,
-        "numLines": 1,
         "slide": 0,
         "slideX": 695
       },
@@ -785,30 +529,9 @@
         "height": 51,
         "opacity": 1.0,
         "fontFamily": "Poppins-SemiBold",
-        "fontSize": 22.2,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 25.5,
-        "numLines": 2,
-        "styleRuns": [
-          {
-            "fontFamily": "Poppins-SemiBold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 32.1,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          },
-          {
-            "fontFamily": "Poppins-SemiBold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 37.8,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": true
-          }
-        ],
         "slide": 0,
         "slideX": 795
       },
@@ -822,12 +545,9 @@
         "height": 84,
         "opacity": 1.0,
         "fontFamily": "AlmarenaNeue-Regular",
-        "fontSize": 36.5,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 42.0,
-        "numLines": 2,
         "slide": 0,
         "slideX": 114
       },
@@ -841,12 +561,9 @@
         "height": 77,
         "opacity": 1.0,
         "fontFamily": "AlmarenaNeue-Regular",
-        "fontSize": 33.5,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 38.5,
-        "numLines": 2,
         "slide": 1,
         "slideX": 86
       },
@@ -860,12 +577,9 @@
         "height": 125,
         "opacity": 1.0,
         "fontFamily": "AlmarenaNeue-Regular",
-        "fontSize": 36.2,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 41.7,
-        "numLines": 3,
         "slide": 3,
         "slideX": 80
       },
@@ -879,12 +593,9 @@
         "height": 166,
         "opacity": 1.0,
         "fontFamily": "AlmarenaNeue-Regular",
-        "fontSize": 48.1,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 55.3,
-        "numLines": 3,
         "slide": 4,
         "slideX": 101
       },
@@ -898,12 +609,9 @@
         "height": 117,
         "opacity": 1.0,
         "fontFamily": "AlmarenaNeue-Regular",
-        "fontSize": 33.9,
         "fontColor": "#ffffff",
         "alignment": "right",
         "tracking": -40,
-        "lineHeight": 39.0,
-        "numLines": 3,
         "slide": 2,
         "slideX": 419
       }
@@ -959,30 +667,9 @@
         "height": 51,
         "opacity": 1.0,
         "fontFamily": "Poppins-SemiBold",
-        "fontSize": 22.2,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 25.5,
-        "numLines": 2,
-        "styleRuns": [
-          {
-            "fontFamily": "Poppins-SemiBold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 32.1,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          },
-          {
-            "fontFamily": "Poppins-SemiBold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 37.8,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": true
-          }
-        ],
         "slide": 0,
         "slideX": 794
       },
@@ -996,12 +683,9 @@
         "height": 136,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 118.3,
         "fontColor": "#295d6f",
         "alignment": "center",
         "tracking": -40,
-        "lineHeight": 136,
-        "numLines": 1,
         "slide": 0,
         "slideX": 115
       },
@@ -1015,30 +699,9 @@
         "height": 183,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 79.6,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 91.5,
-        "numLines": 2,
-        "styleRuns": [
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 11.6,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          },
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 11.6,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": true
-          }
-        ],
         "slide": 0,
         "slideX": 110
       },
@@ -1052,12 +715,9 @@
         "height": 49,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 42.6,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 49,
-        "numLines": 1,
         "slide": 0,
         "slideX": 110
       },
@@ -1071,30 +731,9 @@
         "height": 416,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 361.7,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 416,
-        "numLines": 1,
-        "styleRuns": [
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 11.6,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          },
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#416f80",
-            "psdFontSize": 11.6,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          }
-        ],
         "slide": 1,
         "slideX": 114
       },
@@ -1108,12 +747,9 @@
         "height": 193,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 83.9,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 96.5,
-        "numLines": 2,
         "slide": 2,
         "slideX": 75
       },
@@ -1127,12 +763,9 @@
         "height": 137,
         "opacity": 1.0,
         "fontFamily": "AlmarenaNeue-Regular",
-        "fontSize": 39.7,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 45.7,
-        "numLines": 3,
         "slide": 2,
         "slideX": 74
       },
@@ -1146,12 +779,9 @@
         "height": 180,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 78.3,
         "fontColor": "#ffffff",
         "alignment": "right",
         "tracking": -40,
-        "lineHeight": 90.0,
-        "numLines": 2,
         "slide": 3,
         "slideX": 372
       },
@@ -1165,12 +795,9 @@
         "height": 90,
         "opacity": 1.0,
         "fontFamily": "AlmarenaNeue-Regular",
-        "fontSize": 39.1,
         "fontColor": "#ffffff",
         "alignment": "right",
         "tracking": -40,
-        "lineHeight": 45.0,
-        "numLines": 2,
         "slide": 3,
         "slideX": 612
       },
@@ -1184,12 +811,9 @@
         "height": 281,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 244.3,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 281,
-        "numLines": 1,
         "slide": 4,
         "slideX": 95
       },
@@ -1203,12 +827,9 @@
         "height": 91,
         "opacity": 1.0,
         "fontFamily": "AlmarenaNeue-Regular",
-        "fontSize": 39.6,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 45.5,
-        "numLines": 2,
         "slide": 4,
         "slideX": 94
       },
@@ -1222,12 +843,9 @@
         "height": 257,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 223.5,
         "fontColor": "#437181",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 257,
-        "numLines": 1,
         "slide": 5,
         "slideX": 104
       },
@@ -1241,12 +859,9 @@
         "height": 134,
         "opacity": 1.0,
         "fontFamily": "AlmarenaNeue-Regular",
-        "fontSize": 58.3,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 67.0,
-        "numLines": 2,
         "slide": 5,
         "slideX": 101
       },
@@ -1260,12 +875,9 @@
         "height": 272,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 236.5,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 272,
-        "numLines": 1,
         "slide": 6,
         "slideX": 91
       },
@@ -1279,12 +891,9 @@
         "height": 67,
         "opacity": 1.0,
         "fontFamily": "AlmarenaNeue-Regular",
-        "fontSize": 58.3,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 67,
-        "numLines": 1,
         "slide": 6,
         "slideX": 94
       },
@@ -1298,12 +907,9 @@
         "height": 467,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 203.0,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 233.5,
-        "numLines": 2,
         "slide": 7,
         "slideX": 73
       }
@@ -1366,30 +972,9 @@
         "height": 51,
         "opacity": 1.0,
         "fontFamily": "Poppins-SemiBold",
-        "fontSize": 22.2,
         "fontColor": "#ffffff",
         "alignment": "left",
-        "tracking": -40,
-        "lineHeight": 25.5,
-        "numLines": 2,
-        "styleRuns": [
-          {
-            "fontFamily": "Poppins-SemiBold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 32.1,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          },
-          {
-            "fontFamily": "Poppins-SemiBold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 37.8,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": true
-          }
-        ]
+        "tracking": -40
       },
       {
         "id": "O_QUE_ACONTECE_15_ANOS_82_528",
@@ -1401,12 +986,9 @@
         "height": 145,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 126.1,
         "fontColor": "#295d6f",
         "alignment": "left",
-        "tracking": -40,
-        "lineHeight": 145,
-        "numLines": 1
+        "tracking": -40
       },
       {
         "id": "O_QUE_ACONTECE_E_vocês_ainda_não_vi_78_697",
@@ -1418,12 +1000,9 @@
         "height": 53,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 46.1,
         "fontColor": "#ffffff",
         "alignment": "left",
-        "tracking": -40,
-        "lineHeight": 53,
-        "numLines": 1
+        "tracking": -40
       },
       {
         "id": "O_QUE_ACONTECE_Em_breve._435_1597",
@@ -1435,12 +1014,9 @@
         "height": 38,
         "opacity": 1.0,
         "fontFamily": "Poppins-ExtraLight",
-        "fontSize": 33.0,
         "fontColor": "#ffffff",
         "alignment": "center",
-        "tracking": -40,
-        "lineHeight": 38,
-        "numLines": 1
+        "tracking": -40
       }
     ]
   },
@@ -1477,30 +1053,9 @@
         "height": 51,
         "opacity": 1.0,
         "fontFamily": "Poppins-SemiBold",
-        "fontSize": 22.2,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 25.5,
-        "numLines": 2,
-        "styleRuns": [
-          {
-            "fontFamily": "Poppins-SemiBold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 32.1,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          },
-          {
-            "fontFamily": "Poppins-SemiBold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 37.8,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": true
-          }
-        ],
         "slide": 0,
         "slideX": 768
       },
@@ -1514,12 +1069,9 @@
         "height": 193,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 167.8,
         "fontColor": "#295d6f",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 193,
-        "numLines": 1,
         "slide": 0,
         "slideX": 77
       },
@@ -1533,30 +1085,9 @@
         "height": 139,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 60.4,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 69.5,
-        "numLines": 2,
-        "styleRuns": [
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 18.8,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          },
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 22.0,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": true
-          }
-        ],
         "slide": 0,
         "slideX": 78
       },
@@ -1570,31 +1101,10 @@
         "height": 315,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 137.0,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 157.5,
-        "numLines": 2,
         "fauxItalic": true,
-        "styleRuns": [
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 18.8,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": true
-          },
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 18.8,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          }
-        ],
         "slide": 1,
         "slideX": 106
       },
@@ -1608,12 +1118,9 @@
         "height": 166,
         "opacity": 1.0,
         "fontFamily": "AlmarenaNeue-Regular",
-        "fontSize": 48.1,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 55.3,
-        "numLines": 3,
         "slide": 2,
         "slideX": 126
       },
@@ -1627,12 +1134,9 @@
         "height": 35,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 30.4,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 35,
-        "numLines": 1,
         "fauxItalic": true,
         "slide": 2,
         "slideX": 124
@@ -1647,38 +1151,9 @@
         "height": 146,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 127.0,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 146,
-        "numLines": 1,
-        "styleRuns": [
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 18.8,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          },
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 18.8,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": true
-          },
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#abc7c9",
-            "psdFontSize": 18.8,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": true
-          }
-        ],
         "slide": 3,
         "slideX": 85
       },
@@ -1692,31 +1167,10 @@
         "height": 267,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 58.0,
         "fontColor": "#ffffff",
         "alignment": "right",
         "tracking": -40,
-        "lineHeight": 66.8,
-        "numLines": 4,
         "fauxItalic": true,
-        "styleRuns": [
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 18.8,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": true
-          },
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 18.8,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          }
-        ],
         "slide": 4,
         "slideX": 389
       },
@@ -1730,12 +1184,9 @@
         "height": 88,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 76.5,
         "fontColor": "#295d6f",
         "alignment": "right",
         "tracking": -40,
-        "lineHeight": 88,
-        "numLines": 1,
         "slide": 4,
         "slideX": 520
       },
@@ -1749,12 +1200,9 @@
         "height": 116,
         "opacity": 1.0,
         "fontFamily": "AlmarenaNeue-Regular",
-        "fontSize": 100.9,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 116,
-        "numLines": 1,
         "slide": 3,
         "slideX": 85
       },
@@ -1768,12 +1216,9 @@
         "height": 46,
         "opacity": 1.0,
         "fontFamily": "AlmarenaNeue-Regular",
-        "fontSize": 40.0,
         "fontColor": "#ffffff",
         "alignment": "right",
         "tracking": -40,
-        "lineHeight": 46,
-        "numLines": 1,
         "slide": 4,
         "slideX": 550
       },
@@ -1787,46 +1232,9 @@
         "height": 127,
         "opacity": 1.0,
         "fontFamily": "AlmarenaNeue-Regular",
-        "fontSize": 55.2,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 63.5,
-        "numLines": 2,
-        "styleRuns": [
-          {
-            "fontFamily": "AlmarenaNeue-Regular",
-            "fontColor": "#ffffff",
-            "psdFontSize": 22.0,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          },
-          {
-            "fontFamily": "AlmarenaNeue-Regular",
-            "fontColor": "#ffffff",
-            "psdFontSize": 22.0,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": true
-          },
-          {
-            "fontFamily": "AlmarenaNeue-Regular",
-            "fontColor": "#ffffff",
-            "psdFontSize": 22.0,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          },
-          {
-            "fontFamily": "AlmarenaNeue-Regular",
-            "fontColor": "#ffffff",
-            "psdFontSize": 22.0,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": true
-          }
-        ],
         "slide": 5,
         "slideX": 128
       },
@@ -1840,46 +1248,9 @@
         "height": 227,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 65.8,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 75.7,
-        "numLines": 3,
-        "styleRuns": [
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 18.8,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          },
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#abc7c9",
-            "psdFontSize": 18.8,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": true
-          },
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#abc7c9",
-            "psdFontSize": 18.8,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          },
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#abc7c9",
-            "psdFontSize": 18.8,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": true
-          }
-        ],
         "slide": 5,
         "slideX": 126
       },
@@ -1893,30 +1264,9 @@
         "height": 179,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 77.8,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 89.5,
-        "numLines": 2,
-        "styleRuns": [
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 18.8,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          },
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 22.0,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": true
-          }
-        ],
         "slide": 6,
         "slideX": 96
       }
@@ -1977,30 +1327,9 @@
         "height": 51,
         "opacity": 1.0,
         "fontFamily": "Poppins-SemiBold",
-        "fontSize": 22.2,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 25.5,
-        "numLines": 2,
-        "styleRuns": [
-          {
-            "fontFamily": "Poppins-SemiBold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 32.1,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          },
-          {
-            "fontFamily": "Poppins-SemiBold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 37.8,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": true
-          }
-        ],
         "slide": 0,
         "slideX": 780
       },
@@ -2014,30 +1343,9 @@
         "height": 353,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 307.0,
         "fontColor": "#295d6f",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 353,
-        "numLines": 1,
-        "styleRuns": [
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#295d6f",
-            "psdFontSize": 23.2,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          },
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 23.2,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          }
-        ],
         "slide": 0,
         "slideX": 96
       },
@@ -2051,12 +1359,9 @@
         "height": 120,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 52.2,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 60.0,
-        "numLines": 2,
         "slide": 1,
         "slideX": 80
       },
@@ -2070,12 +1375,9 @@
         "height": 190,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 165.2,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 190,
-        "numLines": 1,
         "slide": 2,
         "slideX": 98
       },
@@ -2089,12 +1391,9 @@
         "height": 137,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 119.1,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 137,
-        "numLines": 1,
         "slide": 3,
         "slideX": 104
       },
@@ -2108,30 +1407,9 @@
         "height": 279,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 242.6,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 279,
-        "numLines": 1,
-        "styleRuns": [
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 10.7,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          },
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#437185",
-            "psdFontSize": 10.7,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          }
-        ],
         "slide": 3,
         "slideX": 104
       },
@@ -2145,30 +1423,9 @@
         "height": 182,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 158.3,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 182,
-        "numLines": 1,
-        "styleRuns": [
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 10.7,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          },
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 10.7,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": true
-          }
-        ],
         "slide": 5,
         "slideX": 101
       },
@@ -2182,12 +1439,9 @@
         "height": 221,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 96.1,
         "fontColor": "#4d7b8d",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 110.5,
-        "numLines": 2,
         "slide": 4,
         "slideX": 120
       },
@@ -2201,12 +1455,9 @@
         "height": 46,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 40.0,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 46,
-        "numLines": 1,
         "slide": 2,
         "slideX": 97
       },
@@ -2220,12 +1471,9 @@
         "height": 191,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 166.1,
         "fontColor": "#416f83",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 191,
-        "numLines": 1,
         "slide": 1,
         "slideX": 82
       },
@@ -2239,12 +1487,9 @@
         "height": 165,
         "opacity": 1.0,
         "fontFamily": "AlmarenaNeue-Regular",
-        "fontSize": 47.8,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 55.0,
-        "numLines": 3,
         "slide": 0,
         "slideX": 97
       },
@@ -2258,12 +1503,9 @@
         "height": 113,
         "opacity": 1.0,
         "fontFamily": "AlmarenaNeue-Regular",
-        "fontSize": 49.1,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 56.5,
-        "numLines": 2,
         "slide": 4,
         "slideX": 120
       },
@@ -2277,12 +1519,9 @@
         "height": 113,
         "opacity": 1.0,
         "fontFamily": "AlmarenaNeue-Regular",
-        "fontSize": 49.1,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 56.5,
-        "numLines": 2,
         "slide": 5,
         "slideX": 98
       },
@@ -2296,12 +1535,9 @@
         "height": 175,
         "opacity": 1.0,
         "fontFamily": "AlmarenaNeue-Regular",
-        "fontSize": 76.1,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 87.5,
-        "numLines": 2,
         "slide": 4,
         "slideX": 119
       },
@@ -2315,12 +1551,9 @@
         "height": 359,
         "opacity": 1.0,
         "fontFamily": "AlmarenaNeue-Regular",
-        "fontSize": 62.4,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 71.8,
-        "numLines": 5,
         "slide": 1,
         "slideX": 84
       },
@@ -2334,12 +1567,9 @@
         "height": 126,
         "opacity": 1.0,
         "fontFamily": "AlmarenaNeue-Regular",
-        "fontSize": 36.5,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 42.0,
-        "numLines": 3,
         "slide": 2,
         "slideX": 97
       },
@@ -2353,12 +1583,9 @@
         "height": 189,
         "opacity": 1.0,
         "fontFamily": "AlmarenaNeue-Regular",
-        "fontSize": 41.1,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 47.2,
-        "numLines": 4,
         "slide": 3,
         "slideX": 104
       },
@@ -2372,12 +1599,9 @@
         "height": 263,
         "opacity": 1.0,
         "fontFamily": "AlmarenaNeue-Regular",
-        "fontSize": 45.7,
         "fontColor": "#ffffff",
         "alignment": "left",
         "tracking": -40,
-        "lineHeight": 52.6,
-        "numLines": 5,
         "slide": 2,
         "slideX": 96
       }
@@ -2433,30 +1657,9 @@
         "height": 51,
         "opacity": 1.0,
         "fontFamily": "Poppins-SemiBold",
-        "fontSize": 22.2,
         "fontColor": "#ffffff",
         "alignment": "left",
-        "tracking": -40,
-        "lineHeight": 25.5,
-        "numLines": 2,
-        "styleRuns": [
-          {
-            "fontFamily": "Poppins-SemiBold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 32.1,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          },
-          {
-            "fontFamily": "Poppins-SemiBold",
-            "fontColor": "#ffffff",
-            "psdFontSize": 37.8,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": true
-          }
-        ]
+        "tracking": -40
       },
       {
         "id": "STORY_GRANDE_DIA_AMANHÃ__É_GRANDE_O_D_110_401",
@@ -2468,30 +1671,9 @@
         "height": 251,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 109.1,
         "fontColor": "#4f6a76",
         "alignment": "center",
-        "tracking": -40,
-        "lineHeight": 125.5,
-        "numLines": 2,
-        "styleRuns": [
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#4f6a76",
-            "psdFontSize": 51.5,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          },
-          {
-            "fontFamily": "Formula1-Display-Bold",
-            "fontColor": "#4f6a76",
-            "psdFontSize": 31.8,
-            "tracking": -40,
-            "fauxBold": false,
-            "fauxItalic": false
-          }
-        ]
+        "tracking": -40
       },
       {
         "id": "STORY_GRANDE_DIA_A_gente_mal_consegue_111_682",
@@ -2503,12 +1685,9 @@
         "height": 48,
         "opacity": 1.0,
         "fontFamily": "Formula1-Display-Bold",
-        "fontSize": 41.7,
         "fontColor": "#ffffff",
         "alignment": "center",
-        "tracking": -40,
-        "lineHeight": 48,
-        "numLines": 1
+        "tracking": -40
       }
     ]
   }
