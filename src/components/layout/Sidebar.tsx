@@ -288,13 +288,13 @@ export function Sidebar() {
               {section.collapsible ? (
                 <button
                   onClick={() => toggleSection(section.id)}
-                  className={`w-full flex items-center gap-2 px-2.5 h-8 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition-colors duration-150 ${
+                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-lg text-[13px] font-medium transition-colors duration-150 ${
                     hasActive
                       ? "text-accent"
                       : "text-text-muted hover:text-text-secondary"
                   }`}
                 >
-                  <section.icon className="w-3.5 h-3.5 shrink-0" />
+                  <section.icon className="w-4 h-4 shrink-0" />
                   <span className="flex-1 text-left">{section.label}</span>
                   <ChevronRight
                     className={`w-3 h-3 transition-transform duration-200 ${
