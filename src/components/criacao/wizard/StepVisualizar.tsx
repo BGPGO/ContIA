@@ -28,6 +28,7 @@ import { PostCanvas } from "@/components/post-design/PostCanvas";
 import { CustomCanvas } from "@/components/post-design/CustomCanvas";
 import { TemplateBuilder } from "@/components/post-design/TemplateBuilder";
 import { useCustomTemplates } from "@/hooks/useCustomTemplates";
+import { useMarcaDNA } from "@/hooks/useMarcaDNA";
 import type { CustomTemplate } from "@/types/custom-template";
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -85,6 +86,53 @@ export function StepVisualizar({ state, setField, empresa, onRegenerate }: StepV
   const [exportingAll, setExportingAll] = useState(false);
 
   const isCarousel = state.format === "carrossel";
+
+  /* ── Brand DNA — auto-apply brand colors and style ────────────────── */
+
+  const { dna } = useMarcaDNA(empresa?.id);
+  const brandInitializedRef = useRef(false);
+
+  // Auto-apply brand colors from DNA on first render
+  if (dna?.dna_sintetizado && !brandInitializedRef.current) {
+    brandInitializedRef.current = true;
+    const ds = dna.dna_sintetizado;
+
+    // Set brand color from DNA palette
+    if (ds.paleta_cores?.length) {
+      const primaryColor = ds.paleta_cores[0];
+      if (primaryColor && /^#[0-9A-Fa-f]{6}$/.test(primaryColor)) {
+        setField("designBrandColor", primaryColor);
+      }
+    } else if (empresa?.cor_primaria) {
+      setField("designBrandColor", empresa.cor_primaria);
+    }
+
+    // Auto-select template based on brand style
+    if (ds.estilo_visual) {
+      const style = ds.estilo_visual.toLowerCase();
+      let bestTemplate: PostDesignTemplate = state.designTemplate;
+
+      if (style.includes("minimalista") || style.includes("clean") || style.includes("limpo")) {
+        bestTemplate = "minimal-clean";
+      } else if (style.includes("bold") || style.includes("impactante") || style.includes("forte")) {
+        bestTemplate = "bold-statement";
+      } else if (style.includes("gradiente") || style.includes("moderno") || style.includes("vibrante")) {
+        bestTemplate = "gradient-wave";
+      } else if (style.includes("editorial") || style.includes("profissional") || style.includes("corporativo")) {
+        bestTemplate = "editorial";
+      } else if (style.includes("quote") || style.includes("citação") || style.includes("frase")) {
+        bestTemplate = "quote-card";
+      }
+
+      // If AI suggested a template in the generation, prefer that
+      const aiSuggested = state.result?.visualPost?.suggestedTemplate;
+      if (aiSuggested && aiSuggested !== "bold-statement") {
+        bestTemplate = aiSuggested as PostDesignTemplate;
+      }
+
+      setField("designTemplate", bestTemplate);
+    }
+  }
 
   /* ── Custom templates state ────────────────────────────────────────── */
 
@@ -191,8 +239,25 @@ export function StepVisualizar({ state, setField, empresa, onRegenerate }: StepV
 
   /* ── Variations ─────────────────────────────────────────────────────── */
 
+  // Build brand color palette from DNA + empresa + fallback
+  const dnaPalette = useMemo(() => {
+    const colors: string[] = [];
+    if (dna?.dna_sintetizado?.paleta_cores?.length) {
+      dna.dna_sintetizado.paleta_cores.forEach((c: string) => {
+        if (/^#[0-9A-Fa-f]{6}$/.test(c)) colors.push(c);
+      });
+    }
+    if (empresa?.cor_primaria && !colors.includes(empresa.cor_primaria)) {
+      colors.unshift(empresa.cor_primaria);
+    }
+    if (empresa?.cor_secundaria && !colors.includes(empresa.cor_secundaria)) {
+      colors.push(empresa.cor_secundaria);
+    }
+    return colors.length > 0 ? colors : COLOR_PALETTE;
+  }, [dna, empresa]);
+
   const variations = useMemo(() => {
-    const suggested = state.result?.visualPost?.suggestedTemplate || "bold-statement";
+    const suggested = state.result?.visualPost?.suggestedTemplate || state.designTemplate || "bold-statement";
     const templates: PostDesignTemplate[] = isCarousel
       ? ["carousel-slide", "tip-numbered", "split-content", "bold-statement", "editorial", "gradient-wave"]
       : [
@@ -206,9 +271,10 @@ export function StepVisualizar({ state, setField, empresa, onRegenerate }: StepV
     return unique.map((t, i) => ({
       id: i,
       template: t,
-      color: i === 0 ? brandColor : COLOR_PALETTE[i % COLOR_PALETTE.length],
+      // Use brand colors for all variations, cycling through DNA palette
+      color: i === 0 ? brandColor : dnaPalette[i % dnaPalette.length],
     }));
-  }, [state.result, brandColor, isCarousel]);
+  }, [state.result, state.designTemplate, brandColor, dnaPalette, isCarousel]);
 
   /* ── Image upload helper ─────────────────────────────────────────── */
 

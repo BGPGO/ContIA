@@ -9,6 +9,7 @@ import type { PostDesignData } from "@/components/post-design/PostCanvas";
 import { PostCanvas } from "@/components/post-design/PostCanvas";
 import { DesignPicker } from "@/components/post-design/DesignPicker";
 import { ExportButton } from "@/components/post-design/ExportButton";
+import { useMarcaDNA } from "@/hooks/useMarcaDNA";
 
 interface StepDesignProps {
   state: WizardState;
@@ -17,6 +18,10 @@ interface StepDesignProps {
 }
 
 export function StepDesign({ state, setField, empresa }: StepDesignProps) {
+  const { dna } = useMarcaDNA(empresa?.id);
+  const dnaBrandColors = dna?.dna_sintetizado?.paleta_cores?.filter(
+    (c: string) => /^#[0-9A-Fa-f]{6}$/.test(c)
+  ) || [];
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const designData: PostDesignData = {
@@ -58,6 +63,7 @@ export function StepDesign({ state, setField, empresa }: StepDesignProps) {
             onBrandColorChange={(c) => setField("designBrandColor", c)}
             aspectRatio={state.designAspectRatio}
             onAspectRatioChange={(r) => setField("designAspectRatio", r)}
+            dnaBrandColors={dnaBrandColors}
           />
         </div>
 

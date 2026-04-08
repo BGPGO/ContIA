@@ -131,6 +131,7 @@ interface DesignPickerProps {
   onBrandColorChange: (c: string) => void;
   aspectRatio: "1:1" | "4:5" | "9:16";
   onAspectRatioChange: (r: "1:1" | "4:5" | "9:16") => void;
+  dnaBrandColors?: string[]; // Brand colors from DNA palette
 }
 
 /* ------------------------------------------------------------------ */
@@ -145,7 +146,17 @@ export function DesignPicker({
   onBrandColorChange,
   aspectRatio,
   onAspectRatioChange,
+  dnaBrandColors,
 }: DesignPickerProps) {
+  // Merge DNA brand colors with defaults, putting brand colors first
+  const effectiveColorPresets = (() => {
+    if (!dnaBrandColors?.length) return COLOR_PRESETS;
+    const merged = [...dnaBrandColors];
+    COLOR_PRESETS.forEach((c) => {
+      if (!merged.includes(c)) merged.push(c);
+    });
+    return merged.slice(0, 12);
+  })();
   const [customColor, setCustomColor] = useState(brandColor);
 
   /* Sync custom input when a preset is picked */
@@ -275,9 +286,14 @@ export function DesignPicker({
         </h3>
 
         <div className="bg-bg-card border border-border rounded-xl p-4 space-y-4">
+          {/* Brand colors label */}
+          {dnaBrandColors?.length ? (
+            <p className="text-[10px] text-text-muted font-medium">Cores da marca</p>
+          ) : null}
+
           {/* Preset swatches */}
           <div className="flex flex-wrap gap-2.5">
-            {COLOR_PRESETS.map((color) => {
+            {effectiveColorPresets.map((color) => {
               const isActive = brandColor === color;
               return (
                 <motion.button
