@@ -210,29 +210,39 @@ export async function refreshLongLivedToken(
 /* ── Profile ─────────────────────────────────────── */
 
 export async function getProfile(igUserId: string, token: string): Promise<IGProfile> {
-  // Campos mínimos primeiro — alguns campos falham dependendo do tipo de conta/permissões
-  try {
-    return await igFetch<IGProfile>(`/${igUserId}`, token, {
-      fields:
-        "id,username,name,biography,profile_picture_url,followers_count,follows_count,media_count,website",
-    });
-  } catch {
-    // Fallback: só campos garantidos pelo instagram_business_basic
-    const basic = await igFetch<Partial<IGProfile>>(`/${igUserId}`, token, {
-      fields: "id,username,name,profile_picture_url,media_count",
-    });
-    return {
-      id: basic.id || igUserId,
-      username: basic.username || "",
-      name: basic.name || basic.username || "",
-      biography: "",
-      profile_picture_url: basic.profile_picture_url || "",
-      followers_count: 0,
-      follows_count: 0,
-      media_count: basic.media_count || 0,
-      website: "",
-    };
+  // Tentar /me primeiro (mais confiável com Business Login), depois /{userId}
+  const endpoints = ["/me", `/${igUserId}`];
+  const fieldSets = [
+    "id,username,name,biography,profile_picture_url,followers_count,follows_count,media_count,website",
+    "id,username,name,profile_picture_url,media_count",
+    "id,username",
+  ];
+
+  for (const endpoint of endpoints) {
+    for (const fields of fieldSets) {
+      try {
+        const data = await igFetch<Partial<IGProfile>>(endpoint, token, { fields });
+        if (data.username) {
+          return {
+            id: data.id || igUserId,
+            username: data.username,
+            name: data.name || data.username,
+            biography: data.biography || "",
+            profile_picture_url: data.profile_picture_url || "",
+            followers_count: data.followers_count || 0,
+            follows_count: data.follows_count || 0,
+            media_count: data.media_count || 0,
+            website: data.website || "",
+          };
+        }
+      } catch (e) {
+        console.warn(`[IG getProfile] ${endpoint} fields=${fields.slice(0,30)}... failed:`, (e as Error).message);
+        continue;
+      }
+    }
   }
+
+  throw new Error("Nenhuma combinação de endpoint/campos retornou o perfil do Instagram");
 }
 
 /* ── Media ───────────────────────────────────────── */
