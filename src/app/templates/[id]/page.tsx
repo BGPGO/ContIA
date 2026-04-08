@@ -114,6 +114,36 @@ function wrapText(
   return allLines;
 }
 
+// Auto-fit: find the font size that makes wrapped text fit the layer box
+function fitFontSize(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  maxHeight: number,
+  fontStr: (size: number) => string
+): { fontSize: number; lines: string[] } {
+  let lo = 4;
+  let hi = maxHeight;
+  let bestSize = lo;
+  let bestLines: string[] = [text];
+
+  for (let i = 0; i < 20; i++) {
+    const mid = (lo + hi) / 2;
+    ctx.font = fontStr(mid);
+    const lines = wrapText(ctx, text, maxWidth, mid);
+    const totalH = lines.length * mid * 1.15;
+
+    if (totalH <= maxHeight) {
+      bestSize = mid;
+      bestLines = lines;
+      lo = mid;
+    } else {
+      hi = mid;
+    }
+  }
+  return { fontSize: bestSize, lines: bestLines };
+}
+
 function drawTextLayer(
   ctx: CanvasRenderingContext2D,
   layer: TemplateTextLayer,
@@ -123,37 +153,36 @@ function drawTextLayer(
     css: "'Poppins', sans-serif",
     weight: 400,
   };
-  const fontSize = layer.fontSize || 24;
   const x = layer.slide !== undefined ? layer.slideX || 0 : layer.x;
   const y = layer.y;
   const layerWidth = layer.width;
+  const layerHeight = layer.height;
   const alignment = layer.alignment || "left";
+  const fontStyle = layer.fauxItalic ? "italic " : "";
 
   ctx.save();
   ctx.globalAlpha = layer.opacity;
   ctx.fillStyle = layer.fontColor || "#ffffff";
-
-  // Apply tracking (letter-spacing approximation)
-  const trackingPx = (layer.tracking || 0) / 1000 * fontSize;
-
-  const fontStyle = layer.fauxItalic ? "italic " : "";
-  ctx.font = `${fontStyle}${font.weight} ${fontSize}px ${font.css}`;
   ctx.textBaseline = "top";
 
-  // Wrap text to fit layer width
-  const lines = wrapText(ctx, editedText, layerWidth, fontSize);
-  const numLines = lines.length;
+  // Auto-fit font size to bounding box
+  const makeFontStr = (size: number) =>
+    `${fontStyle}${font.weight} ${size}px ${font.css}`;
 
-  // Compute line height: if layer has explicit lineHeight use it,
-  // otherwise derive from layer height / number of original lines
-  let lineH: number;
-  if (layer.lineHeight && layer.numLines && layer.numLines > 1) {
-    lineH = layer.lineHeight;
-  } else {
-    lineH = fontSize * 1.15;
-  }
+  const { fontSize, lines } = fitFontSize(
+    ctx,
+    editedText,
+    layerWidth,
+    layerHeight,
+    makeFontStr
+  );
 
-  // Apply tracking via manual character rendering if significant
+  ctx.font = makeFontStr(fontSize);
+  const lineH = fontSize * 1.15;
+
+  // Tracking (letter-spacing)
+  const trackingPx = ((layer.tracking || 0) / 1000) * fontSize;
+
   const drawLine = (line: string, lx: number, ly: number) => {
     if (Math.abs(trackingPx) > 0.5) {
       let cx = lx;
