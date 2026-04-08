@@ -30,6 +30,11 @@ interface TemplateTextLayer {
   fontWeight?: string;
   fontStyle?: string;
   lineHeight?: number;
+  alignment?: "left" | "center" | "right";
+  tracking?: number;
+  numLines?: number;
+  fauxBold?: boolean;
+  fauxItalic?: boolean;
   slide?: number;
   slideX?: number;
 }
@@ -59,22 +64,55 @@ interface Template {
 
 const FONT_MAP: Record<string, { css: string; weight: number }> = {
   "Formula1-Display-Bold": {
-    css: "'Formula1 Display', 'Oswald', sans-serif",
+    css: "'Oswald', 'Anton', sans-serif",
     weight: 700,
   },
   "Formula1-Display-Regular": {
-    css: "'Formula1 Display', 'Oswald', sans-serif",
+    css: "'Oswald', 'Anton', sans-serif",
     weight: 400,
   },
   "Poppins-SemiBold": { css: "'Poppins', sans-serif", weight: 600 },
   "Poppins-ExtraLight": { css: "'Poppins', sans-serif", weight: 200 },
   "AlmarenaNeue-Regular": {
-    css: "'Almarena Neue', 'Poppins', sans-serif",
-    weight: 400,
+    css: "'Poppins', sans-serif",
+    weight: 300,
   },
 };
 
 // ── Canvas text drawing ────────────────────────────────────────
+
+function wrapText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  fontSize: number
+): string[] {
+  // If text already has explicit line breaks, split on those
+  const explicitLines = text.split(/\r|\n/);
+  const allLines: string[] = [];
+
+  for (const eLine of explicitLines) {
+    // Check if this line fits
+    if (ctx.measureText(eLine).width <= maxWidth) {
+      allLines.push(eLine);
+      continue;
+    }
+    // Word wrap
+    const words = eLine.split(" ");
+    let current = "";
+    for (const word of words) {
+      const test = current ? current + " " + word : word;
+      if (ctx.measureText(test).width <= maxWidth) {
+        current = test;
+      } else {
+        if (current) allLines.push(current);
+        current = word;
+      }
+    }
+    if (current) allLines.push(current);
+  }
+  return allLines;
+}
 
 function drawTextLayer(
   ctx: CanvasRenderingContext2D,
@@ -82,23 +120,62 @@ function drawTextLayer(
   editedText: string
 ) {
   const font = FONT_MAP[layer.fontFamily || ""] || {
-    css: "Poppins",
+    css: "'Poppins', sans-serif",
     weight: 400,
   };
   const fontSize = layer.fontSize || 24;
   const x = layer.slide !== undefined ? layer.slideX || 0 : layer.x;
   const y = layer.y;
+  const layerWidth = layer.width;
+  const alignment = layer.alignment || "left";
 
   ctx.save();
   ctx.globalAlpha = layer.opacity;
   ctx.fillStyle = layer.fontColor || "#ffffff";
-  ctx.font = `${font.weight} ${fontSize}px ${font.css}`;
+
+  // Apply tracking (letter-spacing approximation)
+  const trackingPx = (layer.tracking || 0) / 1000 * fontSize;
+
+  const fontStyle = layer.fauxItalic ? "italic " : "";
+  ctx.font = `${fontStyle}${font.weight} ${fontSize}px ${font.css}`;
   ctx.textBaseline = "top";
 
-  const lines = editedText.split(/\r|\n/);
-  const lineH = layer.lineHeight || fontSize * 1.2;
+  // Wrap text to fit layer width
+  const lines = wrapText(ctx, editedText, layerWidth, fontSize);
+  const numLines = lines.length;
+
+  // Compute line height: if layer has explicit lineHeight use it,
+  // otherwise derive from layer height / number of original lines
+  let lineH: number;
+  if (layer.lineHeight && layer.numLines && layer.numLines > 1) {
+    lineH = layer.lineHeight;
+  } else {
+    lineH = fontSize * 1.15;
+  }
+
+  // Apply tracking via manual character rendering if significant
+  const drawLine = (line: string, lx: number, ly: number) => {
+    if (Math.abs(trackingPx) > 0.5) {
+      let cx = lx;
+      for (const ch of line) {
+        ctx.fillText(ch, cx, ly);
+        cx += ctx.measureText(ch).width + trackingPx;
+      }
+    } else {
+      ctx.fillText(line, lx, ly);
+    }
+  };
+
   lines.forEach((line, i) => {
-    ctx.fillText(line, x, y + i * lineH);
+    let lx = x;
+    if (alignment === "center") {
+      const w = ctx.measureText(line).width;
+      lx = x + (layerWidth - w) / 2;
+    } else if (alignment === "right") {
+      const w = ctx.measureText(line).width;
+      lx = x + layerWidth - w;
+    }
+    drawLine(line, lx, y + i * lineH);
   });
 
   ctx.restore();
@@ -131,7 +208,7 @@ export default function TemplateEditorPage() {
   useEffect(() => {
     const link = document.createElement("link");
     link.href =
-      "https://fonts.googleapis.com/css2?family=Poppins:wght@200;400;600;700&family=Oswald:wght@400;700&display=swap";
+      "https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,200;0,300;0,400;0,600;0,700;1,200;1,300;1,400&family=Oswald:wght@400;500;700&family=Anton&display=swap";
     link.rel = "stylesheet";
     document.head.appendChild(link);
   }, []);
@@ -457,7 +534,8 @@ export default function TemplateEditorPage() {
                   />
                   <p className="text-[11px] text-text-muted mt-1">
                     {layer.fontFamily || "Poppins"} &middot;{" "}
-                    {layer.fontSize || 24}px
+                    {Math.round(layer.fontSize || 24)}px
+                    {layer.alignment && layer.alignment !== "left" && ` · ${layer.alignment}`}
                     {layer.fontColor && (
                       <>
                         {" "}

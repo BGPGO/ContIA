@@ -15,6 +15,11 @@ export interface TemplateTextLayer {
   fontWeight?: string;
   fontStyle?: string;
   lineHeight?: number;
+  alignment?: 'left' | 'center' | 'right';
+  tracking?: number;
+  numLines?: number;
+  fauxBold?: boolean;
+  fauxItalic?: boolean;
   slide?: number;
   slideX?: number;
 }
