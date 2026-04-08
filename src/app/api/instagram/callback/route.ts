@@ -44,18 +44,40 @@ export async function GET(req: NextRequest) {
   try {
     // O code do Instagram vem com #_ no final — remover
     const cleanCode = code.replace(/#_$/, "");
+    console.log("[IG Callback] Step 1: exchanging code for token, redirectUri:", redirectUri);
 
     // 1. Trocar code por short-lived token + user_id
-    const tokenData = await exchangeCodeForToken(cleanCode, appId, appSecret, redirectUri);
+    let tokenData;
+    try {
+      tokenData = await exchangeCodeForToken(cleanCode, appId, appSecret, redirectUri);
+      console.log("[IG Callback] Step 1 OK: user_id=", tokenData.user_id);
+    } catch (e: any) {
+      const detail = `Step 1 (token exchange): ${e.message || e}`;
+      console.error("[IG Callback]", detail);
+      return NextResponse.redirect(new URL(`/conexoes?error=auth_failed&detail=${encodeURIComponent(detail)}`, origin));
+    }
 
     // 2. Trocar por long-lived token (~60 dias)
-    const longToken = await exchangeForLongLivedToken(
-      tokenData.access_token,
-      appSecret
-    );
+    let longToken;
+    try {
+      longToken = await exchangeForLongLivedToken(tokenData.access_token, appSecret);
+      console.log("[IG Callback] Step 2 OK: long-lived token obtained");
+    } catch (e: any) {
+      const detail = `Step 2 (long-lived token): ${e.message || e}`;
+      console.error("[IG Callback]", detail);
+      return NextResponse.redirect(new URL(`/conexoes?error=auth_failed&detail=${encodeURIComponent(detail)}`, origin));
+    }
 
     // 3. Buscar perfil do Instagram
-    const profile = await getProfile(tokenData.user_id, longToken.access_token);
+    let profile;
+    try {
+      profile = await getProfile(tokenData.user_id, longToken.access_token);
+      console.log("[IG Callback] Step 3 OK: profile=", profile.username);
+    } catch (e: any) {
+      const detail = `Step 3 (profile fetch): ${e.message || e}`;
+      console.error("[IG Callback]", detail);
+      return NextResponse.redirect(new URL(`/conexoes?error=auth_failed&detail=${encodeURIComponent(detail)}`, origin));
+    }
 
     // 4. Salvar no Supabase
     const supabase = await createClient();
