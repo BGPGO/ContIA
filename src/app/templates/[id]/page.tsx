@@ -419,6 +419,8 @@ export default function TemplateEditorPage() {
 
   const visibleLayers = getCurrentLayers();
   const isCarousel = template.format === "carousel";
+  const { width: canvasW, height: canvasH } = getCanvasDimensions();
+  const isPortrait = canvasH > canvasW;
 
   // ── Render ───────────────────────────────────────────────────
 
@@ -436,18 +438,26 @@ export default function TemplateEditorPage() {
       {/* Main layout */}
       <div className="flex flex-col lg:flex-row gap-6">
         {/* ── Left panel: Canvas preview ── */}
-        <div className="lg:w-[60%] flex flex-col items-center">
+        <div className={cn(
+          "flex flex-col items-center",
+          isPortrait ? "lg:w-[40%]" : "lg:w-[60%]"
+        )}>
           {/* Canvas container */}
           <div
             className={cn(
-              "relative w-full rounded-xl overflow-hidden border border-border",
-              "bg-bg-primary flex items-center justify-center"
+              "relative rounded-xl overflow-hidden border border-border",
+              "bg-bg-primary flex items-center justify-center",
+              isPortrait ? "w-fit mx-auto" : "w-full"
             )}
           >
             <canvas
               ref={canvasRef}
-              className="w-full h-auto"
-              style={{ maxHeight: "75vh" }}
+              style={{
+                maxHeight: "75vh",
+                maxWidth: "100%",
+                width: isPortrait ? "auto" : "100%",
+                height: isPortrait ? "75vh" : "auto",
+              }}
             />
           </div>
 
@@ -492,7 +502,7 @@ export default function TemplateEditorPage() {
         </div>
 
         {/* ── Right panel: Editor form ── */}
-        <div className="lg:w-[40%]">
+        <div className={cn(isPortrait ? "lg:w-[60%]" : "lg:w-[40%]")}>
           <div className="rounded-xl border border-border bg-bg-secondary p-5">
             {/* Template info header */}
             <div className="mb-6">

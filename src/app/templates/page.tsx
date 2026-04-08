@@ -104,11 +104,11 @@ export default function TemplatesPage() {
               )}
             >
               {/* Thumbnail */}
-              <div className="relative aspect-square bg-bg-primary overflow-hidden">
+              <div className="relative bg-bg-primary overflow-hidden" style={{ aspectRatio: tpl.format === 'story' ? '9/16' : '4/5' }}>
                 <img
                   src={tpl.thumbnail}
                   alt={tpl.name}
-                  className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+                  className="w-full h-full object-contain group-hover:scale-[1.02] transition-transform duration-300"
                 />
                 {/* Format badge */}
                 <span
