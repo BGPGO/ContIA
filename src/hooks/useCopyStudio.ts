@@ -280,7 +280,17 @@ export function useCopyStudio() {
                 case "copy":
                   try {
                     const copyPayload = JSON.parse(sse.data);
-                    receivedCopy = (copyPayload.copy ?? copyPayload) as CopyContent;
+                    const rawCopy = (copyPayload.copy ?? copyPayload) as Record<string, unknown>;
+                    // Ensure required fields have defaults (AI may omit caption/hashtags)
+                    receivedCopy = {
+                      headline: (rawCopy.headline as string) || (rawCopy.titulo as string) || "",
+                      caption: (rawCopy.caption as string) || (rawCopy.conteudo as string) || (rawCopy.legenda as string) || "",
+                      hashtags: (rawCopy.hashtags as string[]) || [],
+                      cta: (rawCopy.cta as string) || "",
+                      slides: rawCopy.slides as CopyContent["slides"],
+                      reelsScript: rawCopy.reelsScript as CopyContent["reelsScript"],
+                      imagePrompt: rawCopy.imagePrompt as string | undefined,
+                    };
                     // Push current copy to history before replacing
                     if (currentCopy) {
                       setCopyHistory((prev) => [...prev, currentCopy]);
@@ -337,10 +347,20 @@ export function useCopyStudio() {
           }
 
           if (data.copy) {
+            const rc = data.copy as Record<string, unknown>;
+            const safeCopy: CopyContent = {
+              headline: (rc.headline as string) || (rc.titulo as string) || "",
+              caption: (rc.caption as string) || (rc.conteudo as string) || (rc.legenda as string) || "",
+              hashtags: (rc.hashtags as string[]) || [],
+              cta: (rc.cta as string) || "",
+              slides: rc.slides as CopyContent["slides"],
+              reelsScript: rc.reelsScript as CopyContent["reelsScript"],
+              imagePrompt: rc.imagePrompt as string | undefined,
+            };
             if (currentCopy) {
               setCopyHistory((prev) => [...prev, currentCopy]);
             }
-            setCurrentCopy(data.copy);
+            setCurrentCopy(safeCopy);
           }
 
           const assistantMessage: CopyChatMessage = {

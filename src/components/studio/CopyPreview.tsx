@@ -212,7 +212,7 @@ function PostPreview({
   onEdit: (field: keyof CopyContent, value: unknown) => void;
 }) {
   const mainLimit = platforms.length > 0 ? CAPTION_LIMITS[platforms[0]] || 2200 : 2200;
-  const captionLen = copy.caption.length;
+  const captionLen = (copy.caption || "").length;
   const isOverLimit = captionLen > mainLimit;
 
   return (
@@ -247,7 +247,7 @@ function PostPreview({
           </span>
         </div>
         <EditableField
-          value={copy.caption}
+          value={copy.caption || ""}
           onChange={(val) => onEdit("caption", val)}
           className="text-sm text-[#e8eaff] leading-relaxed whitespace-pre-line"
           multiline
@@ -255,14 +255,14 @@ function PostPreview({
       </div>
 
       {/* Hashtags */}
-      {copy.hashtags.length > 0 && (
+      {(copy.hashtags?.length ?? 0) > 0 && (
         <div className="space-y-1.5">
           <label className="flex items-center gap-1.5 text-[10px] font-medium text-text-muted uppercase tracking-wider">
             <Hash size={10} />
             Hashtags
           </label>
           <div className="flex flex-wrap gap-1.5">
-            {copy.hashtags.map((tag, i) => (
+            {copy.hashtags!.map((tag, i) => (
               <span
                 key={i}
                 className="text-xs px-2.5 py-1 rounded-full bg-accent/10 text-[#4ecdc4] cursor-default
@@ -370,15 +370,15 @@ function CarouselPreview({
       {/* Caption + Hashtags for entire carousel */}
       <div className="pt-3 border-t border-border/50 space-y-3">
         <EditableField
-          value={copy.caption}
+          value={copy.caption || ""}
           onChange={(val) => onEdit("caption", val)}
           className="text-sm text-[#e8eaff] leading-relaxed"
           multiline
           placeholder="Legenda do carrossel..."
         />
-        {copy.hashtags.length > 0 && (
+        {(copy.hashtags?.length ?? 0) > 0 && (
           <div className="flex flex-wrap gap-1.5">
-            {copy.hashtags.map((tag, i) => (
+            {copy.hashtags!.map((tag, i) => (
               <span
                 key={i}
                 className="text-xs px-2 py-0.5 rounded-full bg-accent/10 text-[#4ecdc4]"
