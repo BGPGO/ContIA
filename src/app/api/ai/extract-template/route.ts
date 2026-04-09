@@ -15,29 +15,41 @@ Analise esta imagem de post/card e extraia a estrutura visual completa.
 REGRAS:
 1. Identifique TODOS os elementos de texto, suas posicoes (em % do canvas), tamanhos estimados de fonte, pesos, cores e alinhamentos
 2. Classifique cada texto pelo papel: headline, subheadline, body, cta, brand, category
-3. Identifique o fundo: cor solida, gradiente ou imagem
+3. Identifique o fundo: cor solida, gradiente ou IMAGEM/FOTO
 4. Identifique elementos decorativos: linhas, formas, bordas, acentos visuais
 5. Extraia a paleta de cores dominante (3-5 cores hex)
 6. Posicoes devem ser em PORCENTAGEM do canvas (0-100% para x e y)
 7. Tamanho de fonte em pixels estimados (considerando canvas de 1080px)
 8. SEMPRE retorne JSON valido no formato especificado
-9. Se o fundo for uma imagem/foto, use type "solid" com a cor dominante de fundo
+9. Se o fundo for uma imagem/foto, use type "image" e descreva a foto em "photo_description"
 10. Para gradientes, identifique as cores inicial e final e o angulo aproximado
 11. Elementos decorativos incluem: linhas separadoras, barras de cor, circulos, retangulos, bordas
-12. O campo "content" deve conter o texto EXATO visivel na imagem
+12. O campo "content" deve conter o texto EXATO visivel na imagem — NUNCA use placeholders como {{headline}}
 13. Se nao conseguir ler um texto, descreva-o como "[texto ilegivel]"
 14. font_weight deve ser string: "300" para light, "400" para regular, "600" para semibold, "700" para bold, "800" para extrabold, "900" para black
+15. Descreva a HIERARQUIA VISUAL: qual elemento chama mais atencao primeiro? segundo? terceiro?
+16. Para fontes: estime se e serif, sans-serif, display, handwritten, monospace
+17. Para imagens de fundo: descreva a foto/ilustracao em detalhe (para gerar similar com DALL-E se necessario)
+18. Se houver LOGO ou ICONE, identifique posicao e tamanho estimado
+19. Se houver elementos SOBREPOSTOS (texto sobre imagem com overlay), identifique a cor e opacidade do overlay
+20. Identifique ESPACAMENTO entre elementos (gaps em %)
+21. Para cada texto, estime o NUMERO DE LINHAS visiveis
 
 FORMATO DE RESPOSTA: Apenas JSON, sem markdown, sem explicacoes.
 
 {
   "layout": {
     "background": {
-      "type": "solid|gradient",
+      "type": "solid|gradient|image",
       "color": "#hex",
       "gradientFrom": "#hex",
       "gradientTo": "#hex",
-      "gradientAngle": 135
+      "gradientAngle": 135,
+      "has_photo": false,
+      "photo_description": "descricao detalhada da foto de fundo",
+      "overlay_color": "#000000",
+      "overlay_opacity": 0.0,
+      "dominant_color": "#hex"
     },
     "elements": [
       {
@@ -47,10 +59,14 @@ FORMATO DE RESPOSTA: Apenas JSON, sem markdown, sem explicacoes.
         "x_percent": 5,
         "y_percent": 15,
         "width_percent": 90,
+        "height_percent": 15,
         "font_size_estimate": 48,
         "font_weight": "700",
+        "font_type": "sans-serif|serif|display|handwritten|monospace",
         "font_align": "left|center|right",
-        "color": "#ffffff"
+        "color": "#ffffff",
+        "line_count": 1,
+        "letter_spacing": "normal|tight|wide"
       },
       {
         "type": "shape",
@@ -62,8 +78,10 @@ FORMATO DE RESPOSTA: Apenas JSON, sem markdown, sem explicacoes.
         "color": "#4ecdc4"
       }
     ],
+    "visual_hierarchy": ["headline", "subheadline", "cta", "brand"],
     "colorPalette": ["#hex1", "#hex2", "#hex3"],
-    "style": "minimal|bold|editorial|gradient|quote"
+    "style": "minimal|bold|editorial|gradient|quote|photo-overlay",
+    "overall_style": "descricao do estilo geral"
   }
 }`;
 
@@ -76,8 +94,10 @@ interface FabricObj {
   [key: string]: unknown;
 }
 
-function objData(role: CanvasElementRole, editable = false, locked = false): ContiaObjectData {
-  return { role, editable, locked };
+function objData(role: CanvasElementRole, editable = false, locked = false, originalText?: string): ContiaObjectData {
+  const data: ContiaObjectData = { role, editable, locked };
+  if (originalText) data.originalText = originalText;
+  return data;
 }
 
 function makeRect(props: Record<string, unknown>): FabricObj {
@@ -97,7 +117,8 @@ function makeRect(props: Record<string, unknown>): FabricObj {
 function makeTextbox(
   text: string,
   role: CanvasElementRole,
-  props: Record<string, unknown>
+  props: Record<string, unknown>,
+  originalText?: string
 ): FabricObj {
   return {
     type: "Textbox",
@@ -115,7 +136,7 @@ function makeTextbox(
     selectable: true,
     editable: true,
     ...props,
-    data: objData(role, true),
+    data: objData(role, true, false, originalText),
   };
 }
 
@@ -152,34 +173,55 @@ function makeLine(props: Record<string, unknown>): FabricObj {
   };
 }
 
+function makeImage(src: string, props: Record<string, unknown>): FabricObj {
+  return {
+    type: "Image",
+    src,
+    left: 0,
+    top: 0,
+    selectable: false,
+    evented: false,
+    ...props,
+  };
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
-   Placeholder map for template roles
+   Font type → fontFamily mapping
    ═══════════════════════════════════════════════════════════════════════════ */
 
-const ROLE_PLACEHOLDER: Record<string, string> = {
-  headline: "{{headline}}",
-  subheadline: "{{subheadline}}",
-  body: "{{body}}",
-  cta: "{{cta}}",
-  brand: "{{brand}}",
-  category: "{{category}}",
+const FONT_TYPE_MAP: Record<string, string> = {
+  "sans-serif": "Inter",
+  serif: "Georgia",
+  display: "Impact",
+  handwritten: "Dancing Script",
+  monospace: "JetBrains Mono",
+  "sans-serif-display": "Montserrat",
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Convert AI layout → Fabric.js canvas JSON
    ═══════════════════════════════════════════════════════════════════════════ */
 
+interface AIBackground {
+  type: string;
+  color?: string;
+  gradientFrom?: string;
+  gradientTo?: string;
+  gradientAngle?: number;
+  has_photo?: boolean;
+  photo_description?: string;
+  overlay_color?: string;
+  overlay_opacity?: number;
+  dominant_color?: string;
+}
+
 interface AILayout {
-  background: {
-    type: string;
-    color?: string;
-    gradientFrom?: string;
-    gradientTo?: string;
-    gradientAngle?: number;
-  };
+  background: AIBackground;
   elements: AIElement[];
   colorPalette: string[];
   style: string;
+  visual_hierarchy?: string[];
+  overall_style?: string;
 }
 
 interface AITextElement {
@@ -189,10 +231,14 @@ interface AITextElement {
   x_percent: number;
   y_percent: number;
   width_percent: number;
+  height_percent?: number;
   font_size_estimate: number;
   font_weight: string;
+  font_type?: string;
   font_align: string;
   color: string;
+  line_count?: number;
+  letter_spacing?: string;
 }
 
 interface AIShapeElement {
@@ -209,48 +255,89 @@ type AIElement = AITextElement | AIShapeElement;
 
 function convertLayoutToFabric(
   layout: AILayout,
-  aspectRatio: "1:1" | "4:5" | "9:16"
-): { canvasJson: object; extractedCopy: Record<string, string> } {
+  aspectRatio: "1:1" | "4:5" | "9:16",
+  imageDataUrl?: string
+): { canvasJson: object; extractedCopy: Record<string, string>; hasBackgroundImage: boolean } {
   const dim = CANVAS_DIMENSIONS[aspectRatio] || CANVAS_DIMENSIONS["1:1"];
   const W = dim.width;
   const H = dim.height;
   const objects: FabricObj[] = [];
   const extractedCopy: Record<string, string> = {};
+  let hasBackgroundImage = false;
+
+  const isPhotoBackground =
+    layout.background.type === "image" ||
+    layout.background.has_photo === true;
 
   // ── 1. Background ──
-  let bgFill: string | object = layout.background.color || "#151826";
+  if (isPhotoBackground && imageDataUrl) {
+    // Preserve the original uploaded image as background
+    hasBackgroundImage = true;
+    objects.push(
+      makeImage(imageDataUrl, {
+        left: 0,
+        top: 0,
+        width: W,
+        height: H,
+        scaleX: 1,
+        scaleY: 1,
+        data: objData("background-image", false, true),
+      })
+    );
 
-  if (
-    layout.background.type === "gradient" &&
-    layout.background.gradientFrom &&
-    layout.background.gradientTo
-  ) {
-    const angle = (layout.background.gradientAngle || 135) * (Math.PI / 180);
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
-    bgFill = {
-      type: "linear",
-      coords: {
-        x1: W / 2 - (cos * W) / 2,
-        y1: H / 2 - (sin * H) / 2,
-        x2: W / 2 + (cos * W) / 2,
-        y2: H / 2 + (sin * H) / 2,
-      },
-      colorStops: [
-        { offset: 0, color: layout.background.gradientFrom },
-        { offset: 1, color: layout.background.gradientTo },
-      ],
-    };
+    // Add overlay if detected
+    const overlayOpacity = layout.background.overlay_opacity || 0;
+    if (overlayOpacity > 0) {
+      objects.push(
+        makeRect({
+          left: 0,
+          top: 0,
+          width: W,
+          height: H,
+          fill: layout.background.overlay_color || "#000000",
+          opacity: overlayOpacity,
+          selectable: true,
+          evented: true,
+          data: objData("decoration", true),
+        })
+      );
+    }
+  } else {
+    // Solid color or gradient background
+    let bgFill: string | object = layout.background.color || layout.background.dominant_color || "#151826";
+
+    if (
+      layout.background.type === "gradient" &&
+      layout.background.gradientFrom &&
+      layout.background.gradientTo
+    ) {
+      const angle = (layout.background.gradientAngle || 135) * (Math.PI / 180);
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      bgFill = {
+        type: "linear",
+        coords: {
+          x1: W / 2 - (cos * W) / 2,
+          y1: H / 2 - (sin * H) / 2,
+          x2: W / 2 + (cos * W) / 2,
+          y2: H / 2 + (sin * H) / 2,
+        },
+        colorStops: [
+          { offset: 0, color: layout.background.gradientFrom },
+          { offset: 1, color: layout.background.gradientTo },
+        ],
+      };
+    }
+
+    objects.push(
+      makeRect({
+        width: W,
+        height: H,
+        fill: bgFill,
+        data: objData("background"),
+      })
+    );
   }
-
-  objects.push(
-    makeRect({
-      width: W,
-      height: H,
-      fill: bgFill,
-      data: objData("background"),
-    })
-  );
 
   // ── 2. Process elements ──
   for (const el of layout.elements) {
@@ -267,19 +354,30 @@ function convertLayoutToFabric(
         extractedCopy[textEl.role] = textEl.content;
       }
 
-      // Use placeholder text for the template
-      const placeholder = ROLE_PLACEHOLDER[textEl.role] || textEl.content;
+      // USE THE REAL TEXT from the image — NOT placeholders
+      const displayText = textEl.content || "[texto nao identificado]";
+
+      // Map font type to family
+      const fontFamily = (textEl.font_type && FONT_TYPE_MAP[textEl.font_type]) || "Inter";
+
+      // Map letter spacing
+      let charSpacing = 0;
+      if (textEl.letter_spacing === "tight") charSpacing = -20;
+      else if (textEl.letter_spacing === "wide") charSpacing = 80;
 
       objects.push(
-        makeTextbox(placeholder, role, {
+        makeTextbox(displayText, role, {
           left: x,
           top: y,
           width: w,
           fontSize,
           fontWeight: textEl.font_weight || "400",
+          fontFamily,
           textAlign: textEl.font_align || "left",
           fill: textEl.color || "#ffffff",
-        })
+          charSpacing,
+          lineHeight: textEl.line_count && textEl.line_count > 1 ? 1.3 : 1.2,
+        }, displayText)
       );
     } else if (el.type === "shape") {
       const shapeEl = el as AIShapeElement;
@@ -329,13 +427,17 @@ function convertLayoutToFabric(
     }
   }
 
+  const canvasBg = isPhotoBackground
+    ? (layout.background.dominant_color || "#151826")
+    : (typeof objects[0]?.fill === "string" ? objects[0].fill as string : "#151826");
+
   const canvasJson = {
     version: "6.0.0",
     objects,
-    background: typeof bgFill === "string" ? bgFill : "#151826",
+    background: canvasBg,
   };
 
-  return { canvasJson, extractedCopy };
+  return { canvasJson, extractedCopy, hasBackgroundImage };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -402,6 +504,8 @@ export async function POST(request: NextRequest) {
 
     // Add context text
     let contextText = "Analise esta imagem e extraia a estrutura visual completa no formato JSON especificado.";
+    contextText += "\nIMPORTANTE: Use o texto EXATO que aparece na imagem no campo 'content'. NAO use placeholders como {{headline}} ou {{body}}.";
+    contextText += "\nSe o fundo for uma foto/imagem, coloque type: 'image' e descreva a foto em 'photo_description'.";
 
     if (context?.brandName) {
       contextText += `\nMarca: ${context.brandName}`;
@@ -421,7 +525,7 @@ export async function POST(request: NextRequest) {
       model: "gpt-4o",
       messages,
       temperature: 0.2,
-      max_tokens: 3000,
+      max_tokens: 4000,
       response_format: { type: "json_object" },
     });
 
@@ -462,7 +566,12 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Convert layout → Fabric.js JSON ──
-    const { canvasJson, extractedCopy } = convertLayoutToFabric(layout, aspectRatio);
+    // Pass the original image so it can be used as background if needed
+    const { canvasJson, extractedCopy, hasBackgroundImage } = convertLayoutToFabric(
+      layout,
+      aspectRatio,
+      image
+    );
 
     // ── Build style description ──
     const styleLabels: Record<string, string> = {
@@ -471,9 +580,14 @@ export async function POST(request: NextRequest) {
       editorial: "Editorial",
       gradient: "Gradiente moderno",
       quote: "Estilo citacao",
+      "photo-overlay": "Foto com overlay",
     };
     const styleName = styleLabels[layout.style] || layout.style || "Personalizado";
-    const bgType = layout.background.type === "gradient" ? "com gradiente" : "com fundo solido";
+    const bgType = layout.background.type === "gradient"
+      ? "com gradiente"
+      : layout.background.type === "image"
+        ? "com foto de fundo"
+        : "com fundo solido";
     const textCount = layout.elements.filter((e) => e.type === "text").length;
     const shapeCount = layout.elements.filter((e) => e.type === "shape").length;
     const styleDescription = `Template ${styleName} ${bgType}, ${textCount} elemento(s) de texto${shapeCount > 0 ? ` e ${shapeCount} elemento(s) decorativo(s)` : ""}`;
@@ -483,6 +597,10 @@ export async function POST(request: NextRequest) {
       extracted_copy: extractedCopy,
       color_palette: layout.colorPalette || [],
       style_description: styleDescription,
+      has_background_image: hasBackgroundImage,
+      photo_description: layout.background.photo_description || null,
+      visual_hierarchy: layout.visual_hierarchy || [],
+      overall_style: layout.overall_style || null,
     });
   } catch (error: any) {
     console.error("AI template extraction error:", error);

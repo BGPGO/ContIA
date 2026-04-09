@@ -11,6 +11,13 @@ import {
   Eye,
   Type,
   Layers,
+  AlignHorizontalJustifyStart,
+  AlignHorizontalJustifyCenter,
+  AlignHorizontalJustifyEnd,
+  AlignVerticalJustifyStart,
+  AlignVerticalJustifyCenter,
+  AlignVerticalJustifyEnd,
+  Crosshair,
 } from "lucide-react";
 import type { SelectionInfo, FabricCanvasRef } from "./FabricCanvas";
 
@@ -334,6 +341,61 @@ export function PropertyPanel({
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
+        {/* ── Alignment ── */}
+        <div>
+          <SectionHeader icon={Crosshair} label="Alinhamento" />
+          <div className="grid grid-cols-3 gap-1">
+            <button
+              type="button"
+              onClick={() => canvasRef.current?.alignSelected('left')}
+              title="Alinhar a esquerda"
+              className="flex items-center justify-center p-2 rounded-md bg-[#141736] border border-white/10 text-[#8b8fb0] hover:bg-white/10 hover:text-[#e8eaff] transition-all cursor-pointer"
+            >
+              <AlignHorizontalJustifyStart size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => canvasRef.current?.alignSelected('center-h')}
+              title="Centralizar horizontalmente"
+              className="flex items-center justify-center p-2 rounded-md bg-[#141736] border border-white/10 text-[#8b8fb0] hover:bg-white/10 hover:text-[#e8eaff] transition-all cursor-pointer"
+            >
+              <AlignHorizontalJustifyCenter size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => canvasRef.current?.alignSelected('right')}
+              title="Alinhar a direita"
+              className="flex items-center justify-center p-2 rounded-md bg-[#141736] border border-white/10 text-[#8b8fb0] hover:bg-white/10 hover:text-[#e8eaff] transition-all cursor-pointer"
+            >
+              <AlignHorizontalJustifyEnd size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => canvasRef.current?.alignSelected('top')}
+              title="Alinhar ao topo"
+              className="flex items-center justify-center p-2 rounded-md bg-[#141736] border border-white/10 text-[#8b8fb0] hover:bg-white/10 hover:text-[#e8eaff] transition-all cursor-pointer"
+            >
+              <AlignVerticalJustifyStart size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => canvasRef.current?.alignSelected('center-v')}
+              title="Centralizar verticalmente"
+              className="flex items-center justify-center p-2 rounded-md bg-[#141736] border border-white/10 text-[#8b8fb0] hover:bg-white/10 hover:text-[#e8eaff] transition-all cursor-pointer"
+            >
+              <AlignVerticalJustifyCenter size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => canvasRef.current?.alignSelected('bottom')}
+              title="Alinhar abaixo"
+              className="flex items-center justify-center p-2 rounded-md bg-[#141736] border border-white/10 text-[#8b8fb0] hover:bg-white/10 hover:text-[#e8eaff] transition-all cursor-pointer"
+            >
+              <AlignVerticalJustifyEnd size={14} />
+            </button>
+          </div>
+        </div>
+
         {/* ── Position & Size ── */}
         <div>
           <SectionHeader icon={Move} label="Posicao e Tamanho" />

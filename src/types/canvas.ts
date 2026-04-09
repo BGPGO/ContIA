@@ -21,6 +21,7 @@ export interface ContiaObjectData {
   role: CanvasElementRole;
   editable: boolean;
   locked?: boolean;
+  originalText?: string; // Text extracted from image (for revert after copy injection)
 }
 
 // Visual template stored in Supabase

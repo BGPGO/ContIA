@@ -24,6 +24,17 @@ import {
   Minus,
   Palette,
   ImageUp,
+  AlignHorizontalJustifyStart,
+  AlignHorizontalJustifyCenter,
+  AlignHorizontalJustifyEnd,
+  AlignVerticalJustifyStart,
+  AlignVerticalJustifyCenter,
+  AlignVerticalJustifyEnd,
+  FlipHorizontal,
+  FlipVertical,
+  Lock,
+  Unlock,
+  Link,
 } from "lucide-react";
 import type { SelectionInfo, FabricCanvasRef } from "./FabricCanvas";
 
@@ -189,6 +200,8 @@ function AddElementDropdown({
   canvasRef: React.RefObject<FabricCanvasRef | null>;
 }) {
   const [open, setOpen] = useState(false);
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [imageUrl, setImageUrl] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -200,6 +213,8 @@ function AddElementDropdown({
         !dropdownRef.current.contains(e.target as Node)
       ) {
         setOpen(false);
+        setShowUrlInput(false);
+        setImageUrl("");
       }
     };
     document.addEventListener("mousedown", handleClick);
@@ -213,9 +228,14 @@ function AddElementDropdown({
       action: () => canvasRef.current?.addText("Novo texto"),
     },
     {
-      label: "Imagem",
+      label: "Imagem (arquivo)",
       icon: ImagePlus,
       action: () => fileInputRef.current?.click(),
+    },
+    {
+      label: "Imagem (URL)",
+      icon: Link,
+      action: () => setShowUrlInput(true),
     },
     {
       label: "Retangulo",
@@ -240,6 +260,14 @@ function AddElementDropdown({
     e.target.value = "";
   };
 
+  const handleImageUrl = () => {
+    if (!imageUrl.trim()) return;
+    canvasRef.current?.addImage(imageUrl.trim());
+    setImageUrl("");
+    setShowUrlInput(false);
+    setOpen(false);
+  };
+
   return (
     <div className="relative" ref={dropdownRef}>
       <ToolbarButton onClick={() => setOpen(!open)} title="Adicionar elemento">
@@ -253,7 +281,7 @@ function AddElementDropdown({
         className="hidden"
       />
       {open && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-[#141736] border border-white/10 rounded-xl shadow-xl py-1 min-w-[160px]">
+        <div className="absolute top-full left-0 mt-1 z-50 bg-[#141736] border border-white/10 rounded-xl shadow-xl py-1 min-w-[200px]">
           {items.map((item) => {
             const Icon = item.icon;
             return (
@@ -262,7 +290,7 @@ function AddElementDropdown({
                 type="button"
                 onClick={() => {
                   item.action();
-                  setOpen(false);
+                  if (item.label !== "Imagem (URL)") setOpen(false);
                 }}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#8b8fb0] hover:bg-white/5 hover:text-[#e8eaff] transition-colors cursor-pointer"
               >
@@ -271,6 +299,28 @@ function AddElementDropdown({
               </button>
             );
           })}
+          {showUrlInput && (
+            <div className="px-3 py-2 border-t border-white/10">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleImageUrl(); }}
+                  placeholder="https://exemplo.com/imagem.png"
+                  className="flex-1 bg-[#0c0f24] border border-white/10 rounded px-2.5 py-1.5 text-xs text-[#e8eaff] focus:outline-none focus:border-[#4ecdc4]/40"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={handleImageUrl}
+                  className="px-3 py-1.5 bg-[#4ecdc4]/20 text-[#4ecdc4] rounded text-xs font-medium hover:bg-[#4ecdc4]/30 transition-colors cursor-pointer"
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -362,6 +412,62 @@ function OpacitySlider({
       <span className="text-[10px] text-[#5e6388] w-7 text-right">
         {value}%
       </span>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Alignment Buttons Group
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function AlignmentButtons({
+  canvasRef,
+  compact = false,
+}: {
+  canvasRef: React.RefObject<FabricCanvasRef | null>;
+  compact?: boolean;
+}) {
+  const size = compact ? 13 : 14;
+
+  return (
+    <div className="flex items-center gap-0.5 bg-[#141736] rounded-lg p-1">
+      <ToolbarButton
+        onClick={() => canvasRef.current?.alignSelected('left')}
+        title="Alinhar a esquerda"
+      >
+        <AlignHorizontalJustifyStart size={size} />
+      </ToolbarButton>
+      <ToolbarButton
+        onClick={() => canvasRef.current?.alignSelected('center-h')}
+        title="Centralizar horizontalmente"
+      >
+        <AlignHorizontalJustifyCenter size={size} />
+      </ToolbarButton>
+      <ToolbarButton
+        onClick={() => canvasRef.current?.alignSelected('right')}
+        title="Alinhar a direita"
+      >
+        <AlignHorizontalJustifyEnd size={size} />
+      </ToolbarButton>
+      <div className="w-px h-4 bg-white/10 mx-0.5" />
+      <ToolbarButton
+        onClick={() => canvasRef.current?.alignSelected('top')}
+        title="Alinhar ao topo"
+      >
+        <AlignVerticalJustifyStart size={size} />
+      </ToolbarButton>
+      <ToolbarButton
+        onClick={() => canvasRef.current?.alignSelected('center-v')}
+        title="Centralizar verticalmente"
+      >
+        <AlignVerticalJustifyCenter size={size} />
+      </ToolbarButton>
+      <ToolbarButton
+        onClick={() => canvasRef.current?.alignSelected('bottom')}
+        title="Alinhar abaixo"
+      >
+        <AlignVerticalJustifyEnd size={size} />
+      </ToolbarButton>
     </div>
   );
 }
@@ -699,6 +805,37 @@ export function CanvasToolbar({
 
       <ToolbarSeparator />
 
+      {/* ── Alignment & Transform (visible when object selected) ── */}
+      {selection && (
+        <>
+          <AlignmentButtons canvasRef={canvasRef} />
+
+          <div className="flex items-center gap-0.5 bg-[#141736] rounded-lg p-1">
+            <ToolbarButton
+              onClick={() => canvasRef.current?.flipSelected('horizontal')}
+              title="Espelhar horizontalmente"
+            >
+              <FlipHorizontal size={14} />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => canvasRef.current?.flipSelected('vertical')}
+              title="Espelhar verticalmente"
+            >
+              <FlipVertical size={14} />
+            </ToolbarButton>
+          </div>
+
+          <ToolbarButton
+            onClick={() => canvasRef.current?.toggleLockSelected()}
+            title="Bloquear/Desbloquear"
+          >
+            {selection.editable ? <Unlock size={14} /> : <Lock size={14} />}
+          </ToolbarButton>
+
+          <ToolbarSeparator />
+        </>
+      )}
+
       {/* ── RIGHT: Always visible ── */}
       <div className="flex items-center gap-0.5 bg-[#141736] rounded-lg p-1">
         <ToolbarButton
@@ -728,4 +865,5 @@ export function CanvasToolbar({
   );
 }
 
+export { AlignmentButtons };
 export default CanvasToolbar;

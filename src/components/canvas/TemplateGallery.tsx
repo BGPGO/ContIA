@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   X,
@@ -27,8 +27,11 @@ import {
   Image as ImageIcon,
   PenTool,
   Upload,
+  FileImage,
+  ChevronRight,
 } from "lucide-react";
 import type { VisualTemplate, VisualTemplateSummary } from "@/types/canvas";
+import type { PsdTemplate } from "@/lib/psd-templates";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Preset template metadata
@@ -92,6 +95,7 @@ function SourceBadge({ source }: { source: string }) {
 interface TemplateGalleryProps {
   onSelect: (template: VisualTemplate) => void;
   onSelectPreset: (presetId: string) => void;
+  onSelectPsd?: (template: PsdTemplate, slideIndex: number) => void;
   empresaId: string;
   aspectRatio?: "1:1" | "4:5" | "9:16";
   isOpen: boolean;
@@ -116,6 +120,7 @@ type RatioFilter = "todos" | "1:1" | "4:5" | "9:16";
 export function TemplateGallery({
   onSelect,
   onSelectPreset,
+  onSelectPsd,
   empresaId,
   aspectRatio,
   isOpen,
@@ -130,6 +135,27 @@ export function TemplateGallery({
   const [ratioFilter, setRatioFilter] = useState<RatioFilter>("todos");
   const [hoveredPreset, setHoveredPreset] = useState<string | null>(null);
   const [hoveredBrand, setHoveredBrand] = useState<string | null>(null);
+  const [psdTemplates, setPsdTemplates] = useState<PsdTemplate[]>([]);
+  const [hoveredPsd, setHoveredPsd] = useState<string | null>(null);
+  const [psdSlideSelection, setPsdSlideSelection] = useState<Record<string, number>>({});
+
+  // Fetch PSD templates
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    async function fetchPsd() {
+      try {
+        const res = await fetch("/api/psd-templates");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setPsdTemplates(data);
+      } catch {
+        // silently fail
+      }
+    }
+    fetchPsd();
+    return () => { cancelled = true; };
+  }, [isOpen]);
 
   // ── Filter presets by search ──
   const filteredPresets = useMemo(() => {
@@ -161,6 +187,27 @@ export function TemplateGallery({
 
     return result;
   }, [brandTemplates, search, formatFilter, ratioFilter]);
+
+  // ── Filter PSD templates ──
+  const filteredPsdTemplates = useMemo(() => {
+    let result = psdTemplates;
+
+    if (search) {
+      const q = search.toLowerCase();
+      result = result.filter((t) => t.name.toLowerCase().includes(q));
+    }
+
+    if (formatFilter !== "todos") {
+      const formatMap: Record<string, string> = {
+        post: "feed",
+        carousel: "carousel",
+        story: "story",
+      };
+      result = result.filter((t) => t.format === formatMap[formatFilter]);
+    }
+
+    return result;
+  }, [psdTemplates, search, formatFilter]);
 
   const FORMAT_OPTIONS: { value: FormatFilter; label: string }[] = [
     { value: "todos", label: "Todos" },
@@ -397,7 +444,119 @@ export function TemplateGallery({
                 </div>
               </section>
 
-              {/* ── B) Brand Templates ── */}
+              {/* ── B) PSD Brand Templates ── */}
+              {filteredPsdTemplates.length > 0 && onSelectPsd && (
+                <section>
+                  <h3 className="text-xs font-semibold text-[#5e6388] uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <FileImage size={13} />
+                    Templates da Marca ({filteredPsdTemplates.length})
+                  </h3>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {filteredPsdTemplates.map((psd) => {
+                      const isHovered = hoveredPsd === psd.id;
+                      const selectedSlide = psdSlideSelection[psd.id] ?? 0;
+                      const formatLabels: Record<string, string> = {
+                        feed: "Feed",
+                        story: "Story",
+                        carousel: "Carrossel",
+                      };
+
+                      return (
+                        <motion.div
+                          key={psd.id}
+                          onMouseEnter={() => setHoveredPsd(psd.id)}
+                          onMouseLeave={() => setHoveredPsd(null)}
+                          whileHover={{ scale: 1.03 }}
+                          className="group relative bg-[#141736] rounded-xl overflow-hidden hover:ring-2 hover:ring-[#ec4899]/50 cursor-pointer transition-all duration-200"
+                        >
+                          {/* Thumbnail */}
+                          <button
+                            onClick={() => onSelectPsd(psd, selectedSlide)}
+                            className="w-full"
+                          >
+                            <div className="aspect-square bg-[#080b1e] flex items-center justify-center overflow-hidden">
+                              {psd.thumbnail ? (
+                                <img
+                                  src={psd.thumbnail}
+                                  alt={psd.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <FileImage
+                                  size={24}
+                                  className="text-[#5e6388] opacity-40"
+                                />
+                              )}
+                            </div>
+                          </button>
+
+                          {/* Info */}
+                          <div className="p-2.5 space-y-1.5">
+                            <p className="text-[11px] font-semibold text-[#e8eaff] truncate">
+                              {psd.name}
+                            </p>
+
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <SourceBadge source="psd" />
+                              <span
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium"
+                                style={{ backgroundColor: "rgba(236,72,153,0.1)", color: "#ec4899" }}
+                              >
+                                {formatLabels[psd.format] || psd.format}
+                                {psd.format === "carousel" && ` ${psd.slides}`}
+                              </span>
+                            </div>
+
+                            {/* Color swatches */}
+                            <div className="flex items-center gap-1">
+                              {psd.colors.slice(0, 4).map((color, i) => (
+                                <span
+                                  key={i}
+                                  className="w-3 h-3 rounded-full border border-white/10"
+                                  style={{ backgroundColor: color }}
+                                />
+                              ))}
+                              {psd.fonts.length > 0 && (
+                                <span className="text-[9px] text-[#5e6388] ml-1 truncate">
+                                  {psd.fonts[0].replace(/-/g, " ")}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Carousel slide selector */}
+                            {psd.format === "carousel" && psd.slides > 1 && (
+                              <div className="flex items-center gap-1 pt-0.5">
+                                {Array.from({ length: psd.slides }, (_, i) => (
+                                  <button
+                                    key={i}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setPsdSlideSelection((prev) => ({
+                                        ...prev,
+                                        [psd.id]: i,
+                                      }));
+                                    }}
+                                    className={`w-5 h-5 rounded text-[9px] font-medium transition-all ${
+                                      selectedSlide === i
+                                        ? "bg-[#ec4899]/20 text-[#ec4899] border border-[#ec4899]/40"
+                                        : "bg-white/5 text-[#5e6388] border border-white/5 hover:bg-white/10"
+                                    }`}
+                                  >
+                                    {i + 1}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+
+              {/* ── C) Brand Templates ── */}
               {brandTemplates.length > 0 && (
                 <section>
                   <h3 className="text-xs font-semibold text-[#5e6388] uppercase tracking-wider mb-3 flex items-center gap-2">

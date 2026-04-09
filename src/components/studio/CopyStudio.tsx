@@ -9,6 +9,8 @@ import {
   Pencil,
   Check,
   X,
+  Lightbulb,
+  Send,
 } from "lucide-react";
 import type { ContentFormat, ContentTone } from "@/types/ai";
 import type {
@@ -23,6 +25,7 @@ import { useCopySessions } from "@/hooks/useCopySessions";
 import { ChatInterface } from "./ChatInterface";
 import { CopyPreview } from "./CopyPreview";
 import { SessionHistory } from "./SessionHistory";
+import { InspirationPanel } from "./InspirationPanel";
 
 /* ══════════════════════════════════════════════════════════════════
    Sub-components
@@ -296,6 +299,15 @@ export function CopyStudio() {
   };
 
   const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
+  const [inspirationDrawerOpen, setInspirationDrawerOpen] = useState(false);
+  const [quickInput, setQuickInput] = useState("");
+
+  // Determine layout state:
+  // State A: No session / fresh (no messages and no active session)
+  // State B: Active chat session (has messages or streaming)
+  // State C: Copy approved (existing, no changes needed)
+  const hasActiveChat = state.messages.length > 0 || state.isStreaming;
+  const isStateA = !hasActiveChat && !state.sessionId;
 
   // Auto-open mobile preview when copy is generated
   useEffect(() => {
@@ -303,6 +315,34 @@ export function CopyStudio() {
       setMobilePreviewOpen(true);
     }
   }, [studio.currentCopy]);
+
+  // Handle quick-start from suggestion
+  const handleStartFromSuggestion = useCallback(
+    (topic: string, format: ContentFormat, message: string) => {
+      updateConfig({ topic, format });
+      setInspirationDrawerOpen(false);
+      // Small delay to let config update propagate
+      setTimeout(() => sendMessage(message), 50);
+    },
+    [updateConfig, sendMessage]
+  );
+
+  // Handle quick-start from post reference
+  const handleStartFromPost = useCallback(
+    (message: string) => {
+      setInspirationDrawerOpen(false);
+      sendMessage(message);
+    },
+    [sendMessage]
+  );
+
+  // Handle quick input submit (State A)
+  const handleQuickSubmit = useCallback(() => {
+    const text = quickInput.trim();
+    if (!text) return;
+    setQuickInput("");
+    sendMessage(text);
+  }, [quickInput, sendMessage]);
 
   const statusCfg = STATUS_CONFIG[studio.status];
 
@@ -371,52 +411,208 @@ export function CopyStudio() {
           </span>
         </div>
 
-        {/* Mobile preview toggle */}
-        {studio.currentCopy && (
-          <button
-            type="button"
-            onClick={() => setMobilePreviewOpen(true)}
-            className="md:hidden ml-auto px-3 py-1.5 rounded-lg text-[11px] font-medium
-              bg-accent/15 text-accent border border-accent/20 cursor-pointer"
-          >
-            Ver preview
-          </button>
-        )}
+        {/* Right-side buttons */}
+        <div className="flex items-center gap-1.5 ml-auto">
+          {/* Inspiration toggle (State B only) */}
+          {!isStateA && (
+            <button
+              type="button"
+              onClick={() => setInspirationDrawerOpen((v) => !v)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all cursor-pointer
+                ${
+                  inspirationDrawerOpen
+                    ? "bg-accent/15 text-accent border border-accent/20"
+                    : "bg-bg-input border border-border text-text-secondary hover:text-text-primary hover:border-border-light"
+                }`}
+              title="Inspiracao"
+            >
+              <Lightbulb size={13} />
+              <span className="hidden sm:inline">Inspiracao</span>
+            </button>
+          )}
+
+          {/* Mobile preview toggle */}
+          {studio.currentCopy && (
+            <button
+              type="button"
+              onClick={() => setMobilePreviewOpen(true)}
+              className="md:hidden px-3 py-1.5 rounded-lg text-[11px] font-medium
+                bg-accent/15 text-accent border border-accent/20 cursor-pointer"
+            >
+              Ver preview
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* ── Body: Two columns ── */}
+      {/* ── Body ── */}
       <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
-        {/* LEFT: Chat (60%) */}
-        <div className="flex-[3] flex flex-col min-w-0 border-r border-border min-h-0">
-          <ChatInterface
-            messages={studio.messages}
-            isStreaming={studio.isStreaming}
-            streamingText={studio.streamingText}
-            onSendMessage={studio.sendMessage}
-            onQuickAction={studio.handleQuickAction}
-            quickActions={QUICK_ACTIONS}
-            placeholder="Descreva o conteudo que voce quer criar..."
-            disabled={false}
-          />
-        </div>
+        <AnimatePresence mode="wait">
+          {/* ══════════════════════════════════════════════════════
+             STATE A: Fresh start — InspirationPanel full width
+             ══════════════════════════════════════════════════════ */}
+          {isStateA && (
+            <motion.div
+              key="state-a"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+              className="flex-1 flex flex-col min-h-0"
+            >
+              {/* Inspiration panel fills available space */}
+              <div className="flex-1 overflow-hidden">
+                <InspirationPanel
+                  onStartFromSuggestion={handleStartFromSuggestion}
+                  onStartFromPost={handleStartFromPost}
+                  className="h-full"
+                />
+              </div>
 
-        {/* RIGHT: Preview (40%) — desktop only */}
-        <div className="hidden md:flex flex-[2] flex-col min-w-0 bg-bg-primary/30">
-          <CopyPreview
-            copy={studio.currentCopy}
-            format={studio.format}
-            platforms={studio.platforms}
-            isApproved={studio.status === "approved" || studio.status === "designed" || studio.status === "exported"}
-            onApprove={studio.approve}
-            onEdit={studio.editCopy}
-            onCreateVisual={() => {
-              const url = studio.sessionId
-                ? `/studio/editor?session=${studio.sessionId}`
-                : "/studio/editor";
-              router.push(url);
-            }}
-          />
-        </div>
+              {/* Quick input bar at bottom */}
+              <div className="shrink-0 px-4 md:px-8 py-4 border-t border-border bg-bg-secondary">
+                <div className="max-w-2xl mx-auto">
+                  <p className="text-xs text-text-muted text-center mb-2.5">
+                    Ou descreva diretamente o que quer criar
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 relative">
+                      <input
+                        type="text"
+                        value={quickInput}
+                        onChange={(e) => setQuickInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleQuickSubmit();
+                          }
+                        }}
+                        placeholder="Sobre o que quer criar?"
+                        className="w-full bg-bg-input border border-border rounded-xl px-4 py-3 text-sm text-text-primary
+                          placeholder:text-text-muted/50 focus:outline-none focus:border-accent/50
+                          transition-colors"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleQuickSubmit}
+                      disabled={!quickInput.trim()}
+                      className="w-10 h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer
+                        disabled:opacity-30 disabled:cursor-not-allowed shrink-0 text-white"
+                      style={{
+                        background: quickInput.trim()
+                          ? "linear-gradient(135deg, #6c5ce7 0%, #4ecdc4 100%)"
+                          : "rgba(255,255,255,0.06)",
+                      }}
+                    >
+                      <Send size={16} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════
+             STATE B: Active chat — Chat + Preview (+ optional drawer)
+             ══════════════════════════════════════════════════════ */}
+          {!isStateA && (
+            <motion.div
+              key="state-b"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3 }}
+              className="flex-1 overflow-hidden flex flex-col md:flex-row"
+            >
+              {/* LEFT: Chat (60%) */}
+              <div className="flex-[3] flex flex-col min-w-0 border-r border-border min-h-0 relative">
+                <ChatInterface
+                  messages={studio.messages}
+                  isStreaming={studio.isStreaming}
+                  streamingText={studio.streamingText}
+                  onSendMessage={studio.sendMessage}
+                  onQuickAction={studio.handleQuickAction}
+                  quickActions={QUICK_ACTIONS}
+                  placeholder="Descreva o conteudo que voce quer criar..."
+                  disabled={false}
+                />
+
+                {/* ── Inspiration drawer (slide-over from left) ── */}
+                <AnimatePresence>
+                  {inspirationDrawerOpen && (
+                    <>
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 z-30 bg-black/30 backdrop-blur-[2px]"
+                        onClick={() => setInspirationDrawerOpen(false)}
+                      />
+                      <motion.div
+                        initial={{ x: "-100%" }}
+                        animate={{ x: 0 }}
+                        exit={{ x: "-100%" }}
+                        transition={{ type: "spring", stiffness: 350, damping: 35 }}
+                        className="absolute left-0 top-0 bottom-0 z-40 w-full max-w-md
+                          bg-bg-secondary border-r border-border shadow-2xl flex flex-col"
+                      >
+                        {/* Drawer header */}
+                        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
+                          <div className="flex items-center gap-2">
+                            <Lightbulb size={14} className="text-accent" />
+                            <span className="text-sm font-semibold text-text-primary">
+                              Inspiracao
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setInspirationDrawerOpen(false)}
+                            className="p-1 rounded-lg hover:bg-bg-card transition-colors cursor-pointer"
+                          >
+                            <X size={16} className="text-text-muted" />
+                          </button>
+                        </div>
+
+                        {/* Drawer body */}
+                        <div className="flex-1 overflow-hidden">
+                          <InspirationPanel
+                            onStartFromSuggestion={(topic, format, message) => {
+                              handleStartFromSuggestion(topic, format, message);
+                              setInspirationDrawerOpen(false);
+                            }}
+                            onStartFromPost={(message) => {
+                              handleStartFromPost(message);
+                              setInspirationDrawerOpen(false);
+                            }}
+                            className="h-full"
+                          />
+                        </div>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* RIGHT: Preview (40%) — desktop only */}
+              <div className="hidden md:flex flex-[2] flex-col min-w-0 bg-bg-primary/30">
+                <CopyPreview
+                  copy={studio.currentCopy}
+                  format={studio.format}
+                  platforms={studio.platforms}
+                  isApproved={studio.status === "approved" || studio.status === "designed" || studio.status === "exported"}
+                  onApprove={studio.approve}
+                  onEdit={studio.editCopy}
+                  onCreateVisual={() => {
+                    const url = studio.sessionId
+                      ? `/studio/editor?session=${studio.sessionId}`
+                      : "/studio/editor";
+                    router.push(url);
+                  }}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* ── Session history bar ── */}

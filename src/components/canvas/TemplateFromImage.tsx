@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import {
   X,
   Upload,
@@ -12,6 +12,8 @@ import {
   Type,
   PenTool,
   ArrowRight,
+  Image as ImageLucide,
+  Eye,
 } from "lucide-react";
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -27,10 +29,23 @@ interface TemplateFromImageProps {
 }
 
 interface ExtractionResult {
-  canvas_json: object;
+  canvas_json: {
+    version: string;
+    objects: Array<{
+      type: string;
+      text?: string;
+      data?: { role?: string; originalText?: string; editable?: boolean };
+      [key: string]: unknown;
+    }>;
+    background: string;
+  };
   extracted_copy: Record<string, string>;
   color_palette: string[];
   style_description: string;
+  has_background_image?: boolean;
+  photo_description?: string | null;
+  visual_hierarchy?: string[];
+  overall_style?: string | null;
 }
 
 type Step = "upload" | "analyzing" | "result" | "saved";
@@ -46,8 +61,148 @@ const PROGRESS_MESSAGES = [
   "Analisando layout...",
   "Extraindo elementos de texto...",
   "Identificando cores e formas...",
+  "Mapeando hierarquia visual...",
   "Gerando template Fabric.js...",
 ];
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Role labels
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const ROLE_LABELS: Record<string, string> = {
+  headline: "Titulo",
+  subheadline: "Subtitulo",
+  body: "Corpo",
+  cta: "CTA",
+  brand: "Marca",
+  category: "Categoria",
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Mini canvas preview — renders the Fabric.js JSON as HTML/CSS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function CanvasPreview({
+  canvasJson,
+  className = "",
+}: {
+  canvasJson: ExtractionResult["canvas_json"];
+  className?: string;
+}) {
+  const objects = canvasJson?.objects || [];
+  const bgColor = canvasJson?.background || "#151826";
+
+  // Canvas logical size (1080x1080 for 1:1)
+  const canvasW = 1080;
+  const canvasH = 1080;
+
+  return (
+    <div
+      className={`relative overflow-hidden ${className}`}
+      style={{ backgroundColor: bgColor, aspectRatio: "1/1" }}
+    >
+      {objects.map((obj, i) => {
+        const style: React.CSSProperties = {
+          position: "absolute",
+          left: `${((obj.left as number) || 0) / canvasW * 100}%`,
+          top: `${((obj.top as number) || 0) / canvasH * 100}%`,
+        };
+
+        if (obj.type === "Image" && obj.src) {
+          return (
+            <img
+              key={i}
+              src={obj.src as string}
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{ zIndex: i }}
+            />
+          );
+        }
+
+        if (obj.type === "Rect") {
+          const w = ((obj.width as number) || 0) / canvasW * 100;
+          const h = ((obj.height as number) || 0) / canvasH * 100;
+          return (
+            <div
+              key={i}
+              style={{
+                ...style,
+                width: `${w}%`,
+                height: `${h}%`,
+                backgroundColor: typeof obj.fill === "string" ? obj.fill : "#000",
+                opacity: (obj.opacity as number) ?? 1,
+                zIndex: i,
+              }}
+            />
+          );
+        }
+
+        if (obj.type === "Textbox" && obj.text) {
+          const w = ((obj.width as number) || 0) / canvasW * 100;
+          const fontSize = ((obj.fontSize as number) || 32) / canvasW * 100;
+          return (
+            <div
+              key={i}
+              style={{
+                ...style,
+                width: `${w}%`,
+                fontSize: `${fontSize}vw`,
+                fontWeight: (obj.fontWeight as string) || "400",
+                color: (typeof obj.fill === "string" ? obj.fill : "#fff"),
+                textAlign: (obj.textAlign as React.CSSProperties["textAlign"]) || "left",
+                lineHeight: String(obj.lineHeight || 1.2),
+                fontFamily: (obj.fontFamily as string) || "Inter, sans-serif",
+                zIndex: i,
+                overflow: "hidden",
+                wordBreak: "break-word",
+              }}
+            >
+              {obj.text}
+            </div>
+          );
+        }
+
+        if (obj.type === "Circle") {
+          const r = ((obj.radius as number) || 0) / canvasW * 100;
+          return (
+            <div
+              key={i}
+              style={{
+                ...style,
+                width: `${r * 2}%`,
+                height: `${r * 2}%`,
+                borderRadius: "50%",
+                backgroundColor: typeof obj.fill === "string" ? obj.fill : "transparent",
+                border: obj.stroke ? `2px solid ${obj.stroke}` : undefined,
+                opacity: (obj.opacity as number) ?? 1,
+                zIndex: i,
+              }}
+            />
+          );
+        }
+
+        if (obj.type === "Line") {
+          const w = ((obj.x2 as number) || 0) / canvasW * 100;
+          return (
+            <div
+              key={i}
+              style={{
+                ...style,
+                width: `${w}%`,
+                height: `${(obj.strokeWidth as number) || 2}px`,
+                backgroundColor: (obj.stroke as string) || "#4ecdc4",
+                zIndex: i,
+              }}
+            />
+          );
+        }
+
+        return null;
+      })}
+    </div>
+  );
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Component
@@ -68,6 +223,7 @@ export function TemplateFromImage({
   const [error, setError] = useState<string | null>(null);
   const [progressIdx, setProgressIdx] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [editedCopy, setEditedCopy] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -80,6 +236,7 @@ export function TemplateFromImage({
     setTemplateName("");
     setError(null);
     setProgressIdx(0);
+    setEditedCopy({});
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current);
       progressIntervalRef.current = null;
@@ -90,6 +247,25 @@ export function TemplateFromImage({
     resetState();
     onClose();
   }, [resetState, onClose]);
+
+  // Initialize editedCopy when result arrives
+  useEffect(() => {
+    if (result?.extracted_copy) {
+      setEditedCopy({ ...result.extracted_copy });
+    }
+  }, [result]);
+
+  // ── Apply edited copy to canvas JSON ──
+  const getCanvasJsonWithEdits = useCallback((): object => {
+    if (!result) return {};
+    const json = JSON.parse(JSON.stringify(result.canvas_json));
+    for (const obj of json.objects || []) {
+      if (obj.type === "Textbox" && obj.data?.role && editedCopy[obj.data.role]) {
+        obj.text = editedCopy[obj.data.role];
+      }
+    }
+    return json;
+  }, [result, editedCopy]);
 
   // ── File handling ──
   const processFile = useCallback((file: File) => {
@@ -195,20 +371,20 @@ export function TemplateFromImage({
   const handleUseInEditor = useCallback(() => {
     if (!result) return;
     onTemplateCreated({
-      canvas_json: result.canvas_json,
+      canvas_json: getCanvasJsonWithEdits(),
       name: templateName || "Template extraido",
     });
     handleClose();
-  }, [result, templateName, onTemplateCreated, handleClose]);
+  }, [result, templateName, getCanvasJsonWithEdits, onTemplateCreated, handleClose]);
 
   const handleSaveTemplate = useCallback(() => {
     if (!result) return;
     onTemplateCreated({
-      canvas_json: result.canvas_json,
+      canvas_json: getCanvasJsonWithEdits(),
       name: templateName || "Template extraido",
     });
     setStep("saved");
-  }, [result, templateName, onTemplateCreated]);
+  }, [result, templateName, getCanvasJsonWithEdits, onTemplateCreated]);
 
   if (!isOpen) return null;
 
@@ -388,7 +564,7 @@ export function TemplateFromImage({
           {/* ── Step: Result ── */}
           {step === "result" && result && (
             <div className="space-y-6">
-              {/* Split view */}
+              {/* Split view: Original vs Generated */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Left: Original */}
                 <div className="space-y-3">
@@ -407,29 +583,45 @@ export function TemplateFromImage({
                   </div>
                 </div>
 
-                {/* Right: Generated preview */}
+                {/* Right: Canvas preview */}
                 <div className="space-y-3">
                   <h3 className="text-sm font-medium text-[#8b8fb0] flex items-center gap-2">
-                    <PenTool size={14} />
-                    Template gerado
+                    <Eye size={14} />
+                    Preview do template
                   </h3>
-                  <div className="rounded-xl overflow-hidden border border-[#4ecdc4]/20 bg-[#141736] aspect-square flex items-center justify-center p-6">
-                    <div className="text-center space-y-3">
-                      <div className="p-3 rounded-xl bg-[#4ecdc4]/10 inline-block">
-                        <Check size={24} className="text-[#4ecdc4]" />
-                      </div>
-                      <p className="text-sm font-medium text-[#e8eaff]">
-                        Template pronto!
-                      </p>
-                      <p className="text-xs text-[#5e6388]">
-                        {result.style_description}
-                      </p>
-                      <p className="text-xs text-[#5e6388]">
-                        {(result.canvas_json as any)?.objects?.length || 0} objetos no canvas
-                      </p>
-                    </div>
+                  <div className="rounded-xl overflow-hidden border border-[#4ecdc4]/20 bg-[#141736] aspect-square">
+                    <CanvasPreview
+                      canvasJson={result.canvas_json}
+                      className="w-full h-full"
+                    />
                   </div>
                 </div>
+              </div>
+
+              {/* Background image badge */}
+              {result.has_background_image && (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-[#4ecdc4]/5 border border-[#4ecdc4]/20">
+                  <ImageLucide size={16} className="text-[#4ecdc4] shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-[#e8eaff]">
+                      Imagem de fundo preservada
+                    </p>
+                    {result.photo_description && (
+                      <p className="text-xs text-[#5e6388] mt-0.5">
+                        {result.photo_description}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Style description */}
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.03] border border-white/5">
+                <PenTool size={14} className="text-[#6c5ce7] shrink-0" />
+                <p className="text-sm text-[#c0c4e0]">{result.style_description}</p>
+                <span className="text-xs text-[#5e6388] ml-auto shrink-0">
+                  {(result.canvas_json as any)?.objects?.length || 0} objetos
+                </span>
               </div>
 
               {/* Color palette */}
@@ -455,23 +647,37 @@ export function TemplateFromImage({
                 </div>
               )}
 
-              {/* Extracted copy */}
-              {Object.keys(result.extracted_copy).length > 0 && (
+              {/* Extracted copy — EDITABLE */}
+              {Object.keys(editedCopy).length > 0 && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-medium text-[#8b8fb0] flex items-center gap-2">
                     <Type size={14} />
                     Texto extraido
+                    <span className="text-[10px] text-[#5e6388] font-normal ml-1">
+                      (edite antes de salvar)
+                    </span>
                   </h3>
                   <div className="grid gap-2">
-                    {Object.entries(result.extracted_copy).map(([role, text]) => (
+                    {Object.entries(editedCopy).map(([role, text]) => (
                       <div
                         key={role}
                         className="flex items-start gap-3 p-3 rounded-lg bg-white/[0.03] border border-white/5"
                       >
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-[#4ecdc4] bg-[#4ecdc4]/10 px-2 py-0.5 rounded shrink-0 mt-0.5">
-                          {role}
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-[#4ecdc4] bg-[#4ecdc4]/10 px-2 py-1 rounded shrink-0 mt-1">
+                          {ROLE_LABELS[role] || role}
                         </span>
-                        <span className="text-sm text-[#c0c4e0]">{text}</span>
+                        <input
+                          type="text"
+                          value={text}
+                          onChange={(e) =>
+                            setEditedCopy((prev) => ({
+                              ...prev,
+                              [role]: e.target.value,
+                            }))
+                          }
+                          className="flex-1 bg-[#141736] border border-white/10 rounded px-3 py-1.5 text-sm text-[#e8eaff]
+                            focus:outline-none focus:border-[#4ecdc4]/40 transition-colors"
+                        />
                       </div>
                     ))}
                   </div>
@@ -500,6 +706,7 @@ export function TemplateFromImage({
                     onClick={() => {
                       setStep("upload");
                       setResult(null);
+                      setEditedCopy({});
                     }}
                     className="px-4 py-2.5 rounded-lg text-sm font-medium text-[#8b8fb0]
                       hover:text-[#e8eaff] hover:bg-white/5 transition-all cursor-pointer"

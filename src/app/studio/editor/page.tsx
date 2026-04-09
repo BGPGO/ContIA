@@ -19,6 +19,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { VisualTemplate, CopyToTemplatePayload } from "@/types/canvas";
 import { CANVAS_DIMENSIONS } from "@/types/canvas";
 import type { CopyContent } from "@/types/copy-studio";
+import type { PsdTemplate } from "@/lib/psd-templates";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Helper: Convert CopyContent → CopyToTemplatePayload
@@ -266,6 +267,25 @@ function EditorContent() {
     [loadPreset, state.aspectRatio, applyCopy, copyData]
   );
 
+  // ── Handle PSD template selection ──
+  const handlePsdSelect = useCallback(
+    async (template: PsdTemplate, slideIndex: number) => {
+      const { convertPsdToFabricJson } = await import("@/lib/psd-to-fabric");
+      const canvasJson = convertPsdToFabricJson(template, { slideIndex });
+      await loadTemplate(canvasJson);
+
+      // Set aspect ratio based on slide dimensions
+      const ratio = (template.slideHeight || template.height) / (template.slideWidth || template.width);
+      if (ratio > 1.5) setAspectRatio("9:16");
+      else if (ratio > 1.1) setAspectRatio("4:5");
+      else setAspectRatio("1:1");
+
+      if (copyData) applyCopy(copyData);
+      setShowGallery(false);
+    },
+    [loadTemplate, setAspectRatio, applyCopy, copyData]
+  );
+
   // ── Handle aspect ratio change ──
   const handleAspectRatioChange = useCallback(
     (ratio: "1:1" | "4:5" | "9:16") => {
@@ -438,6 +458,7 @@ function EditorContent() {
         onClose={() => setShowGallery(false)}
         onSelect={handleTemplateSelect}
         onSelectPreset={handlePresetSelect}
+        onSelectPsd={handlePsdSelect}
         empresaId={empresaId}
         aspectRatio={state.aspectRatio}
         brandTemplates={templates}

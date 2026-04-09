@@ -51,7 +51,7 @@ export const FONT_MAP: Record<string, { family: string; weight: number; style: s
   'Formula1-Display-Regular': { family: 'Formula1 Display', weight: 400, style: 'normal' },
   'Poppins-SemiBold': { family: 'Poppins', weight: 600, style: 'normal' },
   'Poppins-ExtraLight': { family: 'Poppins', weight: 200, style: 'normal' },
-  'AlmarenaNeue-Regular': { family: 'Almarena Neue', weight: 400, style: 'normal' },
+  'AlmarenaNeue-Regular': { family: 'Genius Techno', weight: 400, style: 'normal' },
 };
 
 export function getFontCSS(psdFontName?: string): { fontFamily: string; fontWeight: number; fontStyle: string } {
