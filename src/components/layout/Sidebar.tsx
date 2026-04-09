@@ -16,6 +16,8 @@ import {
   Zap,
   Scissors,
   Palette,
+  Paintbrush,
+  MessageSquareText,
   Settings,
   ChevronDown,
   ChevronRight,
@@ -62,6 +64,8 @@ const navSections: NavSection[] = [
     icon: Sparkles,
     collapsible: true,
     links: [
+      { label: "Copy Studio", href: "/studio", icon: MessageSquareText },
+      { label: "Editor Visual", href: "/studio/editor", icon: Paintbrush },
       { label: "Criacao", href: "/criacao", icon: Sparkles },
       { label: "Templates", href: "/templates", icon: Palette },
       { label: "Cortes & Video", href: "/cortes", icon: Scissors },

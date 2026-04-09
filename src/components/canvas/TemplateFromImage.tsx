@@ -1,0 +1,580 @@
+"use client";
+
+import { useState, useCallback, useRef } from "react";
+import {
+  X,
+  Upload,
+  ImageIcon,
+  Loader2,
+  Sparkles,
+  Check,
+  Palette,
+  Type,
+  PenTool,
+  ArrowRight,
+} from "lucide-react";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Types
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+interface TemplateFromImageProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onTemplateCreated: (template: { canvas_json: object; name: string }) => void;
+  empresaId: string;
+  aspectRatio?: "1:1" | "4:5" | "9:16";
+}
+
+interface ExtractionResult {
+  canvas_json: object;
+  extracted_copy: Record<string, string>;
+  color_palette: string[];
+  style_description: string;
+}
+
+type Step = "upload" | "analyzing" | "result" | "saved";
+
+const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB
+const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/webp"];
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Progress messages for the analyzing step
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const PROGRESS_MESSAGES = [
+  "Analisando layout...",
+  "Extraindo elementos de texto...",
+  "Identificando cores e formas...",
+  "Gerando template Fabric.js...",
+];
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Component
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+export function TemplateFromImage({
+  isOpen,
+  onClose,
+  onTemplateCreated,
+  empresaId,
+  aspectRatio = "1:1",
+}: TemplateFromImageProps) {
+  const [step, setStep] = useState<Step>("upload");
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [result, setResult] = useState<ExtractionResult | null>(null);
+  const [templateName, setTemplateName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [progressIdx, setProgressIdx] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ── Reset state ──
+  const resetState = useCallback(() => {
+    setStep("upload");
+    setImagePreview(null);
+    setImageFile(null);
+    setResult(null);
+    setTemplateName("");
+    setError(null);
+    setProgressIdx(0);
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+  }, []);
+
+  const handleClose = useCallback(() => {
+    resetState();
+    onClose();
+  }, [resetState, onClose]);
+
+  // ── File handling ──
+  const processFile = useCallback((file: File) => {
+    setError(null);
+
+    if (!ACCEPTED_TYPES.includes(file.type)) {
+      setError("Formato nao suportado. Use PNG, JPEG ou WebP.");
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      setError("Imagem muito grande. O limite e 4MB.");
+      return;
+    }
+
+    setImageFile(file);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImagePreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  const handleFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) processFile(file);
+    },
+    [processFile]
+  );
+
+  // ── Drag & drop ──
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+      const file = e.dataTransfer.files?.[0];
+      if (file) processFile(file);
+    },
+    [processFile]
+  );
+
+  // ── Extract template ──
+  const handleExtract = useCallback(async () => {
+    if (!imagePreview) return;
+
+    setStep("analyzing");
+    setError(null);
+    setProgressIdx(0);
+
+    // Animate progress messages
+    let idx = 0;
+    progressIntervalRef.current = setInterval(() => {
+      idx = Math.min(idx + 1, PROGRESS_MESSAGES.length - 1);
+      setProgressIdx(idx);
+    }, 2000);
+
+    try {
+      const res = await fetch("/api/ai/extract-template", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image: imagePreview,
+          empresa_id: empresaId,
+          context: {
+            format: aspectRatio === "9:16" ? "story" : "post",
+          },
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Erro ${res.status}`);
+      }
+
+      const data: ExtractionResult = await res.json();
+      setResult(data);
+      setTemplateName(`Template extraido - ${new Date().toLocaleDateString("pt-BR")}`);
+      setStep("result");
+    } catch (err: any) {
+      setError(err.message || "Falha ao extrair template. Tente novamente.");
+      setStep("upload");
+    } finally {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+    }
+  }, [imagePreview, empresaId, aspectRatio]);
+
+  // ── Save / Use template ──
+  const handleUseInEditor = useCallback(() => {
+    if (!result) return;
+    onTemplateCreated({
+      canvas_json: result.canvas_json,
+      name: templateName || "Template extraido",
+    });
+    handleClose();
+  }, [result, templateName, onTemplateCreated, handleClose]);
+
+  const handleSaveTemplate = useCallback(() => {
+    if (!result) return;
+    onTemplateCreated({
+      canvas_json: result.canvas_json,
+      name: templateName || "Template extraido",
+    });
+    setStep("saved");
+  }, [result, templateName, onTemplateCreated]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={handleClose}
+      />
+
+      {/* Modal */}
+      <div className="relative bg-[#0c0f24] border border-white/10 rounded-2xl w-full max-w-5xl mx-4 max-h-[90vh] overflow-hidden shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-[#6c5ce7]/20 to-[#4ecdc4]/20">
+              <Sparkles size={20} className="text-[#4ecdc4]" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-[#e8eaff]">
+                Criar Template de Imagem
+              </h2>
+              <p className="text-xs text-[#5e6388]">
+                Envie uma imagem e a IA extrai o layout automaticamente
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleClose}
+            className="p-2 rounded-lg text-[#5e6388] hover:text-[#e8eaff] hover:bg-white/5 transition-all cursor-pointer"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+          {/* ── Step: Upload ── */}
+          {step === "upload" && (
+            <div className="space-y-6">
+              {/* Drop zone */}
+              <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`relative border-2 border-dashed rounded-2xl p-12 text-center transition-all cursor-pointer
+                  ${isDragging
+                    ? "border-[#4ecdc4] bg-[#4ecdc4]/5"
+                    : imagePreview
+                      ? "border-[#4ecdc4]/30 bg-[#141736]"
+                      : "border-white/20 hover:border-[#4ecdc4]/50 hover:bg-white/[0.02]"
+                  }`}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={ACCEPTED_TYPES.join(",")}
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+
+                {imagePreview ? (
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="relative w-64 h-64 rounded-xl overflow-hidden border border-white/10">
+                      <img
+                        src={imagePreview}
+                        alt="Preview"
+                        className="w-full h-full object-contain bg-black/20"
+                      />
+                    </div>
+                    <p className="text-sm text-[#8b8fb0]">
+                      {imageFile?.name} ({((imageFile?.size || 0) / 1024).toFixed(0)} KB)
+                    </p>
+                    <p className="text-xs text-[#5e6388]">
+                      Clique para trocar a imagem
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="p-4 rounded-2xl bg-white/5">
+                      <Upload size={32} className="text-[#5e6388]" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-[#e8eaff]">
+                        Arraste uma imagem aqui ou clique para selecionar
+                      </p>
+                      <p className="text-xs text-[#5e6388] mt-1">
+                        PNG, JPEG ou WebP - Maximo 4MB
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Error */}
+              {error && (
+                <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20">
+                  <p className="text-sm text-red-400">{error}</p>
+                </div>
+              )}
+
+              {/* Extract button */}
+              {imagePreview && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleExtract}
+                    className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white
+                      transition-all cursor-pointer hover:shadow-lg hover:shadow-[#4ecdc4]/20 active:scale-[0.98]"
+                    style={{
+                      background: "linear-gradient(135deg, #6c5ce7 0%, #4ecdc4 100%)",
+                    }}
+                  >
+                    <Sparkles size={16} />
+                    Analisar imagem
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Step: Analyzing ── */}
+          {step === "analyzing" && (
+            <div className="flex flex-col items-center justify-center py-16 space-y-8">
+              {/* Image with scanning effect */}
+              <div className="relative">
+                {imagePreview && (
+                  <div className="relative w-64 h-64 rounded-xl overflow-hidden border border-white/10">
+                    <img
+                      src={imagePreview}
+                      alt="Analisando"
+                      className="w-full h-full object-contain"
+                    />
+                    {/* Scanning overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-b from-[#4ecdc4]/20 via-transparent to-transparent animate-pulse" />
+                    <div
+                      className="absolute left-0 right-0 h-1 bg-[#4ecdc4]/60"
+                      style={{
+                        animation: "scan 2s ease-in-out infinite",
+                        top: "0%",
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Progress */}
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 size={24} className="animate-spin text-[#4ecdc4]" />
+                <p className="text-sm font-medium text-[#e8eaff]">
+                  {PROGRESS_MESSAGES[progressIdx]}
+                </p>
+                <div className="flex gap-1.5">
+                  {PROGRESS_MESSAGES.map((_, i) => (
+                    <div
+                      key={i}
+                      className={`w-2 h-2 rounded-full transition-all duration-500 ${
+                        i <= progressIdx ? "bg-[#4ecdc4]" : "bg-white/10"
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <style jsx>{`
+                @keyframes scan {
+                  0%, 100% { top: 0%; }
+                  50% { top: 95%; }
+                }
+              `}</style>
+            </div>
+          )}
+
+          {/* ── Step: Result ── */}
+          {step === "result" && result && (
+            <div className="space-y-6">
+              {/* Split view */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Left: Original */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-medium text-[#8b8fb0] flex items-center gap-2">
+                    <ImageIcon size={14} />
+                    Imagem original
+                  </h3>
+                  <div className="rounded-xl overflow-hidden border border-white/10 bg-black/20 aspect-square flex items-center justify-center">
+                    {imagePreview && (
+                      <img
+                        src={imagePreview}
+                        alt="Original"
+                        className="w-full h-full object-contain"
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* Right: Generated preview */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-medium text-[#8b8fb0] flex items-center gap-2">
+                    <PenTool size={14} />
+                    Template gerado
+                  </h3>
+                  <div className="rounded-xl overflow-hidden border border-[#4ecdc4]/20 bg-[#141736] aspect-square flex items-center justify-center p-6">
+                    <div className="text-center space-y-3">
+                      <div className="p-3 rounded-xl bg-[#4ecdc4]/10 inline-block">
+                        <Check size={24} className="text-[#4ecdc4]" />
+                      </div>
+                      <p className="text-sm font-medium text-[#e8eaff]">
+                        Template pronto!
+                      </p>
+                      <p className="text-xs text-[#5e6388]">
+                        {result.style_description}
+                      </p>
+                      <p className="text-xs text-[#5e6388]">
+                        {(result.canvas_json as any)?.objects?.length || 0} objetos no canvas
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Color palette */}
+              {result.color_palette.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-medium text-[#8b8fb0] flex items-center gap-2">
+                    <Palette size={14} />
+                    Paleta de cores extraida
+                  </h3>
+                  <div className="flex gap-3">
+                    {result.color_palette.map((color, i) => (
+                      <div key={i} className="flex flex-col items-center gap-1.5">
+                        <div
+                          className="w-12 h-12 rounded-xl border border-white/10 shadow-lg"
+                          style={{ backgroundColor: color }}
+                        />
+                        <span className="text-[10px] text-[#5e6388] font-mono">
+                          {color}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Extracted copy */}
+              {Object.keys(result.extracted_copy).length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-medium text-[#8b8fb0] flex items-center gap-2">
+                    <Type size={14} />
+                    Texto extraido
+                  </h3>
+                  <div className="grid gap-2">
+                    {Object.entries(result.extracted_copy).map(([role, text]) => (
+                      <div
+                        key={role}
+                        className="flex items-start gap-3 p-3 rounded-lg bg-white/[0.03] border border-white/5"
+                      >
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-[#4ecdc4] bg-[#4ecdc4]/10 px-2 py-0.5 rounded shrink-0 mt-0.5">
+                          {role}
+                        </span>
+                        <span className="text-sm text-[#c0c4e0]">{text}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Template name + actions */}
+              <div className="space-y-4 pt-2 border-t border-white/10">
+                <div>
+                  <label className="text-xs text-[#5e6388] mb-1.5 block">
+                    Nome do template
+                  </label>
+                  <input
+                    type="text"
+                    value={templateName}
+                    onChange={(e) => setTemplateName(e.target.value)}
+                    placeholder="Nome do template..."
+                    className="w-full bg-[#080b1e] border border-white/10 rounded-lg px-4 py-2.5 text-sm text-[#e8eaff]
+                      placeholder:text-[#5e6388] focus:outline-none focus:border-[#4ecdc4]/40 transition-colors"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStep("upload");
+                      setResult(null);
+                    }}
+                    className="px-4 py-2.5 rounded-lg text-sm font-medium text-[#8b8fb0]
+                      hover:text-[#e8eaff] hover:bg-white/5 transition-all cursor-pointer"
+                  >
+                    Tentar outra imagem
+                  </button>
+
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleSaveTemplate}
+                      className="px-5 py-2.5 rounded-lg text-sm font-medium text-[#e8eaff]
+                        bg-[#141736] border border-white/10 hover:border-[#6c5ce7]/30
+                        transition-all cursor-pointer"
+                    >
+                      Salvar Template
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleUseInEditor}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white
+                        transition-all cursor-pointer hover:shadow-lg hover:shadow-[#4ecdc4]/20 active:scale-[0.98]"
+                      style={{
+                        background: "linear-gradient(135deg, #6c5ce7 0%, #4ecdc4 100%)",
+                      }}
+                    >
+                      Ajustar no Editor
+                      <ArrowRight size={16} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Step: Saved ── */}
+          {step === "saved" && (
+            <div className="flex flex-col items-center justify-center py-16 space-y-6">
+              <div className="p-4 rounded-2xl bg-[#4ecdc4]/10">
+                <Check size={40} className="text-[#4ecdc4]" />
+              </div>
+              <div className="text-center space-y-2">
+                <h3 className="text-lg font-semibold text-[#e8eaff]">
+                  Template salvo!
+                </h3>
+                <p className="text-sm text-[#5e6388]">
+                  O template &quot;{templateName}&quot; foi criado com sucesso.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  className="px-5 py-2.5 rounded-lg text-sm font-medium text-[#8b8fb0]
+                    hover:text-[#e8eaff] hover:bg-white/5 transition-all cursor-pointer"
+                >
+                  Fechar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUseInEditor}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white
+                    transition-all cursor-pointer hover:shadow-lg hover:shadow-[#4ecdc4]/20 active:scale-[0.98]"
+                  style={{
+                    background: "linear-gradient(135deg, #6c5ce7 0%, #4ecdc4 100%)",
+                  }}
+                >
+                  Abrir no Editor
+                  <ArrowRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
