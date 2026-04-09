@@ -80,6 +80,7 @@ async function igFetch<T>(
   const data = await res.json();
 
   if (data.error) {
+    console.error(`[IG API Error] ${path}: [${data.error.code}] ${data.error.type} — ${data.error.message}`);
     throw new InstagramAPIError(
       data.error.message,
       data.error.code,
@@ -277,6 +278,58 @@ export async function getMedia(
   return [];
 }
 
+/* ── Media Insights (per-post) ──────────────────────────────────────── */
+
+export interface IGMediaInsight {
+  name: string;
+  period: string;
+  values: { value: number }[];
+  title: string;
+  description: string;
+}
+
+export async function getMediaInsights(
+  mediaId: string,
+  token: string,
+  mediaType: "IMAGE" | "VIDEO" | "CAROUSEL_ALBUM" = "IMAGE"
+): Promise<Record<string, number>> {
+  // Métricas variam por tipo de mídia (v22+)
+  const baseMetrics = "reach,views,likes,comments,shares,saves,total_interactions";
+  const reelsExtra = ",ig_reels_avg_watch_time";
+  const metrics = mediaType === "VIDEO" ? baseMetrics + reelsExtra : baseMetrics;
+
+  try {
+    const res = await igFetch<{ data: IGMediaInsight[] }>(
+      `/${mediaId}/insights`,
+      token,
+      { metric: metrics }
+    );
+
+    const result: Record<string, number> = {};
+    for (const insight of res.data ?? []) {
+      result[insight.name] = insight.values?.[0]?.value ?? 0;
+    }
+    return result;
+  } catch (e) {
+    // Fallback com métricas reduzidas
+    try {
+      const res = await igFetch<{ data: IGMediaInsight[] }>(
+        `/${mediaId}/insights`,
+        token,
+        { metric: "reach,views,likes,comments" }
+      );
+      const result: Record<string, number> = {};
+      for (const insight of res.data ?? []) {
+        result[insight.name] = insight.values?.[0]?.value ?? 0;
+      }
+      return result;
+    } catch {
+      console.warn(`[IG getMediaInsights] ${mediaId} all attempts failed`);
+      return {};
+    }
+  }
+}
+
 /* ── Insights ────────────────────────────────────── */
 
 export async function getInsights(
@@ -286,8 +339,8 @@ export async function getInsights(
 ): Promise<IGInsight[]> {
   const endpoints = ["/me/insights", `/${igUserId}/insights`];
   const metricSets = [
-    "impressions,reach,profile_views,follower_count",
-    "impressions,reach",
+    "views,reach,follows_and_unfollows,total_interactions",
+    "views,reach",
   ];
 
   for (const endpoint of endpoints) {
@@ -299,7 +352,8 @@ export async function getInsights(
         });
         return res.data ?? [];
       } catch (e) {
-        console.warn(`[IG getInsights] ${endpoint} metric=${metric.slice(0,20)} failed:`, (e as Error).message);
+        const err = e as Error;
+        console.warn(`[IG getInsights] ${endpoint} metric=${metric} period=${period} failed:`, err.message);
         continue;
       }
     }

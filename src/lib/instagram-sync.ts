@@ -6,7 +6,7 @@
  */
 
 import { createClient as createServiceClient, SupabaseClient } from "@supabase/supabase-js";
-import { getProfile, getMedia, getInsights, InstagramAPIError } from "./instagram";
+import { getProfile, getMedia, getInsights, getMediaInsights, InstagramAPIError } from "./instagram";
 import type { IGProfile, IGMedia, IGInsight } from "./instagram";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -240,6 +240,30 @@ async function syncMedia(
     }
 
     console.log(`[instagram-sync] Media synced: ${rows.length} posts`);
+
+    // Fetch per-post insights (reach, views, saves, shares) — limit to 10 most recent to avoid rate limits
+    const recentItems = mediaItems.slice(0, 10);
+    let insightsUpdated = 0;
+    for (const item of recentItems) {
+      try {
+        const mediaInsights = await getMediaInsights(item.id, token, item.media_type);
+        if (Object.keys(mediaInsights).length > 0) {
+          await supabase
+            .from("instagram_media_cache")
+            .update({ insights: mediaInsights })
+            .eq("empresa_id", empresaId)
+            .eq("ig_media_id", item.id);
+          insightsUpdated++;
+        }
+      } catch {
+        // Per-post insights can fail for various reasons — continue with next
+        continue;
+      }
+    }
+    if (insightsUpdated > 0) {
+      console.log(`[instagram-sync] Media insights updated: ${insightsUpdated}/${recentItems.length} posts`);
+    }
+
     return rows.length;
   } catch (err) {
     console.error("[instagram-sync] Media sync failed:", err);
@@ -256,7 +280,7 @@ async function syncInsights(
   igUserId: string,
   token: string
 ): Promise<number> {
-  const periods: ("day" | "week" | "days_28")[] = ["day", "week", "days_28"];
+  const periods: ("day" | "week" | "days_28")[] = ["day", "days_28"];
   let totalCount = 0;
 
   for (const period of periods) {

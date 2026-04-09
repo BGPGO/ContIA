@@ -775,14 +775,14 @@ export default function AnalyticsPage() {
 
   // Compute reach from insights if available
   const reachInsight = insights.find((i) => i.name === "reach");
-  const impressionsInsight = insights.find((i) => i.name === "impressions");
+  const viewsInsight = insights.find((i) => i.name === "views");
   const avgReach = reachInsight?.values.length
     ? Math.round(reachInsight.values.reduce((s, v) => s + v.value, 0) / reachInsight.values.length)
     : 0;
-  const totalImpressions = impressionsInsight?.values.length
-    ? impressionsInsight.values.reduce((s, v) => s + v.value, 0)
+  const totalViews = viewsInsight?.values.length
+    ? viewsInsight.values.reduce((s, v) => s + v.value, 0)
     : 0;
-  const insightsUnavailable = avgReach === 0 && totalImpressions === 0;
+  const insightsUnavailable = avgReach === 0 && totalViews === 0;
 
   return (
     <div className="fade-in space-y-6 p-2 sm:p-4 md:p-6 max-w-7xl mx-auto">
@@ -827,8 +827,8 @@ export default function AnalyticsPage() {
         />
         <KPICard
           icon={<BarChart3 size={18} />}
-          label="Impressoes Totais"
-          value={totalImpressions > 0 ? formatNumber(totalImpressions) : "--"}
+          label="Visualizacoes"
+          value={totalViews > 0 ? formatNumber(totalViews) : "--"}
           color="#fbbf24"
           index={3}
         />

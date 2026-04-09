@@ -241,8 +241,9 @@ export async function GET(req: NextRequest) {
       getProfile(provider_user_id, access_token),
       getMedia(provider_user_id, access_token, 30),
       getInsights(provider_user_id, access_token, "day").catch((err) => {
-        console.error("Instagram insights error:", err);
-        insightsError = "Dados de alcance e impressoes ficam disponiveis apos alguns dias de atividade no Instagram. A conta pode precisar de 100+ seguidores ou ter posts recentes.";
+        const detail = err instanceof Error ? err.message : String(err);
+        console.error("[analytics] Instagram insights error:", detail);
+        insightsError = `Insights indisponíveis: ${detail}. A conta pode precisar de 100+ seguidores e posts recentes.`;
         return [] as IGInsight[];
       }),
     ]);
