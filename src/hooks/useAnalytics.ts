@@ -19,9 +19,13 @@ export interface IGAnalyticsProfile {
 export interface IGAnalyticsEngagement {
   avg_likes: number;
   avg_comments: number;
+  avg_saves: number;
+  avg_shares: number;
   engagement_rate: number;
   total_likes: number;
   total_comments: number;
+  total_saves: number;
+  total_shares: number;
 }
 
 export interface IGAnalyticsTopPost {
@@ -35,6 +39,10 @@ export interface IGAnalyticsTopPost {
   like_count: number;
   comments_count: number;
   engagement_rate: number;
+  saves: number;
+  shares: number;
+  reach: number;
+  views: number;
 }
 
 export interface IGContentBreakdown {
@@ -67,6 +75,10 @@ export interface IGAnalyticsData {
   posting_frequency: IGPostingFrequency;
   insights: IGInsightTimeSeries[];
   insights_error?: string | null;
+  account_insights: {
+    total_interactions: number;
+    new_followers: number;
+  };
   content_analysis: {
     top_hashtags: IGHashtagStats[];
     avg_caption_length: number;

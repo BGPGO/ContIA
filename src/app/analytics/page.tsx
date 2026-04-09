@@ -24,6 +24,10 @@ import {
   Target,
   LinkIcon,
   Clock,
+  Bookmark,
+  Share2,
+  Zap,
+  UserPlus,
 } from "lucide-react";
 import { useEmpresa } from "@/hooks/useEmpresa";
 import { useAnalytics } from "@/hooks/useAnalytics";
@@ -477,13 +481,23 @@ function TopPostsGrid({ posts }: { posts: IGAnalyticsTopPost[] }) {
 
             {/* Overlay with metrics */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-3">
-              <div className="flex items-center gap-3 text-white text-xs">
+              <div className="flex flex-wrap items-center gap-2 text-white text-xs">
                 <span className="flex items-center gap-1">
-                  <Heart size={11} /> {formatNumber(post.like_count)}
+                  <Heart size={10} /> {formatNumber(post.like_count)}
                 </span>
                 <span className="flex items-center gap-1">
-                  <MessageCircle size={11} /> {formatNumber(post.comments_count)}
+                  <MessageCircle size={10} /> {formatNumber(post.comments_count)}
                 </span>
+                {(post.saves ?? 0) > 0 && (
+                  <span className="flex items-center gap-1">
+                    <Bookmark size={10} /> {formatNumber(post.saves ?? 0)}
+                  </span>
+                )}
+                {(post.shares ?? 0) > 0 && (
+                  <span className="flex items-center gap-1">
+                    <Share2 size={10} /> {formatNumber(post.shares ?? 0)}
+                  </span>
+                )}
               </div>
               <ExternalLink size={12} className="text-white/70 ml-auto" />
             </div>
@@ -507,7 +521,7 @@ function TopPostsGrid({ posts }: { posts: IGAnalyticsTopPost[] }) {
               {post.caption || "Sem legenda"}
             </p>
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5 text-[10px] text-text-muted">
+              <div className="flex items-center gap-2 text-[10px] text-text-muted flex-wrap">
                 <span className="flex items-center gap-0.5">
                   <Heart size={9} className="text-[#e1306c]" />
                   {formatNumber(post.like_count)}
@@ -516,6 +530,18 @@ function TopPostsGrid({ posts }: { posts: IGAnalyticsTopPost[] }) {
                   <MessageCircle size={9} className="text-[#3b82f6]" />
                   {formatNumber(post.comments_count)}
                 </span>
+                {(post.saves ?? 0) > 0 && (
+                  <span className="flex items-center gap-0.5">
+                    <Bookmark size={9} className="text-[#a855f7]" />
+                    {formatNumber(post.saves ?? 0)}
+                  </span>
+                )}
+                {(post.shares ?? 0) > 0 && (
+                  <span className="flex items-center gap-0.5">
+                    <Share2 size={9} className="text-[#06b6d4]" />
+                    {formatNumber(post.shares ?? 0)}
+                  </span>
+                )}
               </div>
               <span className="text-[10px] font-semibold text-[#4ecdc4] tabular-nums">
                 {post.engagement_rate.toFixed(1)}%
@@ -802,7 +828,7 @@ export default function AnalyticsPage() {
       <ProfileCard data={data} onRefresh={handleRefresh} refreshing={refreshing} />
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
         <KPICard
           icon={<Users size={18} />}
           label="Seguidores"
@@ -833,18 +859,46 @@ export default function AnalyticsPage() {
           index={3}
         />
         <KPICard
+          icon={<Zap size={18} />}
+          label="Interacoes Totais"
+          value={data.account_insights?.total_interactions > 0 ? formatNumber(data.account_insights.total_interactions) : "--"}
+          color="#f97316"
+          index={4}
+        />
+        <KPICard
           icon={<Heart size={18} />}
           label="Media de Curtidas"
           value={formatNumber(engagement.avg_likes)}
           color="#e1306c"
-          index={4}
+          index={5}
         />
         <KPICard
           icon={<MessageCircle size={18} />}
           label="Media de Comentarios"
           value={formatNumber(engagement.avg_comments)}
           color="#34d399"
-          index={5}
+          index={6}
+        />
+        <KPICard
+          icon={<Bookmark size={18} />}
+          label="Media de Saves"
+          value={(engagement.avg_saves ?? 0) > 0 ? formatNumber(engagement.avg_saves ?? 0) : "--"}
+          color="#a855f7"
+          index={7}
+        />
+        <KPICard
+          icon={<Share2 size={18} />}
+          label="Media de Shares"
+          value={(engagement.avg_shares ?? 0) > 0 ? formatNumber(engagement.avg_shares ?? 0) : "--"}
+          color="#06b6d4"
+          index={8}
+        />
+        <KPICard
+          icon={<UserPlus size={18} />}
+          label="Novos Seguidores"
+          value={data.account_insights?.new_followers > 0 ? formatNumber(data.account_insights.new_followers) : "--"}
+          color="#10b981"
+          index={9}
         />
       </div>
 

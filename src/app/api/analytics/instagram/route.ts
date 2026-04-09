@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getProfile, getMedia, getInsights } from "@/lib/instagram";
+import { getProfile, getMedia, getInsights, getMediaInsights } from "@/lib/instagram";
 import type { IGProfile, IGMedia, IGInsight } from "@/lib/instagram";
 import { createClient } from "@/lib/supabase/server";
 
@@ -16,6 +16,10 @@ interface TopPost {
   like_count: number;
   comments_count: number;
   engagement_rate: number;
+  saves: number;
+  shares: number;
+  reach: number;
+  views: number;
 }
 
 interface ContentBreakdown {
@@ -45,15 +49,23 @@ interface AnalyticsResponse {
   engagement: {
     avg_likes: number;
     avg_comments: number;
+    avg_saves: number;
+    avg_shares: number;
     engagement_rate: number;
     total_likes: number;
     total_comments: number;
+    total_saves: number;
+    total_shares: number;
   };
   top_posts: TopPost[];
   content_breakdown: ContentBreakdown[];
   posting_frequency: PostingFrequency;
   insights: InsightTimeSeries[];
   insights_error?: string | null;
+  account_insights: {
+    total_interactions: number;
+    new_followers: number;
+  };
   content_analysis: {
     top_hashtags: HashtagStats[];
     avg_caption_length: number;
@@ -100,7 +112,7 @@ function computeEngagement(media: IGMedia[], followersCount: number) {
   };
 }
 
-function computeTopPosts(media: IGMedia[], followersCount: number): TopPost[] {
+function computeTopPosts(media: IGMedia[], followersCount: number): Omit<TopPost, "saves" | "shares" | "reach" | "views">[] {
   return media
     .map((m) => {
       const likes = m.like_count ?? 0;
@@ -248,25 +260,87 @@ export async function GET(req: NextRequest) {
       }),
     ]);
 
+    // If day insights failed, try days_28 as fallback
+    let finalInsights = insightsDay;
+    if (insightsDay.length === 0 && !insightsError) {
+      try {
+        finalInsights = await getInsights(provider_user_id, access_token, "days_28");
+      } catch {
+        // Already have insightsDay = [], just continue
+      }
+    }
+
+    // Extract account-level insight values
+    const getInsightTotal = (name: string) => {
+      const insight = finalInsights.find((i) => i.name === name);
+      if (!insight?.values?.length) return 0;
+      return insight.values.reduce((s, v) => s + v.value, 0);
+    };
+
+    const accountInsights = {
+      total_interactions: getInsightTotal("total_interactions"),
+      new_followers: getInsightTotal("follows_and_unfollows"),
+    };
+
+    // Fetch per-post insights for top 10 posts (reach, saves, shares, views)
+    const topMedia = media.slice(0, 10);
+    const mediaInsightsMap = new Map<string, Record<string, number>>();
+
+    const mediaInsightsResults = await Promise.allSettled(
+      topMedia.map((m) =>
+        getMediaInsights(m.id, access_token, m.media_type as "IMAGE" | "VIDEO" | "CAROUSEL_ALBUM")
+          .then((insights) => ({ id: m.id, insights }))
+      )
+    );
+
+    for (const result of mediaInsightsResults) {
+      if (result.status === "fulfilled" && result.value.insights) {
+        mediaInsightsMap.set(result.value.id, result.value.insights);
+      }
+    }
+
+    // Compute engagement with saves/shares from media insights
+    const allSaves = topMedia.reduce((sum, m) => sum + (mediaInsightsMap.get(m.id)?.saves ?? 0), 0);
+    const allShares = topMedia.reduce((sum, m) => sum + (mediaInsightsMap.get(m.id)?.shares ?? 0), 0);
+
     const engagement = computeEngagement(media, profile.followers_count);
-    const topPosts = computeTopPosts(media, profile.followers_count);
+    const enrichedEngagement = {
+      ...engagement,
+      avg_saves: topMedia.length > 0 ? Math.round(allSaves / topMedia.length) : 0,
+      avg_shares: topMedia.length > 0 ? Math.round(allShares / topMedia.length) : 0,
+      total_saves: allSaves,
+      total_shares: allShares,
+    };
+
+    const topPosts = computeTopPosts(media, profile.followers_count).map((post) => {
+      const mi = mediaInsightsMap.get(post.id);
+      return {
+        ...post,
+        saves: mi?.saves ?? 0,
+        shares: mi?.shares ?? 0,
+        reach: mi?.reach ?? 0,
+        views: mi?.views ?? 0,
+      };
+    });
+
     const contentBreakdown = computeContentBreakdown(media);
     const postingFrequency = computePostingFrequency(media);
     const contentAnalysis = computeContentAnalysis(media);
 
-    const insights: InsightTimeSeries[] = insightsDay.map((insight) => ({
+    const insights: InsightTimeSeries[] = finalInsights.map((insight) => ({
       name: insight.name,
       values: insight.values,
     }));
 
     const response: AnalyticsResponse = {
       profile,
-      engagement,
+      engagement: enrichedEngagement,
       top_posts: topPosts,
       content_breakdown: contentBreakdown,
       posting_frequency: postingFrequency,
       insights,
       ...(insightsError ? { insights_error: insightsError } : {}),
+      account_insights: accountInsights,
       content_analysis: contentAnalysis,
       fetched_at: new Date().toISOString(),
     };
