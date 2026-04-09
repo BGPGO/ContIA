@@ -260,7 +260,9 @@ export async function GET(req: NextRequest) {
       }),
     ]);
 
-    // If day insights failed, try days_28 as fallback
+    // Account insights: only "reach" reliably returns data with Instagram Login API.
+    // Other metrics (views, total_interactions, follows_and_unfollows) return empty
+    // arrays — this is a known limitation. We aggregate those from media-level insights.
     let finalInsights = insightsDay;
     if (insightsDay.length === 0 && !insightsError) {
       try {
@@ -270,53 +272,54 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Extract account-level insight values
-    const getInsightTotal = (name: string) => {
-      const insight = finalInsights.find((i) => i.name === name);
-      if (!insight?.values?.length) return 0;
-      return insight.values.reduce((s, v) => s + v.value, 0);
-    };
-
-    const accountInsights = {
-      total_interactions: getInsightTotal("total_interactions"),
-      new_followers: getInsightTotal("follows_and_unfollows"),
-    };
-
-    // Fetch per-post insights for top 10 posts (reach, saves, shares, views)
-    const topMedia = media.slice(0, 10);
+    // Fetch per-post insights for ALL 30 posts (reach, views, saved, shares, total_interactions)
+    // This is the REAL source of truth — account-level metrics return empty for most.
+    // NOTE: API uses "saved" not "saves" for media insights
     const mediaInsightsMap = new Map<string, Record<string, number>>();
 
     const mediaInsightsResults = await Promise.allSettled(
-      topMedia.map((m) =>
+      media.map((m) =>
         getMediaInsights(m.id, access_token, m.media_type as "IMAGE" | "VIDEO" | "CAROUSEL_ALBUM")
           .then((insights) => ({ id: m.id, insights }))
       )
     );
 
     for (const result of mediaInsightsResults) {
-      if (result.status === "fulfilled" && result.value.insights) {
+      if (result.status === "fulfilled" && Object.keys(result.value.insights).length > 0) {
         mediaInsightsMap.set(result.value.id, result.value.insights);
       }
     }
 
-    // Compute engagement with saves/shares from media insights
-    const allSaves = topMedia.reduce((sum, m) => sum + (mediaInsightsMap.get(m.id)?.saves ?? 0), 0);
-    const allShares = topMedia.reduce((sum, m) => sum + (mediaInsightsMap.get(m.id)?.shares ?? 0), 0);
+    // Aggregate from media insights (real data per post)
+    const postsWithInsights = media.filter((m) => mediaInsightsMap.has(m.id));
+    const piCount = postsWithInsights.length || 1;
+
+    const allViews = postsWithInsights.reduce((s, m) => s + (mediaInsightsMap.get(m.id)?.views ?? 0), 0);
+    const allSaves = postsWithInsights.reduce((s, m) => s + (mediaInsightsMap.get(m.id)?.saved ?? 0), 0);
+    const allShares = postsWithInsights.reduce((s, m) => s + (mediaInsightsMap.get(m.id)?.shares ?? 0), 0);
+    const allReach = postsWithInsights.reduce((s, m) => s + (mediaInsightsMap.get(m.id)?.reach ?? 0), 0);
+    const allInteractions = postsWithInsights.reduce((s, m) => s + (mediaInsightsMap.get(m.id)?.total_interactions ?? 0), 0);
 
     const engagement = computeEngagement(media, profile.followers_count);
     const enrichedEngagement = {
       ...engagement,
-      avg_saves: topMedia.length > 0 ? Math.round(allSaves / topMedia.length) : 0,
-      avg_shares: topMedia.length > 0 ? Math.round(allShares / topMedia.length) : 0,
+      avg_saves: Math.round(allSaves / piCount),
+      avg_shares: Math.round(allShares / piCount),
       total_saves: allSaves,
       total_shares: allShares,
+    };
+
+    // Build account_insights from media aggregation (since account-level returns empty)
+    const accountInsights = {
+      total_interactions: allInteractions,
+      new_followers: 0, // Not available via Instagram Login API — would need profile snapshot delta
     };
 
     const topPosts = computeTopPosts(media, profile.followers_count).map((post) => {
       const mi = mediaInsightsMap.get(post.id);
       return {
         ...post,
-        saves: mi?.saves ?? 0,
+        saves: mi?.saved ?? 0,  // API returns "saved" not "saves"
         shares: mi?.shares ?? 0,
         reach: mi?.reach ?? 0,
         views: mi?.views ?? 0,
@@ -327,10 +330,16 @@ export async function GET(req: NextRequest) {
     const postingFrequency = computePostingFrequency(media);
     const contentAnalysis = computeContentAnalysis(media);
 
+    // Build insights array — include reach from account + aggregated views from media
     const insights: InsightTimeSeries[] = finalInsights.map((insight) => ({
       name: insight.name,
       values: insight.values,
     }));
+
+    // Add aggregated views as a synthetic insight if account-level didn't return it
+    if (!insights.find((i) => i.name === "views") && allViews > 0) {
+      insights.push({ name: "views", values: [{ value: allViews }] });
+    }
 
     const response: AnalyticsResponse = {
       profile,

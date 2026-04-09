@@ -294,7 +294,8 @@ export async function getMediaInsights(
   mediaType: "IMAGE" | "VIDEO" | "CAROUSEL_ALBUM" = "IMAGE"
 ): Promise<Record<string, number>> {
   // Métricas variam por tipo de mídia (v22+)
-  const baseMetrics = "reach,views,likes,comments,shares,saves,total_interactions";
+  // NOTA: a API usa "saved" (não "saves") para media insights
+  const baseMetrics = "reach,views,likes,comments,shares,saved,total_interactions";
   const reelsExtra = ",ig_reels_avg_watch_time";
   const metrics = mediaType === "VIDEO" ? baseMetrics + reelsExtra : baseMetrics;
 
