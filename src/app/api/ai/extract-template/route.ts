@@ -257,21 +257,26 @@ function convertLayoutToFabric(
   layout: AILayout,
   aspectRatio: "1:1" | "4:5" | "9:16",
   imageDataUrl?: string
-): { canvasJson: object; extractedCopy: Record<string, string>; hasBackgroundImage: boolean } {
+): { canvasJson: object; extractedCopy: Record<string, string>; hasBackgroundImage: boolean; originalImageUrl?: string; photoBackgroundReplaced: boolean } {
   const dim = CANVAS_DIMENSIONS[aspectRatio] || CANVAS_DIMENSIONS["1:1"];
   const W = dim.width;
   const H = dim.height;
   const objects: FabricObj[] = [];
   const extractedCopy: Record<string, string> = {};
   let hasBackgroundImage = false;
+  let photoBackgroundReplaced = false;
 
   const isPhotoBackground =
     layout.background.type === "image" ||
     layout.background.has_photo === true;
 
+  // Check if the image has text overlaid — if so, using it as background
+  // would cause DOUBLE TEXT (original baked-in text + extracted text objects)
+  const hasExtractedText = layout.elements.some((el: AIElement) => el.type === "text");
+
   // ── 1. Background ──
-  if (isPhotoBackground && imageDataUrl) {
-    // Preserve the original uploaded image as background
+  if (isPhotoBackground && imageDataUrl && !hasExtractedText) {
+    // Pure photo background (no text overlay) — safe to use as background
     hasBackgroundImage = true;
     objects.push(
       makeImage(imageDataUrl, {
@@ -286,6 +291,40 @@ function convertLayoutToFabric(
     );
 
     // Add overlay if detected
+    const overlayOpacity = layout.background.overlay_opacity || 0;
+    if (overlayOpacity > 0) {
+      objects.push(
+        makeRect({
+          left: 0,
+          top: 0,
+          width: W,
+          height: H,
+          fill: layout.background.overlay_color || "#000000",
+          opacity: overlayOpacity,
+          selectable: true,
+          evented: true,
+          data: objData("decoration", true),
+        })
+      );
+    }
+  } else if (isPhotoBackground && hasExtractedText) {
+    // Photo WITH text overlay — using the original image as background would
+    // cause double text. Use the dominant color as a solid background instead.
+    // The original image URL is returned so the user can manually set it later.
+    photoBackgroundReplaced = true;
+    const bgColor = layout.background.dominant_color || layout.background.color || "#1a1a2e";
+    objects.push(
+      makeRect({
+        width: W,
+        height: H,
+        fill: bgColor,
+        selectable: false,
+        evented: false,
+        data: { role: "background" as CanvasElementRole, editable: true, locked: false, originalImageUrl: imageDataUrl },
+      })
+    );
+
+    // Add overlay tint if detected (preserves the mood of the original)
     const overlayOpacity = layout.background.overlay_opacity || 0;
     if (overlayOpacity > 0) {
       objects.push(
@@ -437,7 +476,7 @@ function convertLayoutToFabric(
     background: canvasBg,
   };
 
-  return { canvasJson, extractedCopy, hasBackgroundImage };
+  return { canvasJson, extractedCopy, hasBackgroundImage, originalImageUrl: imageDataUrl, photoBackgroundReplaced };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -567,7 +606,7 @@ export async function POST(request: NextRequest) {
 
     // ── Convert layout → Fabric.js JSON ──
     // Pass the original image so it can be used as background if needed
-    const { canvasJson, extractedCopy, hasBackgroundImage } = convertLayoutToFabric(
+    const { canvasJson, extractedCopy, hasBackgroundImage, originalImageUrl, photoBackgroundReplaced } = convertLayoutToFabric(
       layout,
       aspectRatio,
       image
@@ -601,6 +640,8 @@ export async function POST(request: NextRequest) {
       photo_description: layout.background.photo_description || null,
       visual_hierarchy: layout.visual_hierarchy || [],
       overall_style: layout.overall_style || null,
+      original_image_url: photoBackgroundReplaced ? originalImageUrl : undefined,
+      photo_background_replaced: photoBackgroundReplaced,
     });
   } catch (error: any) {
     console.error("AI template extraction error:", error);

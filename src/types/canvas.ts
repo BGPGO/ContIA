@@ -22,6 +22,7 @@ export interface ContiaObjectData {
   editable: boolean;
   locked?: boolean;
   originalText?: string; // Text extracted from image (for revert after copy injection)
+  originalImageUrl?: string; // Original image URL when photo bg was replaced by solid color
 }
 
 // Visual template stored in Supabase

@@ -9,15 +9,12 @@ import {
   Pencil,
   Check,
   X,
-  Lightbulb,
   Send,
+  Sparkles,
 } from "lucide-react";
 import type { ContentFormat, ContentTone } from "@/types/ai";
 import type {
-  CopyContent,
-  CopyChatMessage,
   CopySessionStatus,
-  QuickAction,
 } from "@/types/copy-studio";
 import { QUICK_ACTIONS } from "@/types/copy-studio";
 import { useCopyStudio } from "@/hooks/useCopyStudio";
@@ -25,7 +22,6 @@ import { useCopySessions } from "@/hooks/useCopySessions";
 import { ChatInterface } from "./ChatInterface";
 import { CopyPreview } from "./CopyPreview";
 import { SessionHistory } from "./SessionHistory";
-import { InspirationPanel } from "./InspirationPanel";
 
 /* ══════════════════════════════════════════════════════════════════
    Sub-components
@@ -52,6 +48,15 @@ const PLATFORM_OPTIONS = [
   { value: "instagram", label: "IG", color: "var(--color-instagram)" },
   { value: "facebook", label: "FB", color: "var(--color-facebook)" },
   { value: "linkedin", label: "LI", color: "var(--color-linkedin)" },
+];
+
+const WELCOME_CHIPS = [
+  { label: "Me de ideias", message: "Me de 5 ideias de posts baseadas nos meus posts recentes e no que esta performando bem." },
+  { label: "Post sobre...", message: "" },
+  { label: "Carrossel educativo", message: "Quero criar um carrossel educativo. Sugira temas baseados nos meus pilares de conteudo." },
+  { label: "Similar ao que bombou", message: "Analise meus posts com mais engajamento e crie algo no mesmo estilo mas com tema novo." },
+  { label: "Reels trending", message: "Sugira um reels baseado em tendencias do meu nicho, usando o tom da minha marca." },
+  { label: "Story urgente", message: "Preciso de um story rapido para hoje. O que sugere baseado nos meus temas?" },
 ];
 
 function MiniSelect<T extends string>({
@@ -299,7 +304,6 @@ export function CopyStudio() {
   };
 
   const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
-  const [inspirationDrawerOpen, setInspirationDrawerOpen] = useState(false);
   const [quickInput, setQuickInput] = useState("");
 
   // Determine layout state:
@@ -316,26 +320,6 @@ export function CopyStudio() {
     }
   }, [studio.currentCopy]);
 
-  // Handle quick-start from suggestion
-  const handleStartFromSuggestion = useCallback(
-    (topic: string, format: ContentFormat, message: string) => {
-      updateConfig({ topic, format });
-      setInspirationDrawerOpen(false);
-      // Small delay to let config update propagate
-      setTimeout(() => sendMessage(message), 50);
-    },
-    [updateConfig, sendMessage]
-  );
-
-  // Handle quick-start from post reference
-  const handleStartFromPost = useCallback(
-    (message: string) => {
-      setInspirationDrawerOpen(false);
-      sendMessage(message);
-    },
-    [sendMessage]
-  );
-
   // Handle quick input submit (State A)
   const handleQuickSubmit = useCallback(() => {
     const text = quickInput.trim();
@@ -343,6 +327,19 @@ export function CopyStudio() {
     setQuickInput("");
     sendMessage(text);
   }, [quickInput, sendMessage]);
+
+  // Handle chip click
+  const handleChipClick = useCallback(
+    (chip: typeof WELCOME_CHIPS[number]) => {
+      if (chip.message) {
+        sendMessage(chip.message);
+      } else {
+        // For "Post sobre..." — pre-fill input
+        setQuickInput("Post sobre ");
+      }
+    },
+    [sendMessage]
+  );
 
   const statusCfg = STATUS_CONFIG[studio.status];
 
@@ -413,24 +410,6 @@ export function CopyStudio() {
 
         {/* Right-side buttons */}
         <div className="flex items-center gap-1.5 ml-auto">
-          {/* Inspiration toggle (State B only) */}
-          {!isStateA && (
-            <button
-              type="button"
-              onClick={() => setInspirationDrawerOpen((v) => !v)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all cursor-pointer
-                ${
-                  inspirationDrawerOpen
-                    ? "bg-accent/15 text-accent border border-accent/20"
-                    : "bg-bg-input border border-border text-text-secondary hover:text-text-primary hover:border-border-light"
-                }`}
-              title="Inspiracao"
-            >
-              <Lightbulb size={13} />
-              <span className="hidden sm:inline">Inspiracao</span>
-            </button>
-          )}
-
           {/* Mobile preview toggle */}
           {studio.currentCopy && (
             <button
@@ -449,7 +428,7 @@ export function CopyStudio() {
       <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
         <AnimatePresence mode="wait">
           {/* ══════════════════════════════════════════════════════
-             STATE A: Fresh start — InspirationPanel full width
+             STATE A: Fresh start — Clean welcome with smart chips
              ══════════════════════════════════════════════════════ */}
           {isStateA && (
             <motion.div
@@ -458,57 +437,75 @@ export function CopyStudio() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.3 }}
-              className="flex-1 flex flex-col min-h-0"
+              className="flex-1 flex flex-col items-center justify-center min-h-0 px-4"
             >
-              {/* Inspiration panel fills available space */}
-              <div className="flex-1 overflow-hidden">
-                <InspirationPanel
-                  onStartFromSuggestion={handleStartFromSuggestion}
-                  onStartFromPost={handleStartFromPost}
-                  className="h-full"
-                />
-              </div>
-
-              {/* Quick input bar at bottom */}
-              <div className="shrink-0 px-4 md:px-8 py-4 border-t border-border bg-bg-secondary">
-                <div className="max-w-2xl mx-auto">
-                  <p className="text-xs text-text-muted text-center mb-2.5">
-                    Ou descreva diretamente o que quer criar
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 relative">
-                      <input
-                        type="text"
-                        value={quickInput}
-                        onChange={(e) => setQuickInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            handleQuickSubmit();
-                          }
-                        }}
-                        placeholder="Sobre o que quer criar?"
-                        className="w-full bg-bg-input border border-border rounded-xl px-4 py-3 text-sm text-text-primary
-                          placeholder:text-text-muted/50 focus:outline-none focus:border-accent/50
-                          transition-colors"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleQuickSubmit}
-                      disabled={!quickInput.trim()}
-                      className="w-10 h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer
-                        disabled:opacity-30 disabled:cursor-not-allowed shrink-0 text-white"
-                      style={{
-                        background: quickInput.trim()
-                          ? "linear-gradient(135deg, #6c5ce7 0%, #4ecdc4 100%)"
-                          : "rgba(255,255,255,0.06)",
-                      }}
-                    >
-                      <Send size={16} />
-                    </button>
-                  </div>
+              <div className="w-full max-w-xl flex flex-col items-center gap-6">
+                {/* Title */}
+                <div className="flex items-center gap-2.5">
+                  <Sparkles size={22} className="text-accent" />
+                  <h2 className="text-xl font-bold text-text-primary">Copy Studio</h2>
                 </div>
+
+                {/* Subtitle */}
+                <p className="text-base text-text-secondary text-center">
+                  O que voce quer criar hoje?
+                </p>
+
+                {/* Quick chips */}
+                <div className="flex flex-wrap justify-center gap-2">
+                  {WELCOME_CHIPS.map((chip) => (
+                    <button
+                      key={chip.label}
+                      type="button"
+                      onClick={() => handleChipClick(chip)}
+                      className="px-3.5 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer
+                        bg-[#141736] border border-[#4ecdc4]/15 text-[#4ecdc4]/90
+                        hover:bg-[#4ecdc4]/10 hover:border-[#4ecdc4]/30 hover:text-[#4ecdc4]"
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Input bar */}
+                <div className="w-full flex items-center gap-2 mt-2">
+                  <div className="flex-1 relative">
+                    <input
+                      type="text"
+                      value={quickInput}
+                      onChange={(e) => setQuickInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleQuickSubmit();
+                        }
+                      }}
+                      placeholder="Digite sua ideia ou peca sugestoes..."
+                      className="w-full bg-[#141736] border border-[#4ecdc4]/10 rounded-xl px-4 py-3.5 text-sm text-text-primary
+                        placeholder:text-text-muted/50 focus:outline-none focus:border-[#4ecdc4]/40
+                        transition-colors"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleQuickSubmit}
+                    disabled={!quickInput.trim()}
+                    className="w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer
+                      disabled:opacity-30 disabled:cursor-not-allowed shrink-0 text-white"
+                    style={{
+                      background: quickInput.trim()
+                        ? "linear-gradient(135deg, #6c5ce7 0%, #4ecdc4 100%)"
+                        : "rgba(255,255,255,0.06)",
+                    }}
+                  >
+                    <Send size={16} />
+                  </button>
+                </div>
+
+                {/* Context hint */}
+                <p className="text-xs text-text-muted/60 text-center max-w-sm">
+                  O assistente conhece seu DNA, estilo e posts recentes. Peca ideias, refinamentos ou crie do zero.
+                </p>
               </div>
             </motion.div>
           )}
@@ -537,60 +534,6 @@ export function CopyStudio() {
                   disabled={false}
                 />
 
-                {/* ── Inspiration drawer (slide-over from left) ── */}
-                <AnimatePresence>
-                  {inspirationDrawerOpen && (
-                    <>
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="absolute inset-0 z-30 bg-black/30 backdrop-blur-[2px]"
-                        onClick={() => setInspirationDrawerOpen(false)}
-                      />
-                      <motion.div
-                        initial={{ x: "-100%" }}
-                        animate={{ x: 0 }}
-                        exit={{ x: "-100%" }}
-                        transition={{ type: "spring", stiffness: 350, damping: 35 }}
-                        className="absolute left-0 top-0 bottom-0 z-40 w-full max-w-md
-                          bg-bg-secondary border-r border-border shadow-2xl flex flex-col"
-                      >
-                        {/* Drawer header */}
-                        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
-                          <div className="flex items-center gap-2">
-                            <Lightbulb size={14} className="text-accent" />
-                            <span className="text-sm font-semibold text-text-primary">
-                              Inspiracao
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setInspirationDrawerOpen(false)}
-                            className="p-1 rounded-lg hover:bg-bg-card transition-colors cursor-pointer"
-                          >
-                            <X size={16} className="text-text-muted" />
-                          </button>
-                        </div>
-
-                        {/* Drawer body */}
-                        <div className="flex-1 overflow-hidden">
-                          <InspirationPanel
-                            onStartFromSuggestion={(topic, format, message) => {
-                              handleStartFromSuggestion(topic, format, message);
-                              setInspirationDrawerOpen(false);
-                            }}
-                            onStartFromPost={(message) => {
-                              handleStartFromPost(message);
-                              setInspirationDrawerOpen(false);
-                            }}
-                            className="h-full"
-                          />
-                        </div>
-                      </motion.div>
-                    </>
-                  )}
-                </AnimatePresence>
               </div>
 
               {/* RIGHT: Preview (40%) — desktop only */}

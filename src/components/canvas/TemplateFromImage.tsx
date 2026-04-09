@@ -34,7 +34,7 @@ interface ExtractionResult {
     objects: Array<{
       type: string;
       text?: string;
-      data?: { role?: string; originalText?: string; editable?: boolean };
+      data?: { role?: string; originalText?: string; editable?: boolean; originalImageUrl?: string; locked?: boolean };
       [key: string]: unknown;
     }>;
     background: string;
@@ -46,12 +46,38 @@ interface ExtractionResult {
   photo_description?: string | null;
   visual_hierarchy?: string[];
   overall_style?: string | null;
+  original_image_url?: string;
+  photo_background_replaced?: boolean;
 }
 
 type Step = "upload" | "analyzing" | "result" | "saved";
 
 const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB
-const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const ACCEPTED_TYPES = [...ACCEPTED_IMAGE_TYPES, "application/pdf"];
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PDF → Image conversion using pdfjs-dist (renders first page as PNG)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+async function pdfToImage(file: File): Promise<string> {
+  const pdfjsLib = await import("pdfjs-dist");
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const page = await pdf.getPage(1);
+
+  const scale = 2; // High resolution render
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement("canvas");
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  const ctx = canvas.getContext("2d")!;
+
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  return canvas.toDataURL("image/png");
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Progress messages for the analyzing step
@@ -268,26 +294,37 @@ export function TemplateFromImage({
   }, [result, editedCopy]);
 
   // ── File handling ──
-  const processFile = useCallback((file: File) => {
+  const processFile = useCallback(async (file: File) => {
     setError(null);
 
     if (!ACCEPTED_TYPES.includes(file.type)) {
-      setError("Formato nao suportado. Use PNG, JPEG ou WebP.");
+      setError("Formato nao suportado. Use PNG, JPEG, WebP ou PDF.");
       return;
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      setError("Imagem muito grande. O limite e 4MB.");
+      setError("Arquivo muito grande. O limite e 4MB.");
       return;
     }
 
     setImageFile(file);
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setImagePreview(e.target?.result as string);
-    };
-    reader.readAsDataURL(file);
+    if (file.type === "application/pdf") {
+      // Convert PDF first page to image
+      try {
+        const dataUrl = await pdfToImage(file);
+        setImagePreview(dataUrl);
+      } catch (err) {
+        console.error("PDF render error:", err);
+        setError("Nao foi possivel processar o PDF. Tente exportar como imagem.");
+      }
+    } else {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   }, []);
 
   const handleFileChange = useCallback(
@@ -444,7 +481,7 @@ export function TemplateFromImage({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept={ACCEPTED_TYPES.join(",")}
+                  accept={[...ACCEPTED_IMAGE_TYPES, ".pdf"].join(",")}
                   onChange={handleFileChange}
                   className="hidden"
                 />
@@ -475,7 +512,7 @@ export function TemplateFromImage({
                         Arraste uma imagem aqui ou clique para selecionar
                       </p>
                       <p className="text-xs text-[#5e6388] mt-1">
-                        PNG, JPEG ou WebP - Maximo 4MB
+                        PNG, JPEG, WebP ou PDF - Maximo 4MB
                       </p>
                     </div>
                   </div>
@@ -598,8 +635,8 @@ export function TemplateFromImage({
                 </div>
               </div>
 
-              {/* Background image badge */}
-              {result.has_background_image && (
+              {/* Background image badge — photo preserved */}
+              {result.has_background_image && !result.photo_background_replaced && (
                 <div className="flex items-center gap-3 p-3 rounded-xl bg-[#4ecdc4]/5 border border-[#4ecdc4]/20">
                   <ImageLucide size={16} className="text-[#4ecdc4] shrink-0" />
                   <div>
@@ -612,6 +649,64 @@ export function TemplateFromImage({
                       </p>
                     )}
                   </div>
+                </div>
+              )}
+
+              {/* Background replaced notice — photo had text overlay */}
+              {result.photo_background_replaced && (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
+                  <ImageLucide size={16} className="text-amber-400 shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-[#e8eaff]">
+                      Fundo substituido por cor dominante
+                    </p>
+                    <p className="text-xs text-[#5e6388] mt-0.5">
+                      A imagem original continha texto sobre uma foto. Usamos a cor dominante como fundo para evitar sobreposicao de texto. Voce pode restaurar a foto original no editor.
+                    </p>
+                    {result.photo_description && (
+                      <p className="text-xs text-[#8b8fb0] mt-1 italic">
+                        Foto: {result.photo_description}
+                      </p>
+                    )}
+                  </div>
+                  {result.original_image_url && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!result.original_image_url) return;
+                        // Replace the background rect with the original image in canvas_json
+                        const json = result.canvas_json;
+                        const bgIdx = json.objects.findIndex(
+                          (o) => o.data?.role === "background" && o.data?.originalImageUrl
+                        );
+                        if (bgIdx >= 0) {
+                          json.objects[bgIdx] = {
+                            type: "Image",
+                            src: result.original_image_url,
+                            left: 0,
+                            top: 0,
+                            width: 1080,
+                            height: 1080,
+                            scaleX: 1,
+                            scaleY: 1,
+                            selectable: false,
+                            evented: false,
+                            data: { role: "background-image", editable: false, locked: true },
+                          };
+                        }
+                        setResult({
+                          ...result,
+                          has_background_image: true,
+                          photo_background_replaced: false,
+                        });
+                      }}
+                      className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium text-amber-300
+                        bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20
+                        transition-all cursor-pointer"
+                    >
+                      Usar foto original
+                    </button>
+                  )}
                 </div>
               )}
 

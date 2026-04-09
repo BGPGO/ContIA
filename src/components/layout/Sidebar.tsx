@@ -90,6 +90,7 @@ const navSections: NavSection[] = [
     collapsible: true,
     links: [
       { label: "DNA da Marca", href: "/marca", icon: Brain },
+      { label: "Materiais da Marca", href: "/marca/assets", icon: Palette },
       { label: "Inteligencia", href: "/inteligencia", icon: Zap },
     ],
   },

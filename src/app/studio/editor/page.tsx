@@ -7,10 +7,12 @@ import { FabricCanvas } from "@/components/canvas/FabricCanvas";
 import type { FabricCanvasRef, SelectionInfo } from "@/components/canvas/FabricCanvas";
 import { CanvasToolbar } from "@/components/canvas/CanvasToolbar";
 import { PropertyPanel } from "@/components/canvas/PropertyPanel";
+import { LayersPanel } from "@/components/canvas/LayersPanel";
 import { TemplateGallery } from "@/components/canvas/TemplateGallery";
 import { CanvasExporter } from "@/components/canvas/CanvasExporter";
 import { EditorBottomBar } from "@/components/canvas/EditorBottomBar";
 import { TemplateFromImage } from "@/components/canvas/TemplateFromImage";
+import { BrandAssetsPanel } from "@/components/canvas/BrandAssetsPanel";
 import { useFabricCanvas } from "@/hooks/useFabricCanvas";
 import { useVisualTemplates } from "@/hooks/useVisualTemplates";
 import { useEmpresa } from "@/hooks/useEmpresa";
@@ -25,12 +27,13 @@ import type { PsdTemplate } from "@/lib/psd-templates";
    Helper: Convert CopyContent → CopyToTemplatePayload
    ═══════════════════════════════════════════════════════════════════════════ */
 
-function copyToCopyPayload(copy: CopyContent): CopyToTemplatePayload {
+function copyToCopyPayload(copy: CopyContent, empresa?: { nome?: string } | null): CopyToTemplatePayload {
   return {
     headline: copy.headline,
     subheadline: undefined,
-    body: copy.caption,
+    body: copy.caption, // caption IS the body text
     cta: copy.cta || undefined,
+    brandName: empresa?.nome,
     hashtags: copy.hashtags,
   };
 }
@@ -156,6 +159,7 @@ function EditorContent() {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [copyData, setCopyData] = useState<CopyToTemplatePayload | null>(null);
+  const [rightPanelTab, setRightPanelTab] = useState<"properties" | "assets">("properties");
   const [isLoadingSession, setIsLoadingSession] = useState(!!sessionId);
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(!!templateId);
   const [canvasReady, setCanvasReady] = useState(false);
@@ -192,7 +196,7 @@ function EditorContent() {
         if (cancelled) return;
 
         if (data.current_copy) {
-          const payload = copyToCopyPayload(data.current_copy as CopyContent);
+          const payload = copyToCopyPayload(data.current_copy as CopyContent, empresa);
           setCopyData(payload);
         }
       } catch (err) {
@@ -204,7 +208,17 @@ function EditorContent() {
 
     loadSessionCopy();
     return () => { cancelled = true; };
-  }, [sessionId]);
+  }, [sessionId, empresa]);
+
+  // ── Auto-apply copy when it arrives after template is already loaded ──
+  useEffect(() => {
+    if (!copyData || !canvasReady) return;
+    // Only auto-apply if template is already loaded (not loading)
+    if (isLoadingTemplate) return;
+    requestAnimationFrame(() => {
+      applyCopy(copyData);
+    });
+  }, [copyData, canvasReady, isLoadingTemplate, applyCopy]);
 
   // ── Load template from URL param ──
   useEffect(() => {
@@ -230,6 +244,10 @@ function EditorContent() {
           if (template.aspect_ratio) {
             setAspectRatio(template.aspect_ratio);
           }
+          // Apply copy after canvas finishes rendering
+          requestAnimationFrame(() => {
+            if (copyData) applyCopy(copyData);
+          });
         }
       } catch (err) {
         console.warn("[Editor] Error loading template:", err);
@@ -240,7 +258,7 @@ function EditorContent() {
 
     loadTemplateFromId();
     return () => { cancelled = true; };
-  }, [templateId, canvasReady, loadTemplate, setAspectRatio]);
+  }, [templateId, canvasReady, loadTemplate, setAspectRatio, copyData, applyCopy]);
 
   // ── Handle template selection from gallery ──
   const handleTemplateSelect = useCallback(
@@ -251,7 +269,10 @@ function EditorContent() {
           setAspectRatio(template.aspect_ratio as "1:1" | "4:5" | "9:16");
         }
       }
-      if (copyData) applyCopy(copyData);
+      // Wait a tick for canvas to finish rendering before applying copy
+      requestAnimationFrame(() => {
+        if (copyData) applyCopy(copyData);
+      });
       setShowGallery(false);
     },
     [loadTemplate, setAspectRatio, applyCopy, copyData]
@@ -261,7 +282,10 @@ function EditorContent() {
   const handlePresetSelect = useCallback(
     async (presetId: string) => {
       await loadPreset(presetId, state.aspectRatio);
-      if (copyData) applyCopy(copyData);
+      // Wait a tick for canvas to finish rendering before applying copy
+      requestAnimationFrame(() => {
+        if (copyData) applyCopy(copyData);
+      });
       setShowGallery(false);
     },
     [loadPreset, state.aspectRatio, applyCopy, copyData]
@@ -280,7 +304,10 @@ function EditorContent() {
       else if (ratio > 1.1) setAspectRatio("4:5");
       else setAspectRatio("1:1");
 
-      if (copyData) applyCopy(copyData);
+      // Wait a tick for canvas to finish rendering before applying copy
+      requestAnimationFrame(() => {
+        if (copyData) applyCopy(copyData);
+      });
       setShowGallery(false);
     },
     [loadTemplate, setAspectRatio, applyCopy, copyData]
@@ -425,17 +452,57 @@ function EditorContent() {
           )}
         </div>
 
-        {/* Property Panel (desktop) */}
-        <div className="hidden lg:block w-[280px] shrink-0 border-l border-white/10 bg-[#0c0f24] overflow-y-auto">
-          <PropertyPanel
-            selection={selection}
-            canvasRef={canvasRef}
-            brandColors={
-              empresa
-                ? [empresa.cor_primaria, empresa.cor_secundaria].filter(Boolean)
-                : ["#4ecdc4", "#6c5ce7"]
-            }
-          />
+        {/* Right sidebar: Properties/Assets + Layers (desktop) */}
+        <div className="hidden lg:flex flex-col w-[280px] shrink-0 border-l border-white/10 bg-[#0c0f24]">
+          {/* Tab switcher */}
+          <div className="flex border-b border-white/10 shrink-0">
+            <button
+              onClick={() => setRightPanelTab("properties")}
+              className={`flex-1 py-2 text-[10px] font-medium uppercase tracking-wider transition-all cursor-pointer
+                ${rightPanelTab === "properties"
+                  ? "text-[#4ecdc4] border-b-2 border-[#4ecdc4]"
+                  : "text-[#5e6388] hover:text-[#8b8fb0]"
+                }`}
+            >
+              Propriedades
+            </button>
+            <button
+              onClick={() => setRightPanelTab("assets")}
+              className={`flex-1 py-2 text-[10px] font-medium uppercase tracking-wider transition-all cursor-pointer
+                ${rightPanelTab === "assets"
+                  ? "text-[#4ecdc4] border-b-2 border-[#4ecdc4]"
+                  : "text-[#5e6388] hover:text-[#8b8fb0]"
+                }`}
+            >
+              Materiais
+            </button>
+          </div>
+          {/* Tab content */}
+          <div className="flex-1 overflow-y-auto">
+            {rightPanelTab === "properties" ? (
+              <PropertyPanel
+                selection={selection}
+                canvasRef={canvasRef}
+                brandColors={
+                  empresa
+                    ? [empresa.cor_primaria, empresa.cor_secundaria].filter(Boolean)
+                    : ["#4ecdc4", "#6c5ce7"]
+                }
+              />
+            ) : (
+              <BrandAssetsPanel
+                canvasRef={canvasRef}
+                empresaId={empresaId}
+                compact
+              />
+            )}
+          </div>
+          <div className="border-t border-white/10 h-[250px] shrink-0">
+            <LayersPanel
+              canvasRef={canvasRef}
+              selection={selection}
+            />
+          </div>
         </div>
       </div>
 

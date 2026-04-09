@@ -310,7 +310,7 @@ export function PropertyPanel({
 
   if (!selection) {
     return (
-      <div className="w-[260px] shrink-0 bg-[#0c0f24] border-l border-white/10 flex flex-col">
+      <div className="w-full shrink-0 bg-[#0c0f24] flex flex-col">
         <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10">
           <Layers size={14} className="text-[#4ecdc4]/60" />
           <span className="text-xs font-semibold text-[#5e6388] uppercase tracking-wider">
@@ -327,7 +327,7 @@ export function PropertyPanel({
   }
 
   return (
-    <div className="w-[260px] shrink-0 bg-[#0c0f24] border-l border-white/10 flex flex-col overflow-hidden">
+    <div className="w-full shrink-0 bg-[#0c0f24] flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 shrink-0">
         <Layers size={14} className="text-[#4ecdc4]/60" />

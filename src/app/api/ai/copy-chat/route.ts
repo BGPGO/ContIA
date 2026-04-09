@@ -52,8 +52,9 @@ function buildSystemPrompt(params: {
   dna: Record<string, unknown> | null;
   styleProfile: Record<string, unknown> | null;
   realCaptions: string[];
+  postsContext?: string;
 }): string {
-  const { empresaNome, format, tone, platforms, dna, styleProfile, realCaptions } = params;
+  const { empresaNome, format, tone, platforms, dna, styleProfile, realCaptions, postsContext } = params;
 
   let prompt = `Voce e o copywriter e ghostwriter oficial da marca ${empresaNome}.
 
@@ -121,6 +122,34 @@ ${TONE_DESCRIPTIONS[tone]}`;
       prompt += `\n\n--- Legenda ${i + 1} ---\n${cap.slice(0, 600)}`;
     });
   }
+
+  // Posts context with metrics
+  if (postsContext) {
+    prompt += postsContext;
+  }
+
+  // Proactive capabilities
+  prompt += `
+
+## Suas capacidades
+Voce tem acesso aos seguintes dados REAIS da marca:
+- DNA da marca completo (tom, personalidade, pilares, palavras)
+- Perfil de estilo dos posts reais (estrutura, emojis, CTAs)
+- As legendas reais com melhor performance e metricas de engajamento
+- Analise de padroes (formatos, frequencia, tipos de conteudo)
+
+Quando o usuario pedir ideias, sugestoes ou inspiracao:
+1. Analise os posts reais e identifique padroes de sucesso
+2. Identifique gaps de conteudo (pilares nao cobertos recentemente)
+3. Sugira 3-5 ideias concretas baseadas nos dados
+4. Para cada ideia, explique POR QUE vai funcionar (baseado nos dados)
+
+Quando o usuario pedir "algo parecido" com um post:
+1. Identifique o estilo e estrutura do post referenciado
+2. Crie variacoes mantendo o que funcionou
+
+Seja proativo: se o usuario der um tema vago, enriqueca com dados dos posts reais.
+Mencione dados concretos (curtidas, comentarios, formatos) para mostrar que voce CONHECE a marca.`;
 
   // Platform constraints
   if (platforms.length > 0) {
@@ -285,22 +314,63 @@ export async function POST(request: NextRequest) {
       console.warn("[copy-chat] Style profile not available:", (err as Error).message);
     }
 
-    // Fetch real Instagram captions (top 7 by likes)
+    // Fetch real Instagram posts with engagement data (expanded)
     let realCaptions: string[] = [];
+    let postsContext = "";
     try {
-      const { data: realPosts } = await supabase
+      const { data: recentPosts } = await supabase
         .from("instagram_media_cache")
-        .select("caption, like_count")
+        .select("caption, like_count, comments_count, media_type, timestamp")
         .eq("empresa_id", empresa_id)
-        .order("like_count", { ascending: false })
-        .limit(10);
+        .order("timestamp", { ascending: false })
+        .limit(20);
 
-      if (realPosts?.length) {
-        realCaptions = realPosts
-          .filter((p: { caption: string | null }) => p.caption && p.caption.length > 30)
-          .slice(0, 7)
-          .map((p: { caption: string }) => p.caption);
-        console.log("[copy-chat] Injected", realCaptions.length, "real captions");
+      if (recentPosts?.length) {
+        // Extract captions for style reference (top by likes)
+        const withCaptions = recentPosts.filter(
+          (p: { caption: string | null }) => p.caption && p.caption.length > 30
+        );
+        const topByLikes = [...withCaptions]
+          .sort((a: { like_count: number }, b: { like_count: number }) => b.like_count - a.like_count)
+          .slice(0, 7);
+        realCaptions = topByLikes.map((p: { caption: string }) => p.caption);
+
+        // Build rich context block
+        const avgLikes = recentPosts.reduce((s: number, p: { like_count: number }) => s + (p.like_count || 0), 0) / recentPosts.length;
+        const avgComments = recentPosts.reduce((s: number, p: { comments_count: number }) => s + (p.comments_count || 0), 0) / recentPosts.length;
+
+        // Count formats
+        const formatCounts: Record<string, number> = {};
+        recentPosts.forEach((p: { media_type: string | null }) => {
+          const t = p.media_type || "unknown";
+          formatCounts[t] = (formatCounts[t] || 0) + 1;
+        });
+        const formatStr = Object.entries(formatCounts)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(", ");
+
+        postsContext = `\n\n## Dados dos ultimos ${recentPosts.length} posts`;
+        postsContext += `\n- Media de curtidas: ${Math.round(avgLikes)}`;
+        postsContext += `\n- Media de comentarios: ${Math.round(avgComments)}`;
+        postsContext += `\n- Formatos: ${formatStr}`;
+
+        postsContext += `\n\n### Top 5 posts por engajamento:`;
+        const top5 = [...withCaptions]
+          .sort((a: { like_count: number; comments_count: number }, b: { like_count: number; comments_count: number }) =>
+            (b.like_count + b.comments_count * 3) - (a.like_count + a.comments_count * 3)
+          )
+          .slice(0, 5);
+        top5.forEach((p: { like_count: number; comments_count: number; caption: string }, i: number) => {
+          postsContext += `\n${i + 1}. [${p.like_count} curtidas, ${p.comments_count} comentarios] ${p.caption?.slice(0, 200)}`;
+        });
+
+        postsContext += `\n\n### Posts mais recentes:`;
+        withCaptions.slice(0, 5).forEach((p: { timestamp: string; caption: string; media_type: string | null }, i: number) => {
+          const date = p.timestamp ? new Date(p.timestamp).toLocaleDateString("pt-BR") : "?";
+          postsContext += `\n${i + 1}. [${date} | ${p.media_type || "post"}] ${p.caption?.slice(0, 150)}`;
+        });
+
+        console.log("[copy-chat] Injected", realCaptions.length, "real captions +", recentPosts.length, "posts context");
       }
     } catch (err) {
       console.warn("[copy-chat] Could not fetch real captions:", (err as Error).message);
@@ -316,6 +386,7 @@ export async function POST(request: NextRequest) {
       dna,
       styleProfile,
       realCaptions,
+      postsContext,
     });
 
     // ── 3. Build messages array ──

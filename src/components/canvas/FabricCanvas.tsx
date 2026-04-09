@@ -757,8 +757,32 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
           const scaleX = dims.w / (img.width || 1);
           const scaleY = dims.h / (img.height || 1);
           const bgScale = Math.max(scaleX, scaleY);
-          img.set({ scaleX: bgScale, scaleY: bgScale });
-          canvas.backgroundImage = img;
+
+          // Check for existing background image object (from PSD/templates)
+          const existingBg = canvas.getObjects().find(
+            (obj: any) => obj.data?.role === "background-image"
+          );
+
+          if (existingBg) {
+            // Replace the existing background object at the same position
+            const existingIndex = canvas.getObjects().indexOf(existingBg);
+            canvas.remove(existingBg);
+            img.set({
+              left: 0,
+              top: 0,
+              scaleX: bgScale,
+              scaleY: bgScale,
+              selectable: false,
+              evented: false,
+              data: { id: crypto.randomUUID(), role: "background-image", editable: false },
+            });
+            canvas.insertAt(img, existingIndex);
+          } else {
+            // No background object — also clear any existing canvas.backgroundImage
+            img.set({ scaleX: bgScale, scaleY: bgScale });
+            canvas.backgroundImage = img;
+          }
+
           canvas.renderAll();
           saveHistory();
         },
