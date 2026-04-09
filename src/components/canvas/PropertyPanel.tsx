@@ -18,8 +18,10 @@ import {
   AlignVerticalJustifyCenter,
   AlignVerticalJustifyEnd,
   Crosshair,
+  CornerUpLeft,
+  Paintbrush,
 } from "lucide-react";
-import type { SelectionInfo, FabricCanvasRef } from "./FabricCanvas";
+import type { SelectionInfo, FabricCanvasRef, TextSelectionInfo } from "./FabricCanvas";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Types
@@ -29,6 +31,8 @@ interface PropertyPanelProps {
   selection: SelectionInfo | null;
   canvasRef: React.RefObject<FabricCanvasRef | null>;
   brandColors?: string[];
+  isEditingText?: boolean;
+  textSelection?: TextSelectionInfo | null;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -233,6 +237,8 @@ export function PropertyPanel({
   selection,
   canvasRef,
   brandColors,
+  isEditingText = false,
+  textSelection,
 }: PropertyPanelProps) {
   const [lockAspect, setLockAspect] = useState(false);
   const [rotation, setRotation] = useState(0);
@@ -307,6 +313,47 @@ export function PropertyPanel({
     selection?.type === "textbox" ||
     selection?.type === "text" ||
     selection?.type === "i-text";
+
+  const isRect = selection?.type === "rect";
+
+  const isShape =
+    selection?.type === "rect" ||
+    selection?.type === "circle" ||
+    selection?.type === "triangle" ||
+    selection?.type === "polygon" ||
+    selection?.type === "line";
+
+  // ── Fill type helpers ──
+  const setFillSolid = useCallback((color?: string) => {
+    updateProp({ fill: color || "#4ecdc4" });
+  }, [updateProp]);
+
+  const setFillGradient = useCallback(() => {
+    const obj = canvasRef.current?.getSelectedObject();
+    if (!obj) return;
+    const canvas = canvasRef.current?.getCanvas();
+    if (!canvas) return;
+    import("fabric").then((fabricModule) => {
+      const w = obj.width || 200;
+      const h = obj.height || 200;
+      const gradient = new fabricModule.Gradient({
+        type: 'linear',
+        coords: { x1: 0, y1: 0, x2: w, y2: h },
+        colorStops: [
+          { offset: 0, color: '#4ecdc4' },
+          { offset: 1, color: '#6c5ce7' },
+        ],
+      });
+      obj.set({ fill: gradient });
+      canvas.renderAll();
+    });
+  }, [canvasRef]);
+
+  const setNoFill = useCallback(() => {
+    const obj = canvasRef.current?.getSelectedObject();
+    if (!obj) return;
+    updateProp({ fill: 'transparent', stroke: obj.stroke || '#4ecdc4', strokeWidth: Math.max(obj.strokeWidth || 0, 2) });
+  }, [canvasRef, updateProp]);
 
   if (!selection) {
     return (
@@ -459,12 +506,95 @@ export function PropertyPanel({
         <div>
           <SectionHeader icon={Palette} label="Aparencia" />
 
+          {/* Fill type toggle for shapes */}
+          {isShape && (
+            <div className="mb-3">
+              <label className="text-[10px] text-[#8b8fb0] uppercase tracking-wide block mb-1.5">
+                Tipo de preenchimento
+              </label>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => setFillSolid()}
+                  className={`flex-1 px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-all cursor-pointer border ${
+                    selection.props.fill !== "transparent" && selection.props.fill !== "__gradient__"
+                      ? "bg-[#4ecdc4]/15 border-[#4ecdc4]/30 text-[#4ecdc4]"
+                      : "bg-[#141736] border-white/10 text-[#8b8fb0] hover:bg-white/5"
+                  }`}
+                >
+                  Solido
+                </button>
+                <button
+                  type="button"
+                  onClick={setFillGradient}
+                  className={`flex-1 px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-all cursor-pointer border ${
+                    selection.props.fill === "__gradient__"
+                      ? "bg-[#6c5ce7]/15 border-[#6c5ce7]/30 text-[#6c5ce7]"
+                      : "bg-[#141736] border-white/10 text-[#8b8fb0] hover:bg-white/5"
+                  }`}
+                >
+                  Gradiente
+                </button>
+                <button
+                  type="button"
+                  onClick={setNoFill}
+                  className={`flex-1 px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-all cursor-pointer border ${
+                    selection.props.fill === "transparent"
+                      ? "bg-white/10 border-white/20 text-[#e8eaff]"
+                      : "bg-[#141736] border-white/10 text-[#8b8fb0] hover:bg-white/5"
+                  }`}
+                >
+                  Sem
+                </button>
+              </div>
+            </div>
+          )}
+
           <ColorSwatches
             label="Preenchimento"
-            value={selection.props.fill || "#4ecdc4"}
+            value={selection.props.fill === "__gradient__" ? "#4ecdc4" : (selection.props.fill || "#4ecdc4")}
             onChange={(color) => updateProp({ fill: color })}
             colors={defaultBrandColors}
           />
+
+          {/* Corner radius for Rects */}
+          {isRect && (
+            <div className="mt-3">
+              <div className="flex items-center gap-2 mb-1.5">
+                <CornerUpLeft size={12} className="text-[#4ecdc4]/60" />
+                <label className="text-[10px] text-[#8b8fb0] uppercase tracking-wide">
+                  Cantos arredondados
+                </label>
+              </div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={selection.props.rx || 0}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    updateProp({ rx: val, ry: val });
+                  }}
+                  className="flex-1 h-1 rounded-full accent-[#4ecdc4] cursor-pointer"
+                />
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={selection.props.rx || 0}
+                    onChange={(e) => {
+                      const val = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                      updateProp({ rx: val, ry: val });
+                    }}
+                    className="w-12 bg-[#141736] border border-white/10 rounded px-2 py-1 text-xs text-[#e8eaff] text-center focus:outline-none focus:border-[#4ecdc4]/40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <span className="text-[10px] text-[#5e6388]">px</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="mt-3">
             <PropSlider
@@ -478,7 +608,7 @@ export function PropertyPanel({
           <div className="mt-3">
             <ColorSwatches
               label="Borda"
-              value="#ffffff"
+              value={selection.props.stroke || "#ffffff"}
               onChange={(color) => updateProp({ stroke: color })}
               colors={defaultBrandColors.slice(0, 5)}
             />
@@ -486,7 +616,7 @@ export function PropertyPanel({
           <div className="mt-2">
             <PropSlider
               label="Espessura borda"
-              value={0}
+              value={selection.props.strokeWidth || 0}
               onChange={(v) => updateProp({ strokeWidth: v })}
               min={0}
               max={20}
@@ -581,10 +711,57 @@ export function PropertyPanel({
             {/* Text color */}
             <ColorSwatches
               label="Cor do texto"
-              value={selection.props.fill || "#e8eaff"}
-              onChange={(color) => updateProp({ fill: color })}
+              value={
+                (isEditingText && textSelection?.hasSelection && textSelection.styles?.fill)
+                  ? textSelection.styles.fill
+                  : (selection.props.fill || "#e8eaff")
+              }
+              onChange={(color) => {
+                if (isEditingText) {
+                  canvasRef.current?.applyStyleToSelection({ fill: color });
+                } else {
+                  updateProp({ fill: color });
+                }
+              }}
               colors={defaultBrandColors}
             />
+
+            {/* Highlight / Text Background */}
+            <div className="mt-3">
+              <label className="text-[10px] text-[#8b8fb0] uppercase tracking-wide">
+                Destaque (Highlight)
+              </label>
+              <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+                {["#facc15", "#fb923c", "#4ade80", "#60a5fa", "#c084fc", "#fb7185", "#4ecdc4", "#e8eaff"].map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => {
+                      if (isEditingText) {
+                        canvasRef.current?.applyStyleToSelection({ textBackgroundColor: c });
+                      } else {
+                        updateProp({ textBackgroundColor: c });
+                      }
+                    }}
+                    className="w-6 h-6 rounded-md border-2 transition-all cursor-pointer border-transparent hover:border-white/20"
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isEditingText) {
+                      canvasRef.current?.applyStyleToSelection({ textBackgroundColor: "" });
+                    } else {
+                      updateProp({ textBackgroundColor: "" });
+                    }
+                  }}
+                  className="px-2 py-1 text-[10px] text-[#8b8fb0] hover:text-[#e8eaff] bg-[#141736] border border-white/10 rounded-md hover:bg-white/5 transition-colors cursor-pointer"
+                >
+                  Remover
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

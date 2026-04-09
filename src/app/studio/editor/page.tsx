@@ -4,7 +4,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useState, useEffect, useCallback, Suspense, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { FabricCanvas } from "@/components/canvas/FabricCanvas";
-import type { FabricCanvasRef, SelectionInfo } from "@/components/canvas/FabricCanvas";
+import type { FabricCanvasRef, SelectionInfo, TextSelectionInfo } from "@/components/canvas/FabricCanvas";
 import { CanvasToolbar } from "@/components/canvas/CanvasToolbar";
 import { PropertyPanel } from "@/components/canvas/PropertyPanel";
 import { LayersPanel } from "@/components/canvas/LayersPanel";
@@ -153,6 +153,8 @@ function EditorContent() {
     duplicateTemplate,
   } = useVisualTemplates(empresaId || undefined);
 
+  const [isEditingText, setIsEditingText] = useState(false);
+  const [textSelection, setTextSelection] = useState<TextSelectionInfo | null>(null);
   const [showGallery, setShowGallery] = useState(!templateId);
   const [showImageExtractor, setShowImageExtractor] = useState(false);
   const [showExporter, setShowExporter] = useState(false);
@@ -407,7 +409,7 @@ function EditorContent() {
         </div>
       )}
 
-      {/* Toolbar */}
+      {/* Toolbar — fixed height */}
       <CanvasToolbar
         selection={selection}
         canvasRef={canvasRef}
@@ -415,17 +417,30 @@ function EditorContent() {
         onAspectRatioChange={handleAspectRatioChange}
         canUndo={state.canUndo}
         canRedo={state.canRedo}
+        isEditingText={isEditingText}
+        textSelection={textSelection}
       />
 
-      {/* Main area: Canvas + Property Panel */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Canvas area */}
-        <div className="flex-1 flex items-center justify-center p-4 bg-[#080b1e] relative overflow-auto">
+      {/* Main area: Layers LEFT | Canvas CENTER | Properties RIGHT */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
+
+        {/* LEFT: Layers Panel (desktop only) */}
+        <div className="hidden lg:flex flex-col w-[250px] shrink-0 border-r border-white/10 bg-[#0c0f24]">
+          <LayersPanel
+            canvasRef={canvasRef}
+            selection={selection}
+          />
+        </div>
+
+        {/* CENTER: Canvas — takes remaining space, centers the canvas, NO scroll */}
+        <div className="flex-1 flex items-center justify-center bg-[#080b1e] overflow-hidden relative">
           <div
             className="relative shadow-2xl shadow-black/50 rounded-lg overflow-hidden"
             style={{
               width: Math.min(dims.width * 0.5, 540),
               height: Math.min(dims.height * 0.5, 960),
+              maxWidth: "85%",
+              maxHeight: "85%",
             }}
           >
             <FabricCanvas
@@ -436,6 +451,8 @@ function EditorContent() {
               onSelectionChange={setSelection}
               onCanvasChange={markDirty}
               onReady={handleCanvasReady}
+              onTextEditingChange={setIsEditingText}
+              onTextSelectionChange={setTextSelection}
             />
           </div>
 
@@ -452,7 +469,7 @@ function EditorContent() {
           )}
         </div>
 
-        {/* Right sidebar: Properties/Assets + Layers (desktop) */}
+        {/* RIGHT: Properties + Brand Assets (desktop only) */}
         <div className="hidden lg:flex flex-col w-[280px] shrink-0 border-l border-white/10 bg-[#0c0f24]">
           {/* Tab switcher */}
           <div className="flex border-b border-white/10 shrink-0">
@@ -477,7 +494,7 @@ function EditorContent() {
               Materiais
             </button>
           </div>
-          {/* Tab content */}
+          {/* Tab content — scrolls independently */}
           <div className="flex-1 overflow-y-auto">
             {rightPanelTab === "properties" ? (
               <PropertyPanel
@@ -488,6 +505,8 @@ function EditorContent() {
                     ? [empresa.cor_primaria, empresa.cor_secundaria].filter(Boolean)
                     : ["#4ecdc4", "#6c5ce7"]
                 }
+                isEditingText={isEditingText}
+                textSelection={textSelection}
               />
             ) : (
               <BrandAssetsPanel
@@ -497,16 +516,10 @@ function EditorContent() {
               />
             )}
           </div>
-          <div className="border-t border-white/10 h-[250px] shrink-0">
-            <LayersPanel
-              canvasRef={canvasRef}
-              selection={selection}
-            />
-          </div>
         </div>
       </div>
 
-      {/* Bottom Bar */}
+      {/* Bottom Bar — fixed height */}
       <EditorBottomBar
         onOpenTemplates={() => setShowGallery(true)}
         onSaveTemplate={() => setShowSaveModal(true)}

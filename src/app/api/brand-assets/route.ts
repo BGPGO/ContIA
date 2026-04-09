@@ -78,19 +78,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Tipo invalido. Use: ${validTypes.join(", ")}` }, { status: 400 });
     }
 
-    // Ensure bucket exists
-    try {
-      await supabase.storage.createBucket(BUCKET_NAME, {
-        public: true,
-        fileSizeLimit: MAX_FILE_SIZE,
-      });
-    } catch {
-      // Bucket may already exist — that's fine
-    }
-
-    // Upload to Supabase Storage
+    // Upload to Supabase Storage (bucket "brand-assets" must exist — created via Supabase dashboard)
     const ext = file.name.split(".").pop() || "bin";
     const storagePath = `${empresaId}/${type}/${crypto.randomUUID()}.${ext}`;
+
+    console.log(`[BrandAssets] Uploading: ${file.name} (${file.size} bytes, ${file.type}) -> ${storagePath}`);
+
     const buffer = Buffer.from(await file.arrayBuffer());
 
     const { error: uploadError } = await supabase.storage
@@ -102,8 +95,15 @@ export async function POST(request: NextRequest) {
 
     if (uploadError) {
       console.error("[BrandAssets] Upload error:", uploadError);
-      return NextResponse.json({ error: "Falha no upload: " + uploadError.message }, { status: 500 });
+      const msg = uploadError.message?.includes("not found")
+        ? `Bucket "${BUCKET_NAME}" nao existe no Supabase. Crie-o no painel do Supabase Storage.`
+        : uploadError.message?.includes("security")
+        ? "Erro de permissao no Storage. Verifique as politicas RLS do bucket."
+        : `Falha no upload: ${uploadError.message}`;
+      return NextResponse.json({ error: msg }, { status: 500 });
     }
+
+    console.log(`[BrandAssets] Upload OK: ${storagePath}`);
 
     // Get public URL
     const { data: urlData } = supabase.storage
@@ -137,12 +137,17 @@ export async function POST(request: NextRequest) {
       console.error("[BrandAssets] Insert error:", insertError);
       // Try to clean up uploaded file
       await supabase.storage.from(BUCKET_NAME).remove([storagePath]);
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
+      const msg = insertError.message?.includes("brand_assets")
+        ? "Tabela brand_assets nao encontrada. Execute a migration no Supabase."
+        : `Falha ao salvar registro: ${insertError.message}`;
+      return NextResponse.json({ error: msg }, { status: 500 });
     }
 
+    console.log(`[BrandAssets] Asset created: ${asset.id} (${name}, ${type})`);
     return NextResponse.json(asset, { status: 201 });
   } catch (err) {
     console.error("[BrandAssets] POST exception:", err);
-    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
+    const message = (err as Error).message || "Erro interno";
+    return NextResponse.json({ error: `Erro no upload: ${message}` }, { status: 500 });
   }
 }

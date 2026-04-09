@@ -46,6 +46,9 @@ const PLATFORM_CONSTRAINTS: Record<string, string> = {
 
 function buildSystemPrompt(params: {
   empresaNome: string;
+  empresaNicho: string;
+  empresaDescricao: string;
+  empresaWebsite: string;
   format: string;
   tone: ContentTone;
   platforms: string[];
@@ -54,9 +57,21 @@ function buildSystemPrompt(params: {
   realCaptions: string[];
   postsContext?: string;
 }): string {
-  const { empresaNome, format, tone, platforms, dna, styleProfile, realCaptions, postsContext } = params;
+  const { empresaNome, empresaNicho, empresaDescricao, empresaWebsite, format, tone, platforms, dna, styleProfile, realCaptions, postsContext } = params;
 
-  let prompt = `Voce e o copywriter e ghostwriter oficial da marca ${empresaNome}.
+  let prompt = `Voce e o copywriter e ghostwriter oficial da marca ${empresaNome}, uma empresa do nicho de ${empresaNicho}.
+${empresaDescricao ? `A empresa: ${empresaDescricao}` : ''}
+
+REGRA ABSOLUTA: Todo conteudo deve ser 100% relevante para ${empresaNicho}. NUNCA gere conteudo de outros nichos.
+
+## Contexto da Marca
+- **Nome**: ${empresaNome}
+- **Nicho**: ${empresaNicho}
+- **Descricao**: ${empresaDescricao || 'Nao disponivel'}
+- **Website**: ${empresaWebsite || 'Nao disponivel'}
+
+IMPORTANTE: Todo conteudo DEVE ser relevante para o nicho "${empresaNicho}".
+NUNCA sugira conteudo de outros nichos. Se a empresa e financeira, TODOS os posts devem ser sobre financas, investimentos, gestao financeira, etc.
 
 ## Seu papel
 Voce cria e refina conteudo para redes sociais em colaboracao com o usuario.
@@ -285,23 +300,61 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
 
     // Fetch empresa data
-    const { data: empresa } = await supabase
+    console.log(`[copy-chat] empresa_id=${empresa_id}`);
+
+    const { data: empresa, error: empresaError } = await supabase
       .from("empresas")
       .select("nome, descricao, nicho, website")
       .eq("id", empresa_id)
       .single();
 
-    const empresaNome = empresa?.nome || "a marca";
+    if (empresaError || !empresa) {
+      console.error(`[copy-chat] FAILED to load empresa: ${empresaError?.message || "not found"}`);
+      return new Response(
+        JSON.stringify({ error: "Empresa nao encontrada" }),
+        { status: 404, headers: { "Content-Type": "application/json" } }
+      );
+    }
 
-    // Fetch Brand DNA
+    console.log(`[copy-chat] Loaded empresa: ${empresa.nome} (nicho=${empresa.nicho})`);
+
+    const empresaNome = empresa.nome || "a marca";
+    const empresaNicho = empresa.nicho || "geral";
+    const empresaDescricao = empresa.descricao || "";
+    const empresaWebsite = empresa.website || "";
+
+    // Fetch Brand DNA (resilient — works even if marca_dna table is empty)
     let dna: Record<string, unknown> | null = null;
     try {
-      const marcaDna = await getMarcaDNA(supabase, empresa_id);
-      if (marcaDna) {
-        dna = marcaDna as unknown as Record<string, unknown>;
+      const { data: marcaDnaRow, error: dnaError } = await supabase
+        .from("marca_dna")
+        .select("dna_sintetizado")
+        .eq("empresa_id", empresa_id)
+        .single();
+
+      if (dnaError) {
+        console.warn(`[copy-chat] DNA fetch error: ${dnaError.message}`);
+      } else if (marcaDnaRow?.dna_sintetizado) {
+        dna = marcaDnaRow.dna_sintetizado as Record<string, unknown>;
+        console.log(`[copy-chat] DNA loaded successfully from dna_sintetizado`);
+      } else {
+        console.log(`[copy-chat] No DNA configured for this empresa — using empresa context only`);
+      }
+
+      // Fallback: try full getMarcaDNA if dna_sintetizado was empty
+      if (!dna) {
+        try {
+          const marcaDna = await getMarcaDNA(supabase, empresa_id);
+          if (marcaDna) {
+            dna = marcaDna as unknown as Record<string, unknown>;
+            console.log(`[copy-chat] DNA loaded via getMarcaDNA fallback`);
+          }
+        } catch (fallbackErr) {
+          console.warn(`[copy-chat] getMarcaDNA fallback error: ${(fallbackErr as Error).message}`);
+        }
       }
     } catch (err) {
-      console.warn("[copy-chat] DNA not available:", (err as Error).message);
+      console.warn(`[copy-chat] DNA exception: ${(err as Error).message}`);
     }
 
     // Fetch StyleProfile via pattern-analyzer
@@ -318,12 +371,18 @@ export async function POST(request: NextRequest) {
     let realCaptions: string[] = [];
     let postsContext = "";
     try {
-      const { data: recentPosts } = await supabase
+      const { data: recentPosts, error: postsError } = await supabase
         .from("instagram_media_cache")
         .select("caption, like_count, comments_count, media_type, timestamp")
         .eq("empresa_id", empresa_id)
         .order("timestamp", { ascending: false })
         .limit(20);
+
+      if (postsError) {
+        console.warn(`[copy-chat] Instagram posts fetch error: ${postsError.message}`);
+      } else {
+        console.log(`[copy-chat] Instagram posts fetched: ${recentPosts?.length || 0} posts`);
+      }
 
       if (recentPosts?.length) {
         // Extract captions for style reference (top by likes)
@@ -378,8 +437,13 @@ export async function POST(request: NextRequest) {
 
     // ── 2. Build system prompt ──
 
+    console.log(`[copy-chat] Building prompt: empresa=${empresaNome}, nicho=${empresaNicho}, dna=${dna ? 'yes' : 'no'}, style=${styleProfile ? 'yes' : 'no'}, captions=${realCaptions.length}`);
+
     const systemPrompt = buildSystemPrompt({
       empresaNome,
+      empresaNicho,
+      empresaDescricao,
+      empresaWebsite,
       format,
       tone,
       platforms,

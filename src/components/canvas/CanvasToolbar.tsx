@@ -35,8 +35,21 @@ import {
   Lock,
   Unlock,
   Link,
+  Triangle,
+  Hexagon,
+  Star,
+  Minus as MinusLine,
+  CornerUpLeft,
+  RectangleHorizontal,
+  BadgeCheck,
+  ArrowRight,
+  Frame,
+  SeparatorHorizontal,
+  Underline,
+  Strikethrough,
+  Highlighter,
 } from "lucide-react";
-import type { SelectionInfo, FabricCanvasRef } from "./FabricCanvas";
+import type { SelectionInfo, FabricCanvasRef, TextSelectionInfo } from "./FabricCanvas";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Types
@@ -49,6 +62,8 @@ interface CanvasToolbarProps {
   onAspectRatioChange: (ratio: "1:1" | "4:5" | "9:16") => void;
   canUndo: boolean;
   canRedo: boolean;
+  isEditingText?: boolean;
+  textSelection?: TextSelectionInfo | null;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -194,6 +209,92 @@ function ColorPickerPopover({
   );
 }
 
+function HighlightColorPicker({
+  value,
+  onChange,
+  onClear,
+}: {
+  value: string;
+  onChange: (color: string) => void;
+  onClear: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  const highlightColors = [
+    "#facc15", // yellow
+    "#fb923c", // orange
+    "#4ade80", // green
+    "#60a5fa", // blue
+    "#c084fc", // purple
+    "#fb7185", // pink
+    "#4ecdc4", // teal (brand)
+    "#e8eaff", // light
+    "#ffffff", // white
+    "#080b1e", // dark
+  ];
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={popoverRef}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        title="Destaque / Highlight"
+        className={`p-2 rounded-md transition-all cursor-pointer ${
+          value
+            ? "bg-[#4ecdc4]/20 text-[#4ecdc4]"
+            : "text-[#8b8fb0] hover:bg-white/10 hover:text-[#e8eaff]"
+        }`}
+      >
+        <Highlighter size={14} />
+      </button>
+      {open && (
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 bg-[#141736] border border-white/10 rounded-xl shadow-xl p-3 w-48">
+          <div className="grid grid-cols-5 gap-1.5 mb-2">
+            {highlightColors.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => {
+                  onChange(c);
+                  setOpen(false);
+                }}
+                className={`w-7 h-7 rounded-md border-2 transition-all cursor-pointer ${
+                  value === c
+                    ? "border-white/60 scale-110"
+                    : "border-transparent hover:border-white/20"
+                }`}
+                style={{ backgroundColor: c }}
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              onClear();
+              setOpen(false);
+            }}
+            className="w-full text-center text-[10px] text-[#8b8fb0] hover:text-[#e8eaff] py-1.5 rounded hover:bg-white/5 transition-colors cursor-pointer"
+          >
+            Remover destaque
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AddElementDropdown({
   canvasRef,
 }: {
@@ -221,34 +322,6 @@ function AddElementDropdown({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
-  const items = [
-    {
-      label: "Texto",
-      icon: Type,
-      action: () => canvasRef.current?.addText("Novo texto"),
-    },
-    {
-      label: "Imagem (arquivo)",
-      icon: ImagePlus,
-      action: () => fileInputRef.current?.click(),
-    },
-    {
-      label: "Imagem (URL)",
-      icon: Link,
-      action: () => setShowUrlInput(true),
-    },
-    {
-      label: "Retangulo",
-      icon: Square,
-      action: () => canvasRef.current?.addRect(),
-    },
-    {
-      label: "Circulo",
-      icon: Circle,
-      action: () => canvasRef.current?.addCircle(),
-    },
-  ];
-
   const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -268,6 +341,87 @@ function AddElementDropdown({
     setOpen(false);
   };
 
+  const close = () => { setOpen(false); setShowUrlInput(false); setImageUrl(""); };
+
+  const basicShapes = [
+    {
+      label: "Texto",
+      icon: Type,
+      color: "#e8eaff",
+      action: () => { canvasRef.current?.addText("Novo texto"); close(); },
+    },
+    {
+      label: "Retangulo",
+      icon: Square,
+      color: "#4ecdc4",
+      action: () => { canvasRef.current?.addRect(); close(); },
+    },
+    {
+      label: "Circulo",
+      icon: Circle,
+      color: "#6c5ce7",
+      action: () => { canvasRef.current?.addCircle(); close(); },
+    },
+    {
+      label: "Triangulo",
+      icon: Triangle,
+      color: "#4ecdc4",
+      action: () => { canvasRef.current?.addTriangle(); close(); },
+    },
+    {
+      label: "Poligono",
+      icon: Hexagon,
+      color: "#6c5ce7",
+      action: () => { canvasRef.current?.addPolygon(6); close(); },
+    },
+    {
+      label: "Linha",
+      icon: MinusLine,
+      color: "#4ecdc4",
+      action: () => { canvasRef.current?.addLine(); close(); },
+    },
+    {
+      label: "Estrela",
+      icon: Star,
+      color: "#f59e0b",
+      action: () => { canvasRef.current?.addStar(); close(); },
+    },
+    {
+      label: "Imagem",
+      icon: ImagePlus,
+      color: "#3b82f6",
+      action: () => { fileInputRef.current?.click(); close(); },
+    },
+  ];
+
+  const presetShapes = [
+    {
+      label: "Pill",
+      icon: RectangleHorizontal,
+      action: () => { canvasRef.current?.addRect({ rx: 50, ry: 50, width: 260, height: 80, fill: "#4ecdc4" }); close(); },
+    },
+    {
+      label: "Badge",
+      icon: BadgeCheck,
+      action: () => { canvasRef.current?.addRect({ rx: 12, ry: 12, width: 160, height: 50, fill: "#6c5ce7" }); close(); },
+    },
+    {
+      label: "Seta",
+      icon: ArrowRight,
+      action: () => { canvasRef.current?.addTriangle({ width: 80, height: 60, fill: "#4ecdc4" }); close(); },
+    },
+    {
+      label: "Frame",
+      icon: Frame,
+      action: () => { canvasRef.current?.addRect({ rx: 0, ry: 0, width: 300, height: 300, fill: "transparent", stroke: "#4ecdc4", strokeWidth: 3 }); close(); },
+    },
+    {
+      label: "Divisor",
+      icon: SeparatorHorizontal,
+      action: () => { canvasRef.current?.addLine({ stroke: "#5e6388", strokeWidth: 2 }); close(); },
+    },
+  ];
+
   return (
     <div className="relative" ref={dropdownRef}>
       <ToolbarButton onClick={() => setOpen(!open)} title="Adicionar elemento">
@@ -281,26 +435,53 @@ function AddElementDropdown({
         className="hidden"
       />
       {open && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-[#141736] border border-white/10 rounded-xl shadow-xl py-1 min-w-[200px]">
-          {items.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.label}
-                type="button"
-                onClick={() => {
-                  item.action();
-                  if (item.label !== "Imagem (URL)") setOpen(false);
-                }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#8b8fb0] hover:bg-white/5 hover:text-[#e8eaff] transition-colors cursor-pointer"
-              >
-                <Icon size={14} />
-                {item.label}
-              </button>
-            );
-          })}
+        <div className="absolute top-full left-0 mt-1 z-50 bg-[#141736] border border-white/10 rounded-xl shadow-2xl w-[280px] overflow-hidden">
+          {/* Header */}
+          <div className="px-4 pt-3 pb-2">
+            <span className="text-xs font-semibold text-[#5e6388] uppercase tracking-wider">
+              Adicionar Elemento
+            </span>
+          </div>
+
+          {/* Basic shapes grid */}
+          <div className="grid grid-cols-4 gap-1 px-3 pb-2">
+            {basicShapes.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={item.action}
+                  className="flex flex-col items-center gap-1.5 p-2.5 rounded-lg hover:bg-white/5 transition-all cursor-pointer group"
+                >
+                  <div
+                    className="w-9 h-9 rounded-lg flex items-center justify-center transition-all group-hover:scale-110"
+                    style={{ backgroundColor: `${item.color}15` }}
+                  >
+                    <Icon size={18} style={{ color: item.color }} />
+                  </div>
+                  <span className="text-[10px] text-[#8b8fb0] group-hover:text-[#e8eaff] transition-colors">
+                    {item.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* URL image option */}
+          <div className="px-3 pb-2">
+            <button
+              type="button"
+              onClick={() => setShowUrlInput(true)}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-[#8b8fb0] hover:bg-white/5 hover:text-[#e8eaff] transition-colors cursor-pointer"
+            >
+              <Link size={13} />
+              Imagem via URL
+            </button>
+          </div>
+
           {showUrlInput && (
-            <div className="px-3 py-2 border-t border-white/10">
+            <div className="px-3 pb-3">
               <div className="flex items-center gap-2">
                 <input
                   type="text"
@@ -308,19 +489,42 @@ function AddElementDropdown({
                   onChange={(e) => setImageUrl(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") handleImageUrl(); }}
                   placeholder="https://exemplo.com/imagem.png"
-                  className="flex-1 bg-[#0c0f24] border border-white/10 rounded px-2.5 py-1.5 text-xs text-[#e8eaff] focus:outline-none focus:border-[#4ecdc4]/40"
+                  className="flex-1 bg-[#0c0f24] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-[#e8eaff] focus:outline-none focus:border-[#4ecdc4]/40"
                   autoFocus
                 />
                 <button
                   type="button"
                   onClick={handleImageUrl}
-                  className="px-3 py-1.5 bg-[#4ecdc4]/20 text-[#4ecdc4] rounded text-xs font-medium hover:bg-[#4ecdc4]/30 transition-colors cursor-pointer"
+                  className="px-3 py-1.5 bg-[#4ecdc4]/20 text-[#4ecdc4] rounded-lg text-xs font-medium hover:bg-[#4ecdc4]/30 transition-colors cursor-pointer"
                 >
                   OK
                 </button>
               </div>
             </div>
           )}
+
+          {/* Preset shapes */}
+          <div className="border-t border-white/10 px-3 py-2">
+            <span className="text-[10px] text-[#5e6388] uppercase tracking-wider font-medium">
+              Formas Prontas
+            </span>
+            <div className="flex items-center gap-1 mt-2 flex-wrap">
+              {presetShapes.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.label}
+                    type="button"
+                    onClick={item.action}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#0c0f24] border border-white/10 text-[10px] text-[#8b8fb0] hover:bg-white/5 hover:text-[#e8eaff] hover:border-[#4ecdc4]/30 transition-all cursor-pointer"
+                  >
+                    <Icon size={12} />
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -483,6 +687,8 @@ export function CanvasToolbar({
   onAspectRatioChange,
   canUndo,
   canRedo,
+  isEditingText = false,
+  textSelection,
 }: CanvasToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -491,6 +697,28 @@ export function CanvasToolbar({
       canvasRef.current?.updateSelectedObject(props);
     },
     [canvasRef]
+  );
+
+  // Apply style — uses per-char when editing text, whole object otherwise
+  const applyTextStyle = useCallback(
+    (style: Record<string, any>) => {
+      canvasRef.current?.applyStyleToSelection(style);
+    },
+    [canvasRef]
+  );
+
+  // Get current selection style for toggle state detection
+  const getActiveStyle = useCallback(
+    (prop: string): any => {
+      if (isEditingText && textSelection?.hasSelection && textSelection.styles) {
+        return textSelection.styles[prop];
+      }
+      // Fall back to object-level prop
+      if (prop === 'fontWeight') return selection?.props.fontWeight;
+      if (prop === 'fill') return selection?.props.fill;
+      return undefined;
+    },
+    [isEditingText, textSelection, selection]
   );
 
   const isText =
@@ -635,48 +863,95 @@ export function CanvasToolbar({
       <div className="flex items-center gap-1.5 flex-1 min-w-0">
         {isText && (
           <>
+            {/* Editing text indicator */}
+            {isEditingText && (
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-[#4ecdc4]/10 rounded-lg border border-[#4ecdc4]/20">
+                <Type size={11} className="text-[#4ecdc4]" />
+                <span className="text-[10px] text-[#4ecdc4] font-medium whitespace-nowrap">
+                  {textSelection?.hasSelection
+                    ? `${textSelection.end - textSelection.start} car. selecionados`
+                    : "Editando texto"}
+                </span>
+              </div>
+            )}
+
             <FontFamilySelect
               value={selection.props.fontFamily || "Plus Jakarta Sans"}
-              onChange={(font) => updateProp({ fontFamily: font })}
+              onChange={(font) => isEditingText ? applyTextStyle({ fontFamily: font }) : updateProp({ fontFamily: font })}
             />
             <FontSizeStepper
               value={selection.props.fontSize || 48}
-              onChange={(size) => updateProp({ fontSize: size })}
+              onChange={(size) => isEditingText ? applyTextStyle({ fontSize: size }) : updateProp({ fontSize: size })}
             />
+            {/* B / I / U / S formatting buttons — per-char when editing */}
             <div className="flex items-center gap-0.5 bg-[#141736] rounded-lg p-1">
               <ToolbarButton
-                onClick={() =>
-                  updateProp({
-                    fontWeight:
-                      selection.props.fontWeight === "bold" ||
-                      Number(selection.props.fontWeight) >= 700
-                        ? "normal"
-                        : "bold",
-                  })
-                }
-                active={
-                  selection.props.fontWeight === "bold" ||
-                  Number(selection.props.fontWeight) >= 700
-                }
-                title="Negrito"
+                onClick={() => {
+                  const currentWeight = getActiveStyle('fontWeight');
+                  const isBold = currentWeight === 'bold' || Number(currentWeight) >= 700;
+                  applyTextStyle({ fontWeight: isBold ? 'normal' : 'bold' });
+                }}
+                active={(() => {
+                  const w = getActiveStyle('fontWeight');
+                  return w === 'bold' || Number(w) >= 700;
+                })()}
+                title="Negrito (per-char quando editando)"
               >
                 <Bold size={14} />
               </ToolbarButton>
               <ToolbarButton
                 onClick={() => {
-                  const obj = canvasRef.current?.getSelectedObject();
-                  if (!obj) return;
-                  updateProp({
-                    fontStyle:
-                      obj.fontStyle === "italic" ? "normal" : "italic",
-                  });
+                  const currentStyle = isEditingText && textSelection?.styles?.fontStyle
+                    ? textSelection.styles.fontStyle
+                    : canvasRef.current?.getSelectedObject()?.fontStyle;
+                  applyTextStyle({ fontStyle: currentStyle === 'italic' ? 'normal' : 'italic' });
                 }}
-                active={false}
+                active={(() => {
+                  if (isEditingText && textSelection?.hasSelection) {
+                    return textSelection.styles?.fontStyle === 'italic';
+                  }
+                  return canvasRef.current?.getSelectedObject()?.fontStyle === 'italic';
+                })()}
                 title="Italico"
               >
                 <Italic size={14} />
               </ToolbarButton>
+              <ToolbarButton
+                onClick={() => {
+                  const current = isEditingText && textSelection?.styles?.underline !== undefined
+                    ? textSelection.styles.underline
+                    : canvasRef.current?.getSelectedObject()?.underline;
+                  applyTextStyle({ underline: !current });
+                }}
+                active={(() => {
+                  if (isEditingText && textSelection?.hasSelection) {
+                    return !!textSelection.styles?.underline;
+                  }
+                  return !!canvasRef.current?.getSelectedObject()?.underline;
+                })()}
+                title="Sublinhado"
+              >
+                <Underline size={14} />
+              </ToolbarButton>
+              <ToolbarButton
+                onClick={() => {
+                  const current = isEditingText && textSelection?.styles?.linethrough !== undefined
+                    ? textSelection.styles.linethrough
+                    : canvasRef.current?.getSelectedObject()?.linethrough;
+                  applyTextStyle({ linethrough: !current });
+                }}
+                active={(() => {
+                  if (isEditingText && textSelection?.hasSelection) {
+                    return !!textSelection.styles?.linethrough;
+                  }
+                  return !!canvasRef.current?.getSelectedObject()?.linethrough;
+                })()}
+                title="Tachado"
+              >
+                <Strikethrough size={14} />
+              </ToolbarButton>
             </div>
+            {/* Text alignment — always object-level */}
             <div className="flex items-center gap-0.5 bg-[#141736] rounded-lg p-1">
               <ToolbarButton
                 onClick={() => updateProp({ textAlign: "left" })}
@@ -700,9 +975,24 @@ export function CanvasToolbar({
                 <AlignRight size={14} />
               </ToolbarButton>
             </div>
+            {/* Text color — per-char when editing */}
             <ColorPickerPopover
-              value={selection.props.fill || "#e8eaff"}
-              onChange={(color) => updateProp({ fill: color })}
+              value={
+                (isEditingText && textSelection?.hasSelection && textSelection.styles?.fill)
+                  ? textSelection.styles.fill
+                  : (selection.props.fill || "#e8eaff")
+              }
+              onChange={(color) => applyTextStyle({ fill: color })}
+            />
+            {/* Highlight / text background color */}
+            <HighlightColorPicker
+              value={
+                (isEditingText && textSelection?.hasSelection && textSelection.styles?.textBackgroundColor)
+                  ? textSelection.styles.textBackgroundColor
+                  : ""
+              }
+              onChange={(color) => applyTextStyle({ textBackgroundColor: color })}
+              onClear={() => applyTextStyle({ textBackgroundColor: "" })}
             />
           </>
         )}
@@ -714,20 +1004,37 @@ export function CanvasToolbar({
                 Preenchimento
               </span>
               <ColorPickerPopover
-                value={selection.props.fill || "#4ecdc4"}
+                value={selection.props.fill === "__gradient__" ? "#4ecdc4" : (selection.props.fill || "#4ecdc4")}
                 onChange={(color) => updateProp({ fill: color })}
               />
             </div>
+            {selection.type === "rect" && (
+              <div className="flex items-center gap-2">
+                <CornerUpLeft size={14} className="text-[#8b8fb0]" />
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={selection.props.rx || 0}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    updateProp({ rx: val, ry: val });
+                  }}
+                  className="w-20 h-1 accent-[#4ecdc4] cursor-pointer"
+                />
+                <span className="text-xs text-[#8b8fb0] w-8 tabular-nums">{selection.props.rx || 0}</span>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <span className="text-[10px] text-[#5e6388] uppercase">
                 Borda
               </span>
               <ColorPickerPopover
-                value={"#ffffff"}
+                value={selection.props.stroke || "#ffffff"}
                 onChange={(color) => updateProp({ stroke: color })}
               />
               <FontSizeStepper
-                value={0}
+                value={selection.props.strokeWidth || 0}
                 onChange={(w) => updateProp({ strokeWidth: w })}
               />
             </div>

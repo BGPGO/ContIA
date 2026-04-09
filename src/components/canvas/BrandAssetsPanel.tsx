@@ -70,6 +70,7 @@ export function BrandAssetsPanel({ canvasRef, empresaId, compact = false }: Bran
   const [filter, setFilter] = useState<AssetFilter>("all");
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadType, setUploadType] = useState<BrandAsset["type"]>("logo");
   const [newColor, setNewColor] = useState("");
   const [showColorInput, setShowColorInput] = useState(false);
@@ -109,8 +110,10 @@ export function BrandAssetsPanel({ canvasRef, empresaId, compact = false }: Bran
     async (files: FileList | null) => {
       if (!files || files.length === 0 || !resolvedEmpresaId) return;
       setIsUploading(true);
+      setUploadError(null);
 
       try {
+        const errors: string[] = [];
         for (const file of Array.from(files)) {
           const formData = new FormData();
           formData.append("file", file);
@@ -121,12 +124,17 @@ export function BrandAssetsPanel({ canvasRef, empresaId, compact = false }: Bran
           const res = await fetch("/api/brand-assets", { method: "POST", body: formData });
           if (!res.ok) {
             const err = await res.json();
+            errors.push(err.error || `Falha ao enviar ${file.name}`);
             console.warn("[BrandAssets] Upload failed:", err.error);
           }
+        }
+        if (errors.length > 0) {
+          setUploadError(errors.join("; "));
         }
         fetchAssets();
       } catch (err) {
         console.warn("[BrandAssets] Upload error:", err);
+        setUploadError((err as Error).message || "Erro no upload");
       } finally {
         setIsUploading(false);
       }
@@ -284,6 +292,19 @@ export function BrandAssetsPanel({ canvasRef, empresaId, compact = false }: Bran
           onChange={(e) => handleUpload(e.target.files)}
         />
       </div>
+
+      {/* Upload error message */}
+      {uploadError && (
+        <div className="mx-3 mb-2 px-2 py-1.5 rounded-md bg-red-500/10 border border-red-500/20 flex items-start gap-2">
+          <span className="text-[10px] text-red-400 flex-1">{uploadError}</span>
+          <button
+            onClick={() => setUploadError(null)}
+            className="text-red-400 hover:text-red-300 cursor-pointer flex-shrink-0"
+          >
+            <X size={10} />
+          </button>
+        </div>
+      )}
 
       {/* Upload type selector */}
       <div className="flex gap-1 px-3 pb-2">

@@ -71,6 +71,7 @@ export default function BrandAssetsPage() {
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadType, setUploadType] = useState<BrandAsset["type"]>("logo");
   const [newColor, setNewColor] = useState("");
   const [showColorInput, setShowColorInput] = useState(false);
@@ -109,7 +110,9 @@ export default function BrandAssetsPage() {
     async (files: FileList | null) => {
       if (!files || files.length === 0 || !empresaId) return;
       setIsUploading(true);
+      setUploadError(null);
       try {
+        const errors: string[] = [];
         for (const file of Array.from(files)) {
           const formData = new FormData();
           formData.append("file", file);
@@ -119,12 +122,17 @@ export default function BrandAssetsPage() {
           const res = await fetch("/api/brand-assets", { method: "POST", body: formData });
           if (!res.ok) {
             const err = await res.json();
+            errors.push(err.error || `Falha ao enviar ${file.name}`);
             console.warn("[BrandAssets] Upload failed:", err.error);
           }
+        }
+        if (errors.length > 0) {
+          setUploadError(errors.join("; "));
         }
         fetchAssets();
       } catch (err) {
         console.warn("[BrandAssets] Upload error:", err);
+        setUploadError((err as Error).message || "Erro no upload");
       } finally {
         setIsUploading(false);
       }
@@ -325,6 +333,19 @@ export default function BrandAssetsPage() {
             onChange={(e) => handleUpload(e.target.files)}
           />
         </div>
+
+        {/* Upload error message */}
+        {uploadError && (
+          <div className="mb-6 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center gap-3">
+            <span className="text-sm text-red-400 flex-1">{uploadError}</span>
+            <button
+              onClick={() => setUploadError(null)}
+              className="text-red-400 hover:text-red-300 cursor-pointer p-1"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Assets grid */}

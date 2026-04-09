@@ -31,7 +31,18 @@ export interface SelectionInfo {
     textAlign?: string;
     opacity?: number;
     text?: string;
+    rx?: number;
+    ry?: number;
+    stroke?: string;
+    strokeWidth?: number;
   };
+}
+
+export interface TextSelectionInfo {
+  start: number;
+  end: number;
+  hasSelection: boolean;
+  styles: Record<string, any>;
 }
 
 export interface FabricCanvasRef {
@@ -49,6 +60,10 @@ export interface FabricCanvasRef {
   addImage: (url: string) => Promise<void>;
   addRect: (options?: Record<string, any>) => void;
   addCircle: (options?: Record<string, any>) => void;
+  addTriangle: (options?: Record<string, any>) => void;
+  addPolygon: (sides: number, options?: Record<string, any>) => void;
+  addStar: (options?: Record<string, any>) => void;
+  addLine: (options?: Record<string, any>) => void;
   undo: () => void;
   redo: () => void;
   setBackgroundColor: (color: string) => void;
@@ -59,6 +74,9 @@ export interface FabricCanvasRef {
   distributeSelected: (direction: 'horizontal' | 'vertical') => void;
   flipSelected: (direction: 'horizontal' | 'vertical') => void;
   toggleLockSelected: () => boolean;
+  applyStyleToSelection: (style: Record<string, any>) => void;
+  getSelectionStyle: () => Record<string, any> | null;
+  isEditingText: () => boolean;
 }
 
 export interface FabricCanvasProps {
@@ -69,6 +87,8 @@ export interface FabricCanvasProps {
   onSelectionChange?: (selection: SelectionInfo | null) => void;
   onCanvasChange?: () => void;
   onReady?: () => void;
+  onTextEditingChange?: (isEditing: boolean) => void;
+  onTextSelectionChange?: (info: TextSelectionInfo) => void;
   className?: string;
 }
 
@@ -97,13 +117,17 @@ function extractSelectionInfo(obj: any): SelectionInfo {
       top: Math.round(obj.top ?? 0),
       width: Math.round(obj.getScaledWidth?.() ?? obj.width ?? bounds.width ?? 0),
       height: Math.round(obj.getScaledHeight?.() ?? obj.height ?? bounds.height ?? 0),
-      fill: typeof obj.fill === "string" ? obj.fill : "#000000",
+      fill: typeof obj.fill === "string" ? obj.fill : (obj.fill?.type ? "__gradient__" : "#000000"),
       fontSize: obj.fontSize,
       fontFamily: obj.fontFamily,
       fontWeight: String(obj.fontWeight ?? ""),
       textAlign: obj.textAlign,
       opacity: obj.opacity != null ? Math.round(obj.opacity * 100) : 100,
       text: obj.text,
+      rx: (obj as any).rx || 0,
+      ry: (obj as any).ry || 0,
+      stroke: typeof obj.stroke === "string" ? obj.stroke : undefined,
+      strokeWidth: obj.strokeWidth || 0,
     },
   };
 }
@@ -122,6 +146,8 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
       onSelectionChange,
       onCanvasChange,
       onReady,
+      onTextEditingChange,
+      onTextSelectionChange,
       className = "",
     },
     ref
@@ -426,6 +452,28 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
 
         fabricRef.current = canvasInstance;
 
+        // ── Canva-like selection overlay ──
+        canvasInstance.selectionColor = 'rgba(78, 205, 196, 0.08)';
+        canvasInstance.selectionBorderColor = '#4ecdc4';
+        canvasInstance.selectionLineWidth = 1.5;
+
+        // Customize object controls (handles) — Canva style
+        fabricModule.FabricObject.prototype.set({
+          transparentCorners: false,
+          cornerColor: '#4ecdc4',
+          cornerStrokeColor: '#ffffff',
+          cornerSize: 8,
+          cornerStyle: 'circle',
+          borderColor: '#4ecdc4',
+          borderScaleFactor: 1.5,
+          padding: 4,
+        });
+
+        // Move rotation handle further up for cleaner look
+        if (fabricModule.FabricObject.prototype.controls?.mtr) {
+          fabricModule.FabricObject.prototype.controls.mtr.offsetY = -30;
+        }
+
         // ── Events: selection ──
         canvasInstance.on("selection:created", (e: any) => {
           const sel = e.selected?.[0];
@@ -451,6 +499,31 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
         });
         canvasInstance.on("object:added", handleChange);
         canvasInstance.on("object:removed", handleChange);
+
+        // ── Events: text editing ──
+        canvasInstance.on("text:editing:entered", () => {
+          onTextEditingChange?.(true);
+        });
+        canvasInstance.on("text:editing:exited", () => {
+          onTextEditingChange?.(false);
+          onTextSelectionChange?.({ start: 0, end: 0, hasSelection: false, styles: {} });
+        });
+        canvasInstance.on("text:selection:changed", (e: any) => {
+          const textObj = e.target;
+          if (textObj && onTextSelectionChange) {
+            const start = textObj.selectionStart ?? 0;
+            const end = textObj.selectionEnd ?? 0;
+            // Get style of first selected char for toolbar state
+            let styles: Record<string, any> = {};
+            if (start !== end && textObj.getSelectionStyles) {
+              const selStyles = textObj.getSelectionStyles(start, end);
+              if (selStyles && selStyles.length > 0) {
+                styles = selStyles[0] || {};
+              }
+            }
+            onTextSelectionChange({ start, end, hasSelection: start !== end, styles });
+          }
+        });
 
         // ── Events: snapping & smart guides ──
         canvasInstance.on("object:moving", handleObjectMoving);
@@ -514,7 +587,8 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
 
         if (e.key === "Delete" || e.key === "Backspace") {
           const active = canvas.getActiveObject();
-          if (active) {
+          // Don't delete text object while editing it
+          if (active && !(active as any).isEditing) {
             canvas.remove(active);
             canvas.discardActiveObject();
             canvas.renderAll();
@@ -735,6 +809,100 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
           });
         },
 
+        addTriangle: (options?: Record<string, any>) => {
+          import("fabric").then(({ Triangle }) => {
+            const canvas = fabricRef.current;
+            if (!canvas) return;
+            const triangle = new Triangle({
+              left: dims.w / 2 - 100,
+              top: dims.h / 2 - 100,
+              width: 200,
+              height: 200,
+              fill: "#4ecdc4",
+              data: { id: crypto.randomUUID(), role: "shape", editable: true },
+              ...options,
+            });
+            canvas.add(triangle);
+            canvas.setActiveObject(triangle);
+            canvas.renderAll();
+          });
+        },
+
+        addPolygon: (sides: number, options?: Record<string, any>) => {
+          import("fabric").then(({ Polygon }) => {
+            const canvas = fabricRef.current;
+            if (!canvas) return;
+            const radius = 100;
+            const points = [];
+            for (let i = 0; i < sides; i++) {
+              const angle = (i * 2 * Math.PI / sides) - Math.PI / 2;
+              points.push({
+                x: radius + radius * Math.cos(angle),
+                y: radius + radius * Math.sin(angle),
+              });
+            }
+            const polygon = new Polygon(points, {
+              left: dims.w / 2 - radius,
+              top: dims.h / 2 - radius,
+              fill: "#6c5ce7",
+              ...options,
+            } as any);
+            (polygon as any).data = { id: crypto.randomUUID(), role: "shape", editable: true };
+            canvas.add(polygon);
+            canvas.setActiveObject(polygon);
+            canvas.renderAll();
+          });
+        },
+
+        addStar: (options?: Record<string, any>) => {
+          import("fabric").then(({ Polygon }) => {
+            const canvas = fabricRef.current;
+            if (!canvas) return;
+            const outerR = 100;
+            const innerR = 45;
+            const spikes = 5;
+            const points = [];
+            for (let i = 0; i < spikes * 2; i++) {
+              const r = i % 2 === 0 ? outerR : innerR;
+              const angle = (i * Math.PI / spikes) - Math.PI / 2;
+              points.push({
+                x: outerR + r * Math.cos(angle),
+                y: outerR + r * Math.sin(angle),
+              });
+            }
+            const star = new Polygon(points, {
+              left: dims.w / 2 - outerR,
+              top: dims.h / 2 - outerR,
+              fill: "#f59e0b",
+              ...options,
+            } as any);
+            (star as any).data = { id: crypto.randomUUID(), role: "shape", editable: true };
+            canvas.add(star);
+            canvas.setActiveObject(star);
+            canvas.renderAll();
+          });
+        },
+
+        addLine: (options?: Record<string, any>) => {
+          import("fabric").then(({ Line }) => {
+            const canvas = fabricRef.current;
+            if (!canvas) return;
+            const line = new Line(
+              [dims.w / 2 - 150, dims.h / 2, dims.w / 2 + 150, dims.h / 2],
+              {
+                stroke: "#4ecdc4",
+                strokeWidth: 4,
+                fill: "",
+                ...options,
+              } as any
+            );
+            (line as any).data = { id: crypto.randomUUID(), role: "shape", editable: true };
+            canvas.add(line);
+            canvas.setActiveObject(line);
+            canvas.renderAll();
+          });
+        },
+
         undo: undoAction,
         redo: redoAction,
 
@@ -907,8 +1075,86 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
           saveHistory();
           return !isLocked; // returns new locked state
         },
+
+        // ── Rich text: apply style to selection ──
+        applyStyleToSelection: (style: Record<string, any>) => {
+          const canvas = fabricRef.current;
+          if (!canvas) return;
+          const obj = canvas.getActiveObject();
+          if (!obj || obj.type !== 'Textbox') return;
+
+          const textbox = obj as any;
+          const start = textbox.selectionStart ?? 0;
+          const end = textbox.selectionEnd ?? 0;
+
+          if (!textbox.isEditing || start === end) {
+            // No text selected or not editing — apply to whole object
+            textbox.set(style);
+          } else {
+            // Apply to selected characters using Fabric's built-in method
+            textbox.setSelectionStyles(style, start, end);
+          }
+
+          canvas.requestRenderAll();
+          saveHistory();
+          emitSelection(obj);
+
+          // Re-emit text selection info so toolbar updates
+          if (textbox.isEditing && onTextSelectionChange) {
+            const selStyles = textbox.getSelectionStyles?.(start, end);
+            const firstStyle = selStyles?.[0] || {};
+            onTextSelectionChange({
+              start,
+              end,
+              hasSelection: start !== end,
+              styles: firstStyle,
+            });
+          }
+        },
+
+        // ── Rich text: get style of current selection ──
+        getSelectionStyle: () => {
+          const canvas = fabricRef.current;
+          if (!canvas) return null;
+          const obj = canvas.getActiveObject();
+          if (!obj || obj.type !== 'Textbox') return null;
+
+          const textbox = obj as any;
+          if (!textbox.isEditing) return null;
+
+          const start = textbox.selectionStart ?? 0;
+          const end = textbox.selectionEnd ?? 0;
+
+          if (start === end) {
+            // Cursor position, no selection — return object-level styles
+            return {
+              fontWeight: textbox.fontWeight,
+              fontStyle: textbox.fontStyle,
+              fill: textbox.fill,
+              textBackgroundColor: textbox.textBackgroundColor,
+              underline: textbox.underline,
+              linethrough: textbox.linethrough,
+              fontSize: textbox.fontSize,
+            };
+          }
+
+          const selStyles = textbox.getSelectionStyles?.(start, end);
+          if (selStyles && selStyles.length > 0) {
+            return selStyles[0];
+          }
+          return null;
+        },
+
+        // ── Rich text: check if currently editing text ──
+        isEditingText: () => {
+          const canvas = fabricRef.current;
+          if (!canvas) return false;
+          const obj = canvas.getActiveObject();
+          if (!obj || obj.type !== 'Textbox') return false;
+          return !!(obj as any).isEditing;
+        },
       }),
-      [dims.w, dims.h, undoAction, redoAction, saveHistory, emitSelection, computeScale, onCanvasChange, addImageFromDataUrl]
+      [dims.w, dims.h, undoAction, redoAction, saveHistory, emitSelection, computeScale, onCanvasChange, addImageFromDataUrl, onTextSelectionChange]
     );
 
     // ── Expose canUndo / canRedo via data attributes for parent to read ──
