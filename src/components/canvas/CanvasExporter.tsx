@@ -23,6 +23,11 @@ interface CanvasExporterProps {
   isVisible: boolean;
   postTitle?: string;
   onSaveAsTemplate?: (name: string) => void;
+  // Carousel support
+  isCarousel?: boolean;
+  slides?: object[];
+  currentSlideIndex?: number;
+  onSwitchSlide?: (index: number) => void;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -44,6 +49,10 @@ export function CanvasExporter({
   isVisible,
   postTitle,
   onSaveAsTemplate,
+  isCarousel = false,
+  slides = [],
+  currentSlideIndex = 0,
+  onSwitchSlide,
 }: CanvasExporterProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [exportFormat, setExportFormat] = useState<"png" | "jpg">("png");
@@ -54,6 +63,8 @@ export function CanvasExporter({
   const [copied, setCopied] = useState(false);
   const [showSaveInput, setShowSaveInput] = useState(false);
   const [templateName, setTemplateName] = useState("");
+  const [isExportingAll, setIsExportingAll] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
 
   // ── Computed dimensions text ──
   const baseDims = { w: 1080, h: 1080 }; // Will be overridden by actual canvas
@@ -85,6 +96,59 @@ export function CanvasExporter({
       setIsExporting(false);
     }
   }, [canvasRef, exportFormat, quality, resolution, postTitle]);
+
+  // ── Export all carousel slides ──
+  const handleExportAllSlides = useCallback(async () => {
+    const canvas = canvasRef.current;
+    if (!canvas || !isCarousel || slides.length === 0 || !onSwitchSlide) return;
+
+    setIsExportingAll(true);
+    setExportProgress(0);
+
+    try {
+      const originalIndex = currentSlideIndex;
+
+      for (let i = 0; i < slides.length; i++) {
+        // Switch to slide i
+        if (i !== currentSlideIndex) {
+          onSwitchSlide(i);
+          // Small delay for canvas to render
+          await new Promise((r) => setTimeout(r, 300));
+        }
+
+        const dataUrl = canvas.toDataURL({
+          format: exportFormat,
+          quality: exportFormat === "jpg" ? quality / 100 : 1,
+          multiplier: resolution,
+        });
+
+        // Trigger download
+        const link = document.createElement("a");
+        link.download = `${postTitle || "post"}-slide-${i + 1}.${exportFormat}`;
+        link.href = dataUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        setExportProgress(Math.round(((i + 1) / slides.length) * 100));
+
+        // Small delay between downloads so browser doesn't block them
+        if (i < slides.length - 1) {
+          await new Promise((r) => setTimeout(r, 200));
+        }
+      }
+
+      // Return to original slide
+      if (originalIndex !== slides.length - 1) {
+        onSwitchSlide(originalIndex);
+      }
+    } catch (err) {
+      console.error("[CanvasExporter] Falha no export de slides:", err);
+    } finally {
+      setIsExportingAll(false);
+      setExportProgress(0);
+    }
+  }, [canvasRef, isCarousel, slides, currentSlideIndex, onSwitchSlide, exportFormat, quality, resolution, postTitle]);
 
   // ── Copy to clipboard ──
   const handleCopy = useCallback(async () => {
@@ -162,6 +226,32 @@ export function CanvasExporter({
           />
         </button>
       </div>
+
+      {/* ── Carousel: Download all slides ── */}
+      {isCarousel && slides.length > 1 && (
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={handleExportAllSlides}
+          disabled={isExportingAll}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold
+            bg-[#141736] border border-[#4ecdc4]/30 text-[#4ecdc4]
+            hover:bg-[#4ecdc4]/10 hover:shadow-[0_0_15px_rgba(78,205,196,0.15)]
+            disabled:opacity-50 transition-all"
+        >
+          {isExportingAll ? (
+            <>
+              <Loader2 size={16} className="animate-spin" />
+              Exportando... {exportProgress}%
+            </>
+          ) : (
+            <>
+              <Download size={16} />
+              Download todos os slides ({slides.length})
+            </>
+          )}
+        </motion.button>
+      )}
 
       {/* ── Expanded options ── */}
       <AnimatePresence>

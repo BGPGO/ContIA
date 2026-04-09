@@ -6,7 +6,6 @@ import {
   EyeOff,
   Lock,
   Unlock,
-  GripVertical,
   Trash2,
   Copy,
   Type as TypeIcon,
@@ -15,7 +14,8 @@ import {
   Circle,
   Minus,
   Layers,
-  Tag,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import type { SelectionInfo, FabricCanvasRef } from "./FabricCanvas";
 
@@ -129,29 +129,27 @@ function getObjectsFromCanvas(canvasRef: React.RefObject<FabricCanvasRef | null>
 function LayerRow({
   layer,
   isSelected,
+  isFirst,
+  isLast,
   onSelect,
   onToggleVisibility,
   onToggleLock,
   onDelete,
   onDuplicate,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  onDragEnd,
-  isDragTarget,
+  onMoveUp,
+  onMoveDown,
 }: {
   layer: LayerInfo;
   isSelected: boolean;
+  isFirst: boolean;
+  isLast: boolean;
   onSelect: () => void;
   onToggleVisibility: () => void;
   onToggleLock: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
-  onDragStart: (e: React.DragEvent) => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: (e: React.DragEvent) => void;
-  onDragEnd: () => void;
-  isDragTarget: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
   const Icon = getLayerIcon(layer.type);
@@ -163,24 +161,13 @@ function LayerRow({
       className={`
         group flex items-center h-10 px-2 gap-1.5 cursor-pointer select-none transition-all
         ${isSelected ? "bg-[#4ecdc4]/10 border-l-2 border-[#4ecdc4]" : "border-l-2 border-transparent"}
-        ${isDragTarget ? "bg-[#4ecdc4]/5 border-t border-t-[#4ecdc4]" : ""}
         ${!isSelected ? "hover:bg-white/5" : ""}
         ${!layer.visible ? "opacity-50" : ""}
       `}
       onClick={onSelect}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      draggable
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-      onDragEnd={onDragEnd}
     >
-      {/* Drag handle */}
-      <div className="cursor-grab active:cursor-grabbing text-[#5e6388] opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-        <GripVertical size={12} />
-      </div>
-
       {/* Visibility toggle */}
       <button
         type="button"
@@ -212,7 +199,7 @@ function LayerRow({
       </span>
 
       {/* Role badge */}
-      {layer.role && (
+      {layer.role && !hovered && (
         <span
           className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-medium"
           style={{
@@ -224,9 +211,27 @@ function LayerRow({
         </span>
       )}
 
-      {/* Hover actions */}
+      {/* Hover actions: UP / DOWN / Duplicate / Delete */}
       {hovered && (
         <div className="flex items-center gap-0.5 shrink-0">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onMoveUp(); }}
+            disabled={isFirst}
+            className="p-0.5 text-[#5e6388] hover:text-[#4ecdc4] transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed"
+            title="Mover para frente (z-index +)"
+          >
+            <ChevronUp size={12} />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onMoveDown(); }}
+            disabled={isLast}
+            className="p-0.5 text-[#5e6388] hover:text-[#4ecdc4] transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed"
+            title="Mover para tras (z-index -)"
+          >
+            <ChevronDown size={12} />
+          </button>
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onDuplicate(); }}
@@ -255,7 +260,6 @@ function LayerRow({
 
 export function LayersPanel({ canvasRef, selection, onRefresh }: LayersPanelProps) {
   const [layers, setLayers] = useState<LayerInfo[]>([]);
-  const [dragTargetIndex, setDragTargetIndex] = useState<number | null>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Refresh layers list from canvas
@@ -379,55 +383,36 @@ export function LayersPanel({ canvasRef, selection, onRefresh }: LayersPanelProp
     });
   }, [canvasRef, refreshLayers]);
 
-  // ── Drag and Drop reorder ──
+  // ── Move Up / Down (z-index reorder) ──
+  // "Move Up" in the display = bring forward in canvas (higher z-index)
+  // "Move Down" in the display = send backward in canvas (lower z-index)
 
-  const handleDragStart = useCallback((e: React.DragEvent, displayIndex: number) => {
-    e.dataTransfer.setData("layerDisplayIndex", String(displayIndex));
-    e.dataTransfer.effectAllowed = "move";
-  }, []);
-
-  const handleDragOver = useCallback((e: React.DragEvent, displayIndex: number) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    setDragTargetIndex(displayIndex);
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent, targetDisplayIndex: number) => {
-    e.preventDefault();
-    setDragTargetIndex(null);
-
-    const sourceDisplayIndex = parseInt(e.dataTransfer.getData("layerDisplayIndex"));
-    if (isNaN(sourceDisplayIndex) || sourceDisplayIndex === targetDisplayIndex) return;
-
+  const handleMoveUp = useCallback((index: number) => {
     const canvas = canvasRef.current?.getCanvas();
     if (!canvas) return;
-
-    // Display is reversed (top = frontmost = last in array)
-    // Convert display indices back to canvas indices
-    const displayLayers = [...layers].reverse();
-    const sourceLayer = displayLayers[sourceDisplayIndex];
-    const targetLayer = displayLayers[targetDisplayIndex];
-
-    if (!sourceLayer || !targetLayer) return;
-
     const objects = canvas.getObjects();
-    const obj = objects[sourceLayer.index];
+    const obj = objects[index];
     if (!obj) return;
-
-    // Move to the target canvas index
-    canvas.moveTo(obj, targetLayer.index);
+    canvas.bringObjectForward(obj);
     canvas.renderAll();
     refreshLayers();
-  }, [canvasRef, layers, refreshLayers]);
+  }, [canvasRef, refreshLayers]);
 
-  const handleDragEnd = useCallback(() => {
-    setDragTargetIndex(null);
-  }, []);
+  const handleMoveDown = useCallback((index: number) => {
+    const canvas = canvasRef.current?.getCanvas();
+    if (!canvas) return;
+    const objects = canvas.getObjects();
+    const obj = objects[index];
+    if (!obj) return;
+    canvas.sendObjectBackwards(obj);
+    canvas.renderAll();
+    refreshLayers();
+  }, [canvasRef, refreshLayers]);
 
   // ── Determine selected object index ──
   const selectedId = selection?.id || null;
 
-  // Reverse for display: top = frontmost
+  // Reverse for display: top = frontmost (highest z-index)
   const displayLayers = [...layers].reverse();
 
   return (
@@ -454,21 +439,24 @@ export function LayersPanel({ canvasRef, selection, onRefresh }: LayersPanelProp
         ) : (
           displayLayers.map((layer, displayIndex) => {
             const isSelected = layer.id === selectedId;
+            // In display: first item = topmost (highest z-index), can't go higher
+            // In display: last item = bottommost (lowest z-index), can't go lower
+            const isFirst = displayIndex === 0;
+            const isLast = displayIndex === displayLayers.length - 1;
             return (
               <LayerRow
                 key={`${layer.index}-${layer.id}`}
                 layer={layer}
                 isSelected={isSelected}
+                isFirst={isFirst}
+                isLast={isLast}
                 onSelect={() => handleSelect(layer.index)}
                 onToggleVisibility={() => handleToggleVisibility(layer.index)}
                 onToggleLock={() => handleToggleLock(layer.index)}
                 onDelete={() => handleDelete(layer.index)}
                 onDuplicate={() => handleDuplicate(layer.index)}
-                onDragStart={(e) => handleDragStart(e, displayIndex)}
-                onDragOver={(e) => handleDragOver(e, displayIndex)}
-                onDrop={(e) => handleDrop(e, displayIndex)}
-                onDragEnd={handleDragEnd}
-                isDragTarget={dragTargetIndex === displayIndex}
+                onMoveUp={() => handleMoveUp(layer.index)}
+                onMoveDown={() => handleMoveDown(layer.index)}
               />
             );
           })

@@ -1081,7 +1081,8 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
           const canvas = fabricRef.current;
           if (!canvas) return;
           const obj = canvas.getActiveObject();
-          if (!obj || obj.type !== 'Textbox') return;
+          // Duck-type check: works with Textbox, IText, FabricText — any text object
+          if (!obj || typeof (obj as any).setSelectionStyles !== 'function') return;
 
           const textbox = obj as any;
           const start = textbox.selectionStart ?? 0;
@@ -1117,7 +1118,7 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
           const canvas = fabricRef.current;
           if (!canvas) return null;
           const obj = canvas.getActiveObject();
-          if (!obj || obj.type !== 'Textbox') return null;
+          if (!obj || typeof (obj as any).getSelectionStyles !== 'function') return null;
 
           const textbox = obj as any;
           if (!textbox.isEditing) return null;
@@ -1150,7 +1151,7 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
           const canvas = fabricRef.current;
           if (!canvas) return false;
           const obj = canvas.getActiveObject();
-          if (!obj || obj.type !== 'Textbox') return false;
+          if (!obj || typeof (obj as any).setSelectionStyles !== 'function') return false;
           return !!(obj as any).isEditing;
         },
       }),

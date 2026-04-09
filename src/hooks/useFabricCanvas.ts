@@ -41,6 +41,19 @@ export interface UseFabricCanvasReturn {
   // State mutations
   markDirty: () => void;
   markClean: () => void;
+
+  // Carousel / multi-slide
+  slides: object[];
+  currentSlideIndex: number;
+  isCarousel: boolean;
+  slideThumbnails: string[];
+  switchSlide: (index: number) => void;
+  addSlide: () => void;
+  deleteSlide: (index: number) => void;
+  duplicateSlide: (index: number) => void;
+  reorderSlide: (from: number, to: number) => void;
+  loadCarousel: (slideJsons: object[]) => Promise<void>;
+  exportAllSlides: (options?: ExportOptions) => string[];
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -261,6 +274,12 @@ export function useFabricCanvas(): UseFabricCanvasReturn {
     canRedo: false,
   });
 
+  // ── Multi-slide / carousel state ──
+  const [slides, setSlides] = useState<object[]>([]);
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [slideThumbnails, setSlideThumbnails] = useState<string[]>([]);
+  const isCarousel = slides.length > 1;
+
   // ── Load a template from Fabric JSON ──
   const loadTemplate = useCallback(async (canvasJson: object) => {
     const canvas = canvasRef.current;
@@ -294,31 +313,45 @@ export function useFabricCanvas(): UseFabricCanvasReturn {
     if (!fabricCanvas) return;
 
     const objects = fabricCanvas.getObjects();
-    const roleMap: Record<string, string> = {
+    const roleMap: Record<string, string | undefined> = {
       headline: copy.headline,
-      ...(copy.subheadline && { subheadline: copy.subheadline }),
-      ...(copy.body && { body: copy.body }),
-      ...(copy.cta && { cta: copy.cta }),
-      ...(copy.brandName && { brand: copy.brandName }),
-      ...(copy.category && { category: copy.category }),
-      ...(copy.hashtags?.length && { hashtags: copy.hashtags.join(" ") }),
+      subheadline: copy.subheadline,
+      body: copy.body,
+      cta: copy.cta,
+      brand: copy.brandName,
+      category: copy.category,
+      hashtags: copy.hashtags?.join(" "),
     };
 
     if (copy.slideNumber !== undefined) {
-      roleMap["slide-number"] =
-        copy.totalSlides
-          ? `${copy.slideNumber}/${copy.totalSlides}`
-          : String(copy.slideNumber);
+      roleMap["slide-number"] = copy.totalSlides
+        ? `${copy.slideNumber}/${copy.totalSlides}`
+        : String(copy.slideNumber);
     }
 
     for (const obj of objects) {
-      const role = (obj as any).data?.role;
-      if (role && roleMap[role] && (obj as any).set) {
-        (obj as any).set({ text: roleMap[role] });
+      const data = (obj as any).data;
+      const role = data?.role;
+      if (!role || roleMap[role] === undefined) continue;
+
+      const newText = roleMap[role]!;
+
+      // Only inject into text-type objects (Textbox, IText, Text)
+      if ((obj as any).text !== undefined) {
+        // Set text preserving all existing typography (font, size, color, etc.)
+        (obj as any).set({ text: newText });
+
+        // Ensure Textbox wraps properly
+        if ((obj as any).splitByGrapheme !== undefined) {
+          (obj as any).set({ splitByGrapheme: false });
+        }
+
+        // Force re-render of cached object
+        (obj as any).dirty = true;
       }
     }
 
-    fabricCanvas.renderAll();
+    fabricCanvas.requestRenderAll();
     setState((prev) => ({ ...prev, isDirty: true }));
   }, []);
 
@@ -360,6 +393,249 @@ export function useFabricCanvas(): UseFabricCanvasReturn {
     setState((prev) => ({ ...prev, isDirty: false }));
   }, []);
 
+  // ── Generate thumbnail for a slide ──
+  const generateThumbnail = useCallback((canvas: FabricCanvasRef): string => {
+    try {
+      return canvas.toDataURL({ format: "png", quality: 0.5, multiplier: 0.08 });
+    } catch {
+      return "";
+    }
+  }, []);
+
+  // ── Save current canvas state into slides array ──
+  const saveCurrentSlide = useCallback((): object[] => {
+    const canvas = canvasRef.current;
+    if (!canvas || slides.length === 0) return slides;
+
+    const currentJson = canvas.toJSON();
+    const thumb = generateThumbnail(canvas);
+    const newSlides = [...slides];
+    newSlides[currentSlideIndex] = currentJson;
+
+    const newThumbs = [...slideThumbnails];
+    newThumbs[currentSlideIndex] = thumb;
+
+    setSlides(newSlides);
+    setSlideThumbnails(newThumbs);
+
+    return newSlides;
+  }, [slides, currentSlideIndex, slideThumbnails, generateThumbnail]);
+
+  // ── Load carousel (array of Fabric JSONs) ──
+  const loadCarousel = useCallback(async (slideJsons: object[]) => {
+    const canvas = canvasRef.current;
+    if (!canvas || slideJsons.length === 0) return;
+
+    setSlides(slideJsons);
+    setCurrentSlideIndex(0);
+
+    // Load first slide
+    await canvas.loadFromJSON(slideJsons[0]);
+
+    // Generate thumbnails for all slides — for the first one use current canvas,
+    // for the rest we generate placeholder thumbnails (they update on switch)
+    const thumbs = slideJsons.map((_, i) => (i === 0 ? generateThumbnail(canvas) : ""));
+    setSlideThumbnails(thumbs);
+
+    setState((prev) => ({ ...prev, isDirty: false }));
+  }, [generateThumbnail]);
+
+  // ── Switch to a different slide ──
+  const switchSlide = useCallback(async (index: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas || index === currentSlideIndex || index < 0 || index >= slides.length) return;
+
+    // Save current slide state + thumbnail
+    const currentJson = canvas.toJSON();
+    const thumb = generateThumbnail(canvas);
+    const newSlides = [...slides];
+    newSlides[currentSlideIndex] = currentJson;
+
+    const newThumbs = [...slideThumbnails];
+    newThumbs[currentSlideIndex] = thumb;
+
+    // Load target slide
+    await canvas.loadFromJSON(newSlides[index]);
+
+    // Update thumbnail for the new slide too
+    newThumbs[index] = generateThumbnail(canvas);
+
+    setSlides(newSlides);
+    setSlideThumbnails(newThumbs);
+    setCurrentSlideIndex(index);
+  }, [slides, currentSlideIndex, slideThumbnails, generateThumbnail]);
+
+  // ── Add a new blank slide ──
+  const addSlide = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Save current state first
+    const currentJson = canvas.toJSON();
+    const thumb = generateThumbnail(canvas);
+    const newSlides = [...slides];
+    newSlides[currentSlideIndex] = currentJson;
+
+    const newThumbs = [...slideThumbnails];
+    newThumbs[currentSlideIndex] = thumb;
+
+    // Create an empty slide JSON matching current canvas dimensions
+    const emptySlide = {
+      version: "6.0.0",
+      objects: [],
+      background: "#080b1e",
+    };
+
+    newSlides.push(emptySlide);
+    newThumbs.push("");
+
+    setSlides(newSlides);
+    setSlideThumbnails(newThumbs);
+
+    // Switch to new slide
+    const newIndex = newSlides.length - 1;
+    canvas.loadFromJSON(emptySlide).then(() => {
+      setCurrentSlideIndex(newIndex);
+      setState((prev) => ({ ...prev, isDirty: true }));
+    });
+  }, [slides, currentSlideIndex, slideThumbnails, generateThumbnail]);
+
+  // ── Delete a slide ──
+  const deleteSlide = useCallback(async (index: number) => {
+    if (slides.length <= 1) return; // Don't delete last slide
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Save current state first
+    const currentJson = canvas.toJSON();
+    const newSlides = [...slides];
+    newSlides[currentSlideIndex] = currentJson;
+
+    const newThumbs = [...slideThumbnails];
+
+    // Remove the slide
+    newSlides.splice(index, 1);
+    newThumbs.splice(index, 1);
+
+    // Determine which slide to show after deletion
+    let nextIndex = currentSlideIndex;
+    if (index === currentSlideIndex) {
+      nextIndex = Math.min(index, newSlides.length - 1);
+    } else if (index < currentSlideIndex) {
+      nextIndex = currentSlideIndex - 1;
+    }
+
+    // Load the target slide
+    await canvas.loadFromJSON(newSlides[nextIndex]);
+    newThumbs[nextIndex] = generateThumbnail(canvas);
+
+    setSlides(newSlides);
+    setSlideThumbnails(newThumbs);
+    setCurrentSlideIndex(nextIndex);
+    setState((prev) => ({ ...prev, isDirty: true }));
+  }, [slides, currentSlideIndex, slideThumbnails, generateThumbnail]);
+
+  // ── Duplicate a slide ──
+  const duplicateSlide = useCallback((index: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Save current state first
+    const currentJson = canvas.toJSON();
+    const newSlides = [...slides];
+    newSlides[currentSlideIndex] = currentJson;
+
+    const newThumbs = [...slideThumbnails];
+
+    // Deep clone the slide to duplicate
+    const cloned = JSON.parse(JSON.stringify(newSlides[index]));
+
+    // Insert after the source slide
+    newSlides.splice(index + 1, 0, cloned);
+    newThumbs.splice(index + 1, 0, newThumbs[index] || "");
+
+    setSlides(newSlides);
+    setSlideThumbnails(newThumbs);
+
+    // Adjust current index if needed
+    if (index < currentSlideIndex) {
+      setCurrentSlideIndex(currentSlideIndex + 1);
+    }
+
+    setState((prev) => ({ ...prev, isDirty: true }));
+  }, [slides, currentSlideIndex, slideThumbnails]);
+
+  // ── Reorder slides (drag & drop) ──
+  const reorderSlide = useCallback((from: number, to: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas || from === to) return;
+
+    // Save current state first
+    const currentJson = canvas.toJSON();
+    const newSlides = [...slides];
+    newSlides[currentSlideIndex] = currentJson;
+
+    const newThumbs = [...slideThumbnails];
+
+    // Remove from source
+    const [movedSlide] = newSlides.splice(from, 1);
+    const [movedThumb] = newThumbs.splice(from, 1);
+
+    // Insert at destination
+    newSlides.splice(to, 0, movedSlide);
+    newThumbs.splice(to, 0, movedThumb);
+
+    // Track where the current slide ended up
+    let newCurrentIndex = currentSlideIndex;
+    if (currentSlideIndex === from) {
+      newCurrentIndex = to;
+    } else if (from < currentSlideIndex && to >= currentSlideIndex) {
+      newCurrentIndex = currentSlideIndex - 1;
+    } else if (from > currentSlideIndex && to <= currentSlideIndex) {
+      newCurrentIndex = currentSlideIndex + 1;
+    }
+
+    setSlides(newSlides);
+    setSlideThumbnails(newThumbs);
+    setCurrentSlideIndex(newCurrentIndex);
+    setState((prev) => ({ ...prev, isDirty: true }));
+  }, [slides, currentSlideIndex, slideThumbnails]);
+
+  // ── Export all slides as data URLs ──
+  const exportAllSlides = useCallback((options?: ExportOptions): string[] => {
+    const canvas = canvasRef.current;
+    if (!canvas) return [];
+
+    // Save current slide state into the array
+    const currentJson = canvas.toJSON();
+    const allSlides = [...slides];
+    allSlides[currentSlideIndex] = currentJson;
+
+    const results: string[] = [];
+
+    // For the current slide, export directly
+    // For other slides, we need to load → export → restore
+    // Since this is sync-ish, we'll return what we can
+    // The actual multi-slide export is handled by the exporter component (async)
+    for (let i = 0; i < allSlides.length; i++) {
+      if (i === currentSlideIndex) {
+        results.push(
+          canvas.toDataURL({
+            format: options?.format || "png",
+            quality: options?.quality || 1,
+            multiplier: options?.multiplier || 1,
+          })
+        );
+      } else {
+        // Placeholder — the async export in CanvasExporter handles this properly
+        results.push("");
+      }
+    }
+
+    return results;
+  }, [slides, currentSlideIndex]);
+
   return {
     canvasRef,
     state,
@@ -373,5 +649,17 @@ export function useFabricCanvas(): UseFabricCanvasReturn {
     setSelection,
     markDirty,
     markClean,
+    // Carousel
+    slides,
+    currentSlideIndex,
+    isCarousel,
+    slideThumbnails,
+    switchSlide,
+    addSlide,
+    deleteSlide,
+    duplicateSlide: duplicateSlide,
+    reorderSlide,
+    loadCarousel,
+    exportAllSlides,
   };
 }

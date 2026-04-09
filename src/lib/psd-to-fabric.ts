@@ -139,13 +139,17 @@ function buildTextObject(
   // Fabric charSpacing is in 1/1000 of font size, same as PSD tracking
   const charSpacing = layer.tracking || 0;
 
+  // Clamp font size to reasonable range (min 10px, max 120px for 1080-width canvas)
+  const rawSize = layer.fontSize || 24;
+  const fontSize = Math.max(10, Math.min(120, rawSize));
+
   return {
     type: 'Textbox',
     left,
     top,
     width: layer.width,
     text,
-    fontSize: layer.fontSize || 24,
+    fontSize,
     fontFamily: font.fontFamily,
     fontWeight: font.fontWeight,
     fontStyle: layer.fauxItalic ? 'italic' : font.fontStyle,

@@ -10,6 +10,7 @@ import { PropertyPanel } from "@/components/canvas/PropertyPanel";
 import { LayersPanel } from "@/components/canvas/LayersPanel";
 import { TemplateGallery } from "@/components/canvas/TemplateGallery";
 import { CanvasExporter } from "@/components/canvas/CanvasExporter";
+import { SlideNavigator } from "@/components/canvas/SlideNavigator";
 import { EditorBottomBar } from "@/components/canvas/EditorBottomBar";
 import { TemplateFromImage } from "@/components/canvas/TemplateFromImage";
 import { BrandAssetsPanel } from "@/components/canvas/BrandAssetsPanel";
@@ -30,7 +31,7 @@ import type { PsdTemplate } from "@/lib/psd-templates";
 function copyToCopyPayload(copy: CopyContent, empresa?: { nome?: string } | null): CopyToTemplatePayload {
   return {
     headline: copy.headline,
-    subheadline: undefined,
+    subheadline: copy.slides?.[0]?.headline || undefined, // First slide headline as subheadline
     body: copy.caption, // caption IS the body text
     cta: copy.cta || undefined,
     brandName: empresa?.nome,
@@ -144,6 +145,17 @@ function EditorContent() {
     setSelection,
     markDirty,
     markClean,
+    // Carousel
+    slides,
+    currentSlideIndex,
+    isCarousel,
+    slideThumbnails,
+    switchSlide,
+    addSlide,
+    deleteSlide: deleteCarouselSlide,
+    duplicateSlide: duplicateCarouselSlide,
+    reorderSlide,
+    loadCarousel,
   } = useFabricCanvas();
 
   const {
@@ -161,6 +173,7 @@ function EditorContent() {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [copyData, setCopyData] = useState<CopyToTemplatePayload | null>(null);
+  const [rawCopyContent, setRawCopyContent] = useState<CopyContent | null>(null);
   const [rightPanelTab, setRightPanelTab] = useState<"properties" | "assets">("properties");
   const [isLoadingSession, setIsLoadingSession] = useState(!!sessionId);
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(!!templateId);
@@ -198,7 +211,9 @@ function EditorContent() {
         if (cancelled) return;
 
         if (data.current_copy) {
-          const payload = copyToCopyPayload(data.current_copy as CopyContent, empresa);
+          const copy = data.current_copy as CopyContent;
+          setRawCopyContent(copy);
+          const payload = copyToCopyPayload(copy, empresa);
           setCopyData(payload);
         }
       } catch (err) {
@@ -296,23 +311,37 @@ function EditorContent() {
   // ── Handle PSD template selection ──
   const handlePsdSelect = useCallback(
     async (template: PsdTemplate, slideIndex: number) => {
-      const { convertPsdToFabricJson } = await import("@/lib/psd-to-fabric");
-      const canvasJson = convertPsdToFabricJson(template, { slideIndex });
-      await loadTemplate(canvasJson);
-
       // Set aspect ratio based on slide dimensions
       const ratio = (template.slideHeight || template.height) / (template.slideWidth || template.width);
       if (ratio > 1.5) setAspectRatio("9:16");
       else if (ratio > 1.1) setAspectRatio("4:5");
       else setAspectRatio("1:1");
 
-      // Wait a tick for canvas to finish rendering before applying copy
-      requestAnimationFrame(() => {
-        if (copyData) applyCopy(copyData);
-      });
+      if ((template.slides || 1) > 1) {
+        // Carousel: load ALL slides
+        const { convertPsdCarouselToFabricSlides } = await import("@/lib/psd-to-fabric");
+        const allSlides = convertPsdCarouselToFabricSlides(template);
+        await loadCarousel(allSlides);
+
+        // Apply copy to each slide if carousel copy is available
+        // (copy injection per-slide happens via the current slide's applyCopy)
+        requestAnimationFrame(() => {
+          if (copyData) applyCopy(copyData);
+        });
+      } else {
+        // Single slide: existing logic
+        const { convertPsdToFabricJson } = await import("@/lib/psd-to-fabric");
+        const canvasJson = convertPsdToFabricJson(template, { slideIndex });
+        await loadTemplate(canvasJson);
+
+        requestAnimationFrame(() => {
+          if (copyData) applyCopy(copyData);
+        });
+      }
+
       setShowGallery(false);
     },
-    [loadTemplate, setAspectRatio, applyCopy, copyData]
+    [loadTemplate, loadCarousel, setAspectRatio, applyCopy, copyData]
   );
 
   // ── Handle aspect ratio change ──
@@ -335,9 +364,9 @@ function EditorContent() {
           empresa_id: empresaId,
           name,
           description: "",
-          canvas_json: json,
+          canvas_json: isCarousel ? { slides, currentSlideIndex } : json,
           thumbnail_url: thumbnail || null,
-          format: "post",
+          format: isCarousel ? "carousel" : "post",
           aspect_ratio: state.aspectRatio,
           source: "manual",
           tags: [],
@@ -432,40 +461,61 @@ function EditorContent() {
           />
         </div>
 
-        {/* CENTER: Canvas — takes remaining space, centers the canvas, NO scroll */}
-        <div className="flex-1 flex items-center justify-center bg-[#080b1e] overflow-hidden relative">
-          <div
-            className="relative shadow-2xl shadow-black/50 rounded-lg overflow-hidden"
-            style={{
-              width: Math.min(dims.width * 0.5, 540),
-              height: Math.min(dims.height * 0.5, 960),
-              maxWidth: "85%",
-              maxHeight: "85%",
-            }}
-          >
-            <FabricCanvas
-              ref={canvasRef}
-              width={dims.width}
-              height={dims.height}
-              aspectRatio={state.aspectRatio}
-              onSelectionChange={setSelection}
-              onCanvasChange={markDirty}
-              onReady={handleCanvasReady}
-              onTextEditingChange={setIsEditingText}
-              onTextSelectionChange={setTextSelection}
-            />
-          </div>
-
-          {/* Exporter popover */}
-          {showExporter && (
-            <div className="absolute bottom-4 right-4 z-30">
-              <CanvasExporter
-                canvasRef={canvasRef}
-                isVisible={showExporter}
-                postTitle="post"
-                onSaveAsTemplate={(name) => handleSaveTemplate(name)}
+        {/* CENTER: Canvas + Slide Navigator */}
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+          {/* Canvas area — takes remaining space, centers the canvas, NO scroll */}
+          <div className="flex-1 flex items-center justify-center bg-[#080b1e] overflow-hidden relative">
+            <div
+              className="relative shadow-2xl shadow-black/50 rounded-lg overflow-hidden"
+              style={{
+                width: Math.min(dims.width * 0.5, 540),
+                height: Math.min(dims.height * 0.5, isCarousel ? 800 : 960),
+                maxWidth: "85%",
+                maxHeight: isCarousel ? "80%" : "85%",
+              }}
+            >
+              <FabricCanvas
+                ref={canvasRef}
+                width={dims.width}
+                height={dims.height}
+                aspectRatio={state.aspectRatio}
+                onSelectionChange={setSelection}
+                onCanvasChange={markDirty}
+                onReady={handleCanvasReady}
+                onTextEditingChange={setIsEditingText}
+                onTextSelectionChange={setTextSelection}
               />
             </div>
+
+            {/* Exporter popover */}
+            {showExporter && (
+              <div className="absolute bottom-4 right-4 z-30">
+                <CanvasExporter
+                  canvasRef={canvasRef}
+                  isVisible={showExporter}
+                  postTitle="post"
+                  onSaveAsTemplate={(name) => handleSaveTemplate(name)}
+                  isCarousel={isCarousel}
+                  slides={slides}
+                  currentSlideIndex={currentSlideIndex}
+                  onSwitchSlide={switchSlide}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Slide Navigator — only for carousels */}
+          {isCarousel && (
+            <SlideNavigator
+              slides={slides}
+              currentSlide={currentSlideIndex}
+              thumbnails={slideThumbnails}
+              onSlideChange={switchSlide}
+              onAddSlide={addSlide}
+              onDeleteSlide={deleteCarouselSlide}
+              onDuplicateSlide={duplicateCarouselSlide}
+              onReorderSlide={reorderSlide}
+            />
           )}
         </div>
 

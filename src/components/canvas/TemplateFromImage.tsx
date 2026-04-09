@@ -54,7 +54,7 @@ type Step = "upload" | "analyzing" | "result" | "saved";
 
 const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB
 const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
-const ACCEPTED_TYPES = [...ACCEPTED_IMAGE_TYPES, "application/pdf"];
+const ACCEPTED_TYPES = [...ACCEPTED_IMAGE_TYPES, "application/pdf", "image/svg+xml"];
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PDF → Image conversion using pdfjs-dist (renders first page as PNG)
@@ -77,6 +77,85 @@ async function pdfToImage(file: File): Promise<string> {
 
   await page.render({ canvasContext: ctx, viewport }).promise;
   return canvas.toDataURL("image/png");
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SVG → Fabric.js direct import (preserves layers, text, shapes)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+async function processSvgFile(file: File): Promise<{
+  canvasJson: ExtractionResult["canvas_json"];
+  extractedText: Record<string, string>;
+}> {
+  const svgString = await file.text();
+  const fabricModule = await import("fabric");
+
+  // Parse SVG using Fabric.js built-in parser
+  const { objects, options } = await fabricModule.loadSVGFromString(svgString);
+
+  // Determine canvas dimensions from SVG viewBox
+  const svgW = (options as any).width || 1080;
+  const svgH = (options as any).height || 1080;
+  const scale = 1080 / svgW;
+  const canvasH = Math.round(svgH * scale);
+
+  const extractedText: Record<string, string> = {};
+  let headlineFound = false;
+  let bodyCount = 0;
+
+  const fabricObjects: any[] = [];
+
+  for (const obj of objects) {
+    if (!obj) continue;
+
+    // Scale to 1080px base width
+    obj.set({
+      left: (obj.left || 0) * scale,
+      top: (obj.top || 0) * scale,
+      scaleX: (obj.scaleX || 1) * scale,
+      scaleY: (obj.scaleY || 1) * scale,
+    });
+
+    // Assign roles to text objects (duck-type check)
+    const isTextObj =
+      typeof (obj as any).text === "string" &&
+      typeof (obj as any).setSelectionStyles === "function";
+
+    if (isTextObj) {
+      const text = (obj as any).text || "";
+      if (!headlineFound && text.length > 0 && text.length < 80) {
+        (obj as any).data = { role: "headline", editable: true, id: crypto.randomUUID() };
+        extractedText.headline = text;
+        headlineFound = true;
+      } else if (text.length > 0) {
+        bodyCount++;
+        const role = bodyCount === 1 ? "body" : `body_${bodyCount}`;
+        (obj as any).data = { role, editable: true, id: crypto.randomUUID() };
+        extractedText[role] = text;
+      }
+    } else {
+      (obj as any).data = { role: "decoration", editable: true, id: crypto.randomUUID() };
+    }
+
+    fabricObjects.push(obj);
+  }
+
+  // Build a canvas JSON structure
+  // We need a temporary StaticCanvas (no DOM needed) to serialize properly
+  const tempCanvas = new fabricModule.StaticCanvas(undefined, {
+    width: 1080,
+    height: canvasH,
+    backgroundColor: "#080b1e",
+  });
+
+  for (const obj of fabricObjects) {
+    tempCanvas.add(obj);
+  }
+
+  const canvasJson = (tempCanvas as any).toJSON(["data"]) as ExtractionResult["canvas_json"];
+  tempCanvas.dispose();
+
+  return { canvasJson, extractedText };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -164,7 +243,7 @@ function CanvasPreview({
           );
         }
 
-        if (obj.type === "Textbox" && obj.text) {
+        if ((obj.type === "Textbox" || obj.type === "IText" || obj.type === "FabricText" || obj.type === "Text") && obj.text) {
           const w = ((obj.width as number) || 0) / canvasW * 100;
           const fontSize = ((obj.fontSize as number) || 32) / canvasW * 100;
           return (
@@ -286,7 +365,9 @@ export function TemplateFromImage({
     if (!result) return {};
     const json = JSON.parse(JSON.stringify(result.canvas_json));
     for (const obj of json.objects || []) {
-      if (obj.type === "Textbox" && obj.data?.role && editedCopy[obj.data.role]) {
+      // Handle text objects from both AI extraction (Textbox) and SVG import (IText, FabricText, etc.)
+      const isTextType = obj.type && (obj.type.toLowerCase().includes("text") || obj.type === "IText");
+      if (isTextType && obj.data?.role && editedCopy[obj.data.role]) {
         obj.text = editedCopy[obj.data.role];
       }
     }
@@ -298,7 +379,7 @@ export function TemplateFromImage({
     setError(null);
 
     if (!ACCEPTED_TYPES.includes(file.type)) {
-      setError("Formato nao suportado. Use PNG, JPEG, WebP ou PDF.");
+      setError("Formato nao suportado. Use PNG, JPEG, WebP, PDF ou SVG.");
       return;
     }
 
@@ -309,7 +390,14 @@ export function TemplateFromImage({
 
     setImageFile(file);
 
-    if (file.type === "application/pdf") {
+    if (file.type === "image/svg+xml") {
+      // SVG: show inline preview and mark for direct import
+      const svgText = await file.text();
+      const blob = new Blob([svgText], { type: "image/svg+xml" });
+      const url = URL.createObjectURL(blob);
+      setImagePreview(url);
+      return;
+    } else if (file.type === "application/pdf") {
       // Convert PDF first page to image
       try {
         const dataUrl = await pdfToImage(file);
@@ -360,6 +448,33 @@ export function TemplateFromImage({
   const handleExtract = useCallback(async () => {
     if (!imagePreview) return;
 
+    // SVG: direct import without AI — much faster and preserves layers
+    if (imageFile?.type === "image/svg+xml") {
+      setStep("analyzing");
+      setError(null);
+      setProgressIdx(0);
+      try {
+        const { canvasJson, extractedText } = await processSvgFile(imageFile);
+        setResult({
+          canvas_json: canvasJson,
+          extracted_copy: extractedText,
+          color_palette: [],
+          style_description: "Importado de SVG — textos e camadas preservados",
+          has_background_image: false,
+          photo_description: null,
+          visual_hierarchy: Object.keys(extractedText),
+          overall_style: null,
+        });
+        setTemplateName(`Template SVG - ${new Date().toLocaleDateString("pt-BR")}`);
+        setStep("result");
+      } catch (err: any) {
+        console.error("SVG import error:", err);
+        setError("Nao foi possivel processar o SVG. Verifique se o arquivo e valido.");
+        setStep("upload");
+      }
+      return;
+    }
+
     setStep("analyzing");
     setError(null);
     setProgressIdx(0);
@@ -402,7 +517,7 @@ export function TemplateFromImage({
         progressIntervalRef.current = null;
       }
     }
-  }, [imagePreview, empresaId, aspectRatio]);
+  }, [imagePreview, imageFile, empresaId, aspectRatio]);
 
   // ── Save / Use template ──
   const handleUseInEditor = useCallback(() => {
@@ -481,7 +596,7 @@ export function TemplateFromImage({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept={[...ACCEPTED_IMAGE_TYPES, ".pdf"].join(",")}
+                  accept={[...ACCEPTED_IMAGE_TYPES, ".pdf", ".svg", "image/svg+xml"].join(",")}
                   onChange={handleFileChange}
                   className="hidden"
                 />
@@ -512,7 +627,10 @@ export function TemplateFromImage({
                         Arraste uma imagem aqui ou clique para selecionar
                       </p>
                       <p className="text-xs text-[#5e6388] mt-1">
-                        PNG, JPEG, WebP ou PDF - Maximo 4MB
+                        PNG, JPEG, WebP, PDF ou SVG - Maximo 4MB
+                      </p>
+                      <p className="text-xs text-[#4ecdc4]/70 mt-1">
+                        Dica: Exporte do Canva como SVG para manter textos e camadas editaveis
                       </p>
                     </div>
                   </div>
@@ -528,7 +646,12 @@ export function TemplateFromImage({
 
               {/* Extract button */}
               {imagePreview && (
-                <div className="flex justify-end">
+                <div className="flex flex-col items-end gap-2">
+                  {imageFile?.type === "image/svg+xml" && (
+                    <p className="text-xs text-[#4ecdc4]">
+                      SVG detectado — importacao direta sem IA, preservando todas as camadas
+                    </p>
+                  )}
                   <button
                     type="button"
                     onClick={handleExtract}
@@ -539,7 +662,7 @@ export function TemplateFromImage({
                     }}
                   >
                     <Sparkles size={16} />
-                    Analisar imagem
+                    {imageFile?.type === "image/svg+xml" ? "Importar SVG" : "Analisar imagem"}
                   </button>
                 </div>
               )}
@@ -707,6 +830,16 @@ export function TemplateFromImage({
                       Usar foto original
                     </button>
                   )}
+                </div>
+              )}
+
+              {/* SVG success badge */}
+              {result.style_description?.includes("SVG") && (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-[#4ecdc4]/5 border border-[#4ecdc4]/20">
+                  <Check size={16} className="text-[#4ecdc4] shrink-0" />
+                  <p className="text-sm font-medium text-[#e8eaff]">
+                    SVG importado com sucesso! Todos os elementos foram preservados como camadas editaveis.
+                  </p>
                 </div>
               )}
 

@@ -333,11 +333,13 @@ export function PropertyPanel({
     if (!obj) return;
     const canvas = canvasRef.current?.getCanvas();
     if (!canvas) return;
-    import("fabric").then((fabricModule) => {
+    import("fabric").then(({ Gradient }) => {
+      // Use unscaled dimensions for gradient coords
       const w = obj.width || 200;
       const h = obj.height || 200;
-      const gradient = new fabricModule.Gradient({
+      const gradient = new Gradient({
         type: 'linear',
+        gradientUnits: 'pixels',
         coords: { x1: 0, y1: 0, x2: w, y2: h },
         colorStops: [
           { offset: 0, color: '#4ecdc4' },
@@ -345,7 +347,8 @@ export function PropertyPanel({
         ],
       });
       obj.set({ fill: gradient });
-      canvas.renderAll();
+      obj.dirty = true; // Force re-render of cached object
+      canvas.requestRenderAll();
     });
   }, [canvasRef]);
 

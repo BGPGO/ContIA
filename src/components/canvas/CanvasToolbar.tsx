@@ -9,17 +9,12 @@ import {
   Square,
   Circle,
   Trash2,
-  ChevronUp,
-  ChevronDown,
   Bold,
   Italic,
   AlignLeft,
   AlignCenter,
   AlignRight,
-  Paintbrush,
   Replace,
-  ArrowUpToLine,
-  ArrowDownToLine,
   Plus,
   Minus,
   Palette,
@@ -40,11 +35,7 @@ import {
   Star,
   Minus as MinusLine,
   CornerUpLeft,
-  RectangleHorizontal,
-  BadgeCheck,
-  ArrowRight,
-  Frame,
-  SeparatorHorizontal,
+  ChevronDown,
   Underline,
   Strikethrough,
   Highlighter,
@@ -75,12 +66,14 @@ function ToolbarButton({
   disabled,
   active,
   title,
+  className: extraClass,
   children,
 }: {
   onClick: () => void;
   disabled?: boolean;
   active?: boolean;
   title: string;
+  className?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -93,7 +86,7 @@ function ToolbarButton({
         active
           ? "bg-[#4ecdc4]/20 text-[#4ecdc4]"
           : "text-[#8b8fb0] hover:bg-white/10 hover:text-[#e8eaff]"
-      }`}
+      } ${extraClass || ""}`}
     >
       {children}
     </button>
@@ -295,170 +288,68 @@ function HighlightColorPicker({
   );
 }
 
-function AddElementDropdown({
+/* ═══════════════════════════════════════════════════════════════════════════
+   Shapes Dropdown (for +Forma button)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function ShapesDropdown({
   canvasRef,
 }: {
   canvasRef: React.RefObject<FabricCanvasRef | null>;
 }) {
   const [open, setOpen] = useState(false);
-  const [showUrlInput, setShowUrlInput] = useState(false);
-  const [imageUrl, setImageUrl] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const handleClick = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      ) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setOpen(false);
-        setShowUrlInput(false);
-        setImageUrl("");
       }
     };
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
-  const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      canvasRef.current?.addImage(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
-  };
+  const close = () => setOpen(false);
 
-  const handleImageUrl = () => {
-    if (!imageUrl.trim()) return;
-    canvasRef.current?.addImage(imageUrl.trim());
-    setImageUrl("");
-    setShowUrlInput(false);
-    setOpen(false);
-  };
-
-  const close = () => { setOpen(false); setShowUrlInput(false); setImageUrl(""); };
-
-  const basicShapes = [
-    {
-      label: "Texto",
-      icon: Type,
-      color: "#e8eaff",
-      action: () => { canvasRef.current?.addText("Novo texto"); close(); },
-    },
-    {
-      label: "Retangulo",
-      icon: Square,
-      color: "#4ecdc4",
-      action: () => { canvasRef.current?.addRect(); close(); },
-    },
-    {
-      label: "Circulo",
-      icon: Circle,
-      color: "#6c5ce7",
-      action: () => { canvasRef.current?.addCircle(); close(); },
-    },
-    {
-      label: "Triangulo",
-      icon: Triangle,
-      color: "#4ecdc4",
-      action: () => { canvasRef.current?.addTriangle(); close(); },
-    },
-    {
-      label: "Poligono",
-      icon: Hexagon,
-      color: "#6c5ce7",
-      action: () => { canvasRef.current?.addPolygon(6); close(); },
-    },
-    {
-      label: "Linha",
-      icon: MinusLine,
-      color: "#4ecdc4",
-      action: () => { canvasRef.current?.addLine(); close(); },
-    },
-    {
-      label: "Estrela",
-      icon: Star,
-      color: "#f59e0b",
-      action: () => { canvasRef.current?.addStar(); close(); },
-    },
-    {
-      label: "Imagem",
-      icon: ImagePlus,
-      color: "#3b82f6",
-      action: () => { fileInputRef.current?.click(); close(); },
-    },
-  ];
-
-  const presetShapes = [
-    {
-      label: "Pill",
-      icon: RectangleHorizontal,
-      action: () => { canvasRef.current?.addRect({ rx: 50, ry: 50, width: 260, height: 80, fill: "#4ecdc4" }); close(); },
-    },
-    {
-      label: "Badge",
-      icon: BadgeCheck,
-      action: () => { canvasRef.current?.addRect({ rx: 12, ry: 12, width: 160, height: 50, fill: "#6c5ce7" }); close(); },
-    },
-    {
-      label: "Seta",
-      icon: ArrowRight,
-      action: () => { canvasRef.current?.addTriangle({ width: 80, height: 60, fill: "#4ecdc4" }); close(); },
-    },
-    {
-      label: "Frame",
-      icon: Frame,
-      action: () => { canvasRef.current?.addRect({ rx: 0, ry: 0, width: 300, height: 300, fill: "transparent", stroke: "#4ecdc4", strokeWidth: 3 }); close(); },
-    },
-    {
-      label: "Divisor",
-      icon: SeparatorHorizontal,
-      action: () => { canvasRef.current?.addLine({ stroke: "#5e6388", strokeWidth: 2 }); close(); },
-    },
+  const shapes = [
+    { label: "Retangulo", icon: Square, color: "#4ecdc4", action: () => { canvasRef.current?.addRect(); close(); } },
+    { label: "Circulo", icon: Circle, color: "#6c5ce7", action: () => { canvasRef.current?.addCircle(); close(); } },
+    { label: "Triangulo", icon: Triangle, color: "#4ecdc4", action: () => { canvasRef.current?.addTriangle(); close(); } },
+    { label: "Poligono", icon: Hexagon, color: "#6c5ce7", action: () => { canvasRef.current?.addPolygon(6); close(); } },
+    { label: "Estrela", icon: Star, color: "#f59e0b", action: () => { canvasRef.current?.addStar(); close(); } },
+    { label: "Linha", icon: MinusLine, color: "#4ecdc4", action: () => { canvasRef.current?.addLine(); close(); } },
   ];
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <ToolbarButton onClick={() => setOpen(!open)} title="Adicionar elemento">
-        <Plus size={16} />
-      </ToolbarButton>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleImageFile}
-        className="hidden"
-      />
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#141736] border border-white/10 text-xs text-[#e8eaff] hover:bg-white/10 hover:border-[#4ecdc4]/30 transition-all cursor-pointer"
+      >
+        <Square size={13} className="text-[#4ecdc4]" />
+        <span>Forma</span>
+        <ChevronDown size={11} className="text-[#5e6388]" />
+      </button>
       {open && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-[#141736] border border-white/10 rounded-xl shadow-2xl w-[280px] overflow-hidden">
-          {/* Header */}
-          <div className="px-4 pt-3 pb-2">
-            <span className="text-xs font-semibold text-[#5e6388] uppercase tracking-wider">
-              Adicionar Elemento
-            </span>
-          </div>
-
-          {/* Basic shapes grid */}
-          <div className="grid grid-cols-4 gap-1 px-3 pb-2">
-            {basicShapes.map((item) => {
+        <div className="absolute top-full left-0 mt-1 z-50 bg-[#141736] border border-white/10 rounded-xl shadow-2xl w-[200px] overflow-hidden p-2">
+          <div className="grid grid-cols-3 gap-1">
+            {shapes.map((item) => {
               const Icon = item.icon;
               return (
                 <button
                   key={item.label}
                   type="button"
                   onClick={item.action}
-                  className="flex flex-col items-center gap-1.5 p-2.5 rounded-lg hover:bg-white/5 transition-all cursor-pointer group"
+                  className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-white/5 transition-all cursor-pointer group"
                 >
                   <div
-                    className="w-9 h-9 rounded-lg flex items-center justify-center transition-all group-hover:scale-110"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center transition-all group-hover:scale-110"
                     style={{ backgroundColor: `${item.color}15` }}
                   >
-                    <Icon size={18} style={{ color: item.color }} />
+                    <Icon size={16} style={{ color: item.color }} />
                   </div>
                   <span className="text-[10px] text-[#8b8fb0] group-hover:text-[#e8eaff] transition-colors">
                     {item.label}
@@ -466,64 +357,6 @@ function AddElementDropdown({
                 </button>
               );
             })}
-          </div>
-
-          {/* URL image option */}
-          <div className="px-3 pb-2">
-            <button
-              type="button"
-              onClick={() => setShowUrlInput(true)}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-[#8b8fb0] hover:bg-white/5 hover:text-[#e8eaff] transition-colors cursor-pointer"
-            >
-              <Link size={13} />
-              Imagem via URL
-            </button>
-          </div>
-
-          {showUrlInput && (
-            <div className="px-3 pb-3">
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleImageUrl(); }}
-                  placeholder="https://exemplo.com/imagem.png"
-                  className="flex-1 bg-[#0c0f24] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-[#e8eaff] focus:outline-none focus:border-[#4ecdc4]/40"
-                  autoFocus
-                />
-                <button
-                  type="button"
-                  onClick={handleImageUrl}
-                  className="px-3 py-1.5 bg-[#4ecdc4]/20 text-[#4ecdc4] rounded-lg text-xs font-medium hover:bg-[#4ecdc4]/30 transition-colors cursor-pointer"
-                >
-                  OK
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Preset shapes */}
-          <div className="border-t border-white/10 px-3 py-2">
-            <span className="text-[10px] text-[#5e6388] uppercase tracking-wider font-medium">
-              Formas Prontas
-            </span>
-            <div className="flex items-center gap-1 mt-2 flex-wrap">
-              {presetShapes.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.label}
-                    type="button"
-                    onClick={item.action}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#0c0f24] border border-white/10 text-[10px] text-[#8b8fb0] hover:bg-white/5 hover:text-[#e8eaff] hover:border-[#4ecdc4]/30 transition-all cursor-pointer"
-                  >
-                    <Icon size={12} />
-                    {item.label}
-                  </button>
-                );
-              })}
-            </div>
           </div>
         </div>
       )}
@@ -677,7 +510,9 @@ function AlignmentButtons({
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Main Toolbar
+   Main Toolbar — Two-row layout
+   Row 1: Undo/Redo | +Texto +Forma +Imagem | Aspect Ratio | Background | Delete
+   Row 2 (context): Text formatting / Shape controls / Image controls
    ═══════════════════════════════════════════════════════════════════════════ */
 
 export function CanvasToolbar({
@@ -691,6 +526,7 @@ export function CanvasToolbar({
   textSelection,
 }: CanvasToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const addImageInputRef = useRef<HTMLInputElement>(null);
 
   const updateProp = useCallback(
     (props: Record<string, any>) => {
@@ -699,7 +535,6 @@ export function CanvasToolbar({
     [canvasRef]
   );
 
-  // Apply style — uses per-char when editing text, whole object otherwise
   const applyTextStyle = useCallback(
     (style: Record<string, any>) => {
       canvasRef.current?.applyStyleToSelection(style);
@@ -707,13 +542,11 @@ export function CanvasToolbar({
     [canvasRef]
   );
 
-  // Get current selection style for toggle state detection
   const getActiveStyle = useCallback(
     (prop: string): any => {
       if (isEditingText && textSelection?.hasSelection && textSelection.styles) {
         return textSelection.styles[prop];
       }
-      // Fall back to object-level prop
       if (prop === 'fontWeight') return selection?.props.fontWeight;
       if (prop === 'fill') return selection?.props.fill;
       return undefined;
@@ -764,6 +597,18 @@ export function CanvasToolbar({
     e.target.value = "";
   };
 
+  // ── Add image from file picker ──
+  const handleAddImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      canvasRef.current?.addImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
   // ── Background image upload ──
   const handleBgImage = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -776,398 +621,390 @@ export function CanvasToolbar({
     e.target.value = "";
   };
 
-  // ── Layer operations ──
-  const bringForward = () => {
-    const canvas = canvasRef.current?.getCanvas();
-    if (!canvas) return;
-    const obj = canvas.getActiveObject();
-    if (obj) {
-      canvas.bringObjectForward(obj);
-      canvas.renderAll();
-    }
-  };
-
-  const sendBackward = () => {
-    const canvas = canvasRef.current?.getCanvas();
-    if (!canvas) return;
-    const obj = canvas.getActiveObject();
-    if (obj) {
-      canvas.sendObjectBackwards(obj);
-      canvas.renderAll();
-    }
-  };
-
-  const sendToBack = () => {
-    const canvas = canvasRef.current?.getCanvas();
-    if (!canvas) return;
-    const obj = canvas.getActiveObject();
-    if (obj) {
-      canvas.sendObjectToBack(obj);
-      canvas.renderAll();
-    }
-  };
-
-  const bringToFront = () => {
-    const canvas = canvasRef.current?.getCanvas();
-    if (!canvas) return;
-    const obj = canvas.getActiveObject();
-    if (obj) {
-      canvas.bringObjectToFront(obj);
-      canvas.renderAll();
-    }
-  };
+  const hasContext = isText || isShape || isImage;
 
   return (
-    <div className="flex items-center gap-1 px-3 py-2 bg-[#0c0f24] border-b border-white/10 flex-wrap">
-      {/* ── LEFT: Always visible ── */}
-      <div className="flex items-center gap-0.5 bg-[#141736] rounded-lg p-1">
-        <ToolbarButton
-          onClick={() => canvasRef.current?.undo()}
-          disabled={!canUndo}
-          title="Desfazer (Ctrl+Z)"
-        >
-          <Undo2 size={15} />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => canvasRef.current?.redo()}
-          disabled={!canRedo}
-          title="Refazer (Ctrl+Y)"
-        >
-          <Redo2 size={15} />
-        </ToolbarButton>
-      </div>
+    <div className="shrink-0 border-b border-white/10 bg-[#0c0f24]">
+      {/* Hidden file inputs */}
+      <input
+        ref={addImageInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleAddImageFile}
+        className="hidden"
+      />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleReplaceImage}
+        className="hidden"
+      />
 
-      <AddElementDropdown canvasRef={canvasRef} />
-
-      {/* Aspect ratio toggle */}
-      <div className="flex items-center gap-0.5 bg-[#141736] rounded-lg p-1">
-        {(["1:1", "4:5", "9:16"] as const).map((ratio) => (
-          <button
-            key={ratio}
-            type="button"
-            onClick={() => onAspectRatioChange(ratio)}
-            className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
-              aspectRatio === ratio
-                ? "bg-[#4ecdc4]/20 text-[#4ecdc4]"
-                : "text-[#5e6388] hover:text-[#8b8fb0] hover:bg-white/5"
-            }`}
+      {/* ══════════════════════════════════════════════════════════════════
+         ROW 1: Always visible — main actions
+         ══════════════════════════════════════════════════════════════════ */}
+      <div className="flex items-center gap-1.5 px-3 py-2">
+        {/* Undo / Redo */}
+        <div className="flex items-center gap-0.5 bg-[#141736] rounded-lg p-1">
+          <ToolbarButton
+            onClick={() => canvasRef.current?.undo()}
+            disabled={!canUndo}
+            title="Desfazer (Ctrl+Z)"
           >
-            {ratio}
-          </button>
-        ))}
-      </div>
+            <Undo2 size={15} />
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() => canvasRef.current?.redo()}
+            disabled={!canRedo}
+            title="Refazer (Ctrl+Y)"
+          >
+            <Redo2 size={15} />
+          </ToolbarButton>
+        </div>
 
-      <ToolbarSeparator />
+        <ToolbarSeparator />
 
-      {/* ── CENTER: Context-sensitive ── */}
-      <div className="flex items-center gap-1.5 flex-1 min-w-0">
-        {isText && (
-          <>
-            {/* Editing text indicator */}
-            {isEditingText && (
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-[#4ecdc4]/10 rounded-lg border border-[#4ecdc4]/20">
-                <Type size={11} className="text-[#4ecdc4]" />
-                <span className="text-[10px] text-[#4ecdc4] font-medium whitespace-nowrap">
-                  {textSelection?.hasSelection
-                    ? `${textSelection.end - textSelection.start} car. selecionados`
-                    : "Editando texto"}
-                </span>
-              </div>
-            )}
+        {/* ── ADD ELEMENTS — Prominent buttons ── */}
+        <button
+          type="button"
+          onClick={() => canvasRef.current?.addText("Novo texto")}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#141736] border border-white/10 text-xs text-[#e8eaff] hover:bg-white/10 hover:border-[#4ecdc4]/30 transition-all cursor-pointer"
+          title="Adicionar texto"
+        >
+          <Type size={13} className="text-[#4ecdc4]" />
+          <span>Texto</span>
+        </button>
 
-            <FontFamilySelect
-              value={selection.props.fontFamily || "Plus Jakarta Sans"}
-              onChange={(font) => isEditingText ? applyTextStyle({ fontFamily: font }) : updateProp({ fontFamily: font })}
-            />
-            <FontSizeStepper
-              value={selection.props.fontSize || 48}
-              onChange={(size) => isEditingText ? applyTextStyle({ fontSize: size }) : updateProp({ fontSize: size })}
-            />
-            {/* B / I / U / S formatting buttons — per-char when editing */}
-            <div className="flex items-center gap-0.5 bg-[#141736] rounded-lg p-1">
-              <ToolbarButton
-                onClick={() => {
-                  const currentWeight = getActiveStyle('fontWeight');
-                  const isBold = currentWeight === 'bold' || Number(currentWeight) >= 700;
-                  applyTextStyle({ fontWeight: isBold ? 'normal' : 'bold' });
-                }}
-                active={(() => {
-                  const w = getActiveStyle('fontWeight');
-                  return w === 'bold' || Number(w) >= 700;
-                })()}
-                title="Negrito (per-char quando editando)"
-              >
-                <Bold size={14} />
-              </ToolbarButton>
-              <ToolbarButton
-                onClick={() => {
-                  const currentStyle = isEditingText && textSelection?.styles?.fontStyle
-                    ? textSelection.styles.fontStyle
-                    : canvasRef.current?.getSelectedObject()?.fontStyle;
-                  applyTextStyle({ fontStyle: currentStyle === 'italic' ? 'normal' : 'italic' });
-                }}
-                active={(() => {
-                  if (isEditingText && textSelection?.hasSelection) {
-                    return textSelection.styles?.fontStyle === 'italic';
-                  }
-                  return canvasRef.current?.getSelectedObject()?.fontStyle === 'italic';
-                })()}
-                title="Italico"
-              >
-                <Italic size={14} />
-              </ToolbarButton>
-              <ToolbarButton
-                onClick={() => {
-                  const current = isEditingText && textSelection?.styles?.underline !== undefined
-                    ? textSelection.styles.underline
-                    : canvasRef.current?.getSelectedObject()?.underline;
-                  applyTextStyle({ underline: !current });
-                }}
-                active={(() => {
-                  if (isEditingText && textSelection?.hasSelection) {
-                    return !!textSelection.styles?.underline;
-                  }
-                  return !!canvasRef.current?.getSelectedObject()?.underline;
-                })()}
-                title="Sublinhado"
-              >
-                <Underline size={14} />
-              </ToolbarButton>
-              <ToolbarButton
-                onClick={() => {
-                  const current = isEditingText && textSelection?.styles?.linethrough !== undefined
-                    ? textSelection.styles.linethrough
-                    : canvasRef.current?.getSelectedObject()?.linethrough;
-                  applyTextStyle({ linethrough: !current });
-                }}
-                active={(() => {
-                  if (isEditingText && textSelection?.hasSelection) {
-                    return !!textSelection.styles?.linethrough;
-                  }
-                  return !!canvasRef.current?.getSelectedObject()?.linethrough;
-                })()}
-                title="Tachado"
-              >
-                <Strikethrough size={14} />
-              </ToolbarButton>
-            </div>
-            {/* Text alignment — always object-level */}
-            <div className="flex items-center gap-0.5 bg-[#141736] rounded-lg p-1">
-              <ToolbarButton
-                onClick={() => updateProp({ textAlign: "left" })}
-                active={selection.props.textAlign === "left"}
-                title="Alinhar esquerda"
-              >
-                <AlignLeft size={14} />
-              </ToolbarButton>
-              <ToolbarButton
-                onClick={() => updateProp({ textAlign: "center" })}
-                active={selection.props.textAlign === "center"}
-                title="Centralizar"
-              >
-                <AlignCenter size={14} />
-              </ToolbarButton>
-              <ToolbarButton
-                onClick={() => updateProp({ textAlign: "right" })}
-                active={selection.props.textAlign === "right"}
-                title="Alinhar direita"
-              >
-                <AlignRight size={14} />
-              </ToolbarButton>
-            </div>
-            {/* Text color — per-char when editing */}
-            <ColorPickerPopover
-              value={
-                (isEditingText && textSelection?.hasSelection && textSelection.styles?.fill)
-                  ? textSelection.styles.fill
-                  : (selection.props.fill || "#e8eaff")
-              }
-              onChange={(color) => applyTextStyle({ fill: color })}
-            />
-            {/* Highlight / text background color */}
-            <HighlightColorPicker
-              value={
-                (isEditingText && textSelection?.hasSelection && textSelection.styles?.textBackgroundColor)
-                  ? textSelection.styles.textBackgroundColor
-                  : ""
-              }
-              onChange={(color) => applyTextStyle({ textBackgroundColor: color })}
-              onClear={() => applyTextStyle({ textBackgroundColor: "" })}
-            />
-          </>
-        )}
+        <ShapesDropdown canvasRef={canvasRef} />
 
-        {isShape && (
-          <>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-[#5e6388] uppercase">
-                Preenchimento
-              </span>
-              <ColorPickerPopover
-                value={selection.props.fill === "__gradient__" ? "#4ecdc4" : (selection.props.fill || "#4ecdc4")}
-                onChange={(color) => updateProp({ fill: color })}
-              />
-            </div>
-            {selection.type === "rect" && (
-              <div className="flex items-center gap-2">
-                <CornerUpLeft size={14} className="text-[#8b8fb0]" />
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={selection.props.rx || 0}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value);
-                    updateProp({ rx: val, ry: val });
-                  }}
-                  className="w-20 h-1 accent-[#4ecdc4] cursor-pointer"
-                />
-                <span className="text-xs text-[#8b8fb0] w-8 tabular-nums">{selection.props.rx || 0}</span>
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-[#5e6388] uppercase">
-                Borda
-              </span>
-              <ColorPickerPopover
-                value={selection.props.stroke || "#ffffff"}
-                onChange={(color) => updateProp({ stroke: color })}
-              />
-              <FontSizeStepper
-                value={selection.props.strokeWidth || 0}
-                onChange={(w) => updateProp({ strokeWidth: w })}
-              />
-            </div>
-            <OpacitySlider
-              value={selection.props.opacity ?? 100}
-              onChange={(v) => updateProp({ opacity: v / 100 })}
-            />
-          </>
-        )}
+        <button
+          type="button"
+          onClick={() => addImageInputRef.current?.click()}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#141736] border border-white/10 text-xs text-[#e8eaff] hover:bg-white/10 hover:border-[#4ecdc4]/30 transition-all cursor-pointer"
+          title="Adicionar imagem"
+        >
+          <ImagePlus size={13} className="text-[#3b82f6]" />
+          <span>Imagem</span>
+        </button>
 
-        {isImage && (
-          <>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleReplaceImage}
-              className="hidden"
-            />
-            <ToolbarButton
-              onClick={() => fileInputRef.current?.click()}
-              title="Substituir imagem"
+        <ToolbarSeparator />
+
+        {/* Aspect ratio toggle */}
+        <div className="flex items-center gap-0.5 bg-[#141736] rounded-lg p-1">
+          {(["1:1", "4:5", "9:16"] as const).map((ratio) => (
+            <button
+              key={ratio}
+              type="button"
+              onClick={() => onAspectRatioChange(ratio)}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
+                aspectRatio === ratio
+                  ? "bg-[#4ecdc4]/20 text-[#4ecdc4]"
+                  : "text-[#5e6388] hover:text-[#8b8fb0] hover:bg-white/5"
+              }`}
             >
-              <Replace size={15} />
-            </ToolbarButton>
-            <OpacitySlider
-              value={selection.props.opacity ?? 100}
-              onChange={(v) => updateProp({ opacity: v / 100 })}
-            />
-            <ToolbarButton onClick={sendToBack} title="Enviar para tras">
-              <ArrowDownToLine size={15} />
-            </ToolbarButton>
-            <ToolbarButton onClick={bringToFront} title="Trazer para frente">
-              <ArrowUpToLine size={15} />
-            </ToolbarButton>
-          </>
-        )}
+              {ratio}
+            </button>
+          ))}
+        </div>
 
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Background controls (when nothing selected) */}
         {!selection && (
           <>
-            <div className="flex items-center gap-2">
-              <Palette size={13} className="text-[#5e6388]" />
-              <span className="text-[10px] text-[#5e6388] uppercase">
-                Fundo
-              </span>
+            <div className="flex items-center gap-1.5">
+              <Palette size={12} className="text-[#5e6388]" />
+              <span className="text-[10px] text-[#5e6388] uppercase">Fundo</span>
               <ColorPickerPopover
                 value="#080b1e"
-                onChange={(color) =>
-                  canvasRef.current?.setBackgroundColor(color)
-                }
+                onChange={(color) => canvasRef.current?.setBackgroundColor(color)}
               />
             </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleBgImage}
-                className="hidden"
-                id="bg-image-input"
-              />
-              <ToolbarButton
-                onClick={() =>
-                  (
-                    document.getElementById("bg-image-input") as HTMLInputElement
-                  )?.click()
-                }
-                title="Imagem de fundo"
-              >
-                <ImageUp size={15} />
-              </ToolbarButton>
-            </div>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleBgImage}
+              className="hidden"
+              id="bg-image-input"
+            />
+            <ToolbarButton
+              onClick={() => (document.getElementById("bg-image-input") as HTMLInputElement)?.click()}
+              title="Imagem de fundo"
+            >
+              <ImageUp size={15} />
+            </ToolbarButton>
           </>
         )}
+
+        {/* Alignment (when selected) */}
+        {selection && (
+          <>
+            <AlignmentButtons canvasRef={canvasRef} compact />
+
+            <div className="flex items-center gap-0.5 bg-[#141736] rounded-lg p-1">
+              <ToolbarButton
+                onClick={() => canvasRef.current?.flipSelected('horizontal')}
+                title="Espelhar horizontalmente"
+              >
+                <FlipHorizontal size={13} />
+              </ToolbarButton>
+              <ToolbarButton
+                onClick={() => canvasRef.current?.flipSelected('vertical')}
+                title="Espelhar verticalmente"
+              >
+                <FlipVertical size={13} />
+              </ToolbarButton>
+            </div>
+
+            <ToolbarButton
+              onClick={() => canvasRef.current?.toggleLockSelected()}
+              title="Bloquear/Desbloquear"
+            >
+              {selection.editable ? <Unlock size={14} /> : <Lock size={14} />}
+            </ToolbarButton>
+          </>
+        )}
+
+        <ToolbarSeparator />
+
+        {/* Delete */}
+        <ToolbarButton
+          onClick={() => canvasRef.current?.deleteSelected()}
+          disabled={!selection}
+          title="Excluir (Delete)"
+        >
+          <Trash2 size={15} />
+        </ToolbarButton>
       </div>
 
-      <ToolbarSeparator />
+      {/* ══════════════════════════════════════════════════════════════════
+         ROW 2: Context toolbar — only when something is selected
+         ══════════════════════════════════════════════════════════════════ */}
+      {hasContext && (
+        <div className="flex items-center gap-1.5 px-3 py-1.5 border-t border-white/5 bg-[#080b1e]/50">
+          {/* ── Text controls ── */}
+          {isText && (
+            <>
+              {/* Editing text indicator */}
+              {isEditingText && (
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-[#4ecdc4]/10 rounded-lg border border-[#4ecdc4]/20">
+                  <Type size={11} className="text-[#4ecdc4]" />
+                  <span className="text-[10px] text-[#4ecdc4] font-medium whitespace-nowrap">
+                    {textSelection?.hasSelection
+                      ? `${textSelection.end - textSelection.start} car.`
+                      : "Editando"}
+                  </span>
+                </div>
+              )}
 
-      {/* ── Alignment & Transform (visible when object selected) ── */}
-      {selection && (
-        <>
-          <AlignmentButtons canvasRef={canvasRef} />
+              <FontFamilySelect
+                value={selection!.props.fontFamily || "Plus Jakarta Sans"}
+                onChange={(font) => isEditingText ? applyTextStyle({ fontFamily: font }) : updateProp({ fontFamily: font })}
+              />
+              <FontSizeStepper
+                value={selection!.props.fontSize || 48}
+                onChange={(size) => isEditingText ? applyTextStyle({ fontSize: size }) : updateProp({ fontSize: size })}
+              />
 
-          <div className="flex items-center gap-0.5 bg-[#141736] rounded-lg p-1">
-            <ToolbarButton
-              onClick={() => canvasRef.current?.flipSelected('horizontal')}
-              title="Espelhar horizontalmente"
-            >
-              <FlipHorizontal size={14} />
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={() => canvasRef.current?.flipSelected('vertical')}
-              title="Espelhar verticalmente"
-            >
-              <FlipVertical size={14} />
-            </ToolbarButton>
-          </div>
+              <ToolbarSeparator />
 
-          <ToolbarButton
-            onClick={() => canvasRef.current?.toggleLockSelected()}
-            title="Bloquear/Desbloquear"
-          >
-            {selection.editable ? <Unlock size={14} /> : <Lock size={14} />}
-          </ToolbarButton>
+              {/* B / I / U / S */}
+              <div className="flex items-center gap-0.5 bg-[#141736] rounded-lg p-1">
+                <ToolbarButton
+                  onClick={() => {
+                    const currentWeight = getActiveStyle('fontWeight');
+                    const isBold = currentWeight === 'bold' || Number(currentWeight) >= 700;
+                    applyTextStyle({ fontWeight: isBold ? 'normal' : 'bold' });
+                  }}
+                  active={(() => {
+                    const w = getActiveStyle('fontWeight');
+                    return w === 'bold' || Number(w) >= 700;
+                  })()}
+                  title="Negrito"
+                >
+                  <Bold size={14} />
+                </ToolbarButton>
+                <ToolbarButton
+                  onClick={() => {
+                    const currentStyle = isEditingText && textSelection?.styles?.fontStyle
+                      ? textSelection.styles.fontStyle
+                      : canvasRef.current?.getSelectedObject()?.fontStyle;
+                    applyTextStyle({ fontStyle: currentStyle === 'italic' ? 'normal' : 'italic' });
+                  }}
+                  active={(() => {
+                    if (isEditingText && textSelection?.hasSelection) {
+                      return textSelection.styles?.fontStyle === 'italic';
+                    }
+                    return canvasRef.current?.getSelectedObject()?.fontStyle === 'italic';
+                  })()}
+                  title="Italico"
+                >
+                  <Italic size={14} />
+                </ToolbarButton>
+                <ToolbarButton
+                  onClick={() => {
+                    const current = isEditingText && textSelection?.styles?.underline !== undefined
+                      ? textSelection.styles.underline
+                      : canvasRef.current?.getSelectedObject()?.underline;
+                    applyTextStyle({ underline: !current });
+                  }}
+                  active={(() => {
+                    if (isEditingText && textSelection?.hasSelection) {
+                      return !!textSelection.styles?.underline;
+                    }
+                    return !!canvasRef.current?.getSelectedObject()?.underline;
+                  })()}
+                  title="Sublinhado"
+                >
+                  <Underline size={14} />
+                </ToolbarButton>
+                <ToolbarButton
+                  onClick={() => {
+                    const current = isEditingText && textSelection?.styles?.linethrough !== undefined
+                      ? textSelection.styles.linethrough
+                      : canvasRef.current?.getSelectedObject()?.linethrough;
+                    applyTextStyle({ linethrough: !current });
+                  }}
+                  active={(() => {
+                    if (isEditingText && textSelection?.hasSelection) {
+                      return !!textSelection.styles?.linethrough;
+                    }
+                    return !!canvasRef.current?.getSelectedObject()?.linethrough;
+                  })()}
+                  title="Tachado"
+                >
+                  <Strikethrough size={14} />
+                </ToolbarButton>
+              </div>
 
-          <ToolbarSeparator />
-        </>
+              <ToolbarSeparator />
+
+              {/* Text color */}
+              <ColorPickerPopover
+                value={
+                  (isEditingText && textSelection?.hasSelection && textSelection.styles?.fill)
+                    ? textSelection.styles.fill
+                    : (selection!.props.fill || "#e8eaff")
+                }
+                onChange={(color) => applyTextStyle({ fill: color })}
+              />
+              {/* Highlight */}
+              <HighlightColorPicker
+                value={
+                  (isEditingText && textSelection?.hasSelection && textSelection.styles?.textBackgroundColor)
+                    ? textSelection.styles.textBackgroundColor
+                    : ""
+                }
+                onChange={(color) => applyTextStyle({ textBackgroundColor: color })}
+                onClear={() => applyTextStyle({ textBackgroundColor: "" })}
+              />
+
+              <ToolbarSeparator />
+
+              {/* Text alignment */}
+              <div className="flex items-center gap-0.5 bg-[#141736] rounded-lg p-1">
+                <ToolbarButton
+                  onClick={() => updateProp({ textAlign: "left" })}
+                  active={selection!.props.textAlign === "left"}
+                  title="Alinhar esquerda"
+                >
+                  <AlignLeft size={14} />
+                </ToolbarButton>
+                <ToolbarButton
+                  onClick={() => updateProp({ textAlign: "center" })}
+                  active={selection!.props.textAlign === "center"}
+                  title="Centralizar"
+                >
+                  <AlignCenter size={14} />
+                </ToolbarButton>
+                <ToolbarButton
+                  onClick={() => updateProp({ textAlign: "right" })}
+                  active={selection!.props.textAlign === "right"}
+                  title="Alinhar direita"
+                >
+                  <AlignRight size={14} />
+                </ToolbarButton>
+              </div>
+            </>
+          )}
+
+          {/* ── Shape controls ── */}
+          {isShape && (
+            <>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-[#5e6388] uppercase">Preencher</span>
+                <ColorPickerPopover
+                  value={selection!.props.fill === "__gradient__" ? "#4ecdc4" : (selection!.props.fill || "#4ecdc4")}
+                  onChange={(color) => updateProp({ fill: color })}
+                />
+              </div>
+
+              <ToolbarSeparator />
+
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-[#5e6388] uppercase">Borda</span>
+                <ColorPickerPopover
+                  value={selection!.props.stroke || "#ffffff"}
+                  onChange={(color) => updateProp({ stroke: color })}
+                />
+                <FontSizeStepper
+                  value={selection!.props.strokeWidth || 0}
+                  onChange={(w) => updateProp({ strokeWidth: w })}
+                />
+              </div>
+
+              {selection!.type === "rect" && (
+                <>
+                  <ToolbarSeparator />
+                  <div className="flex items-center gap-1.5">
+                    <CornerUpLeft size={13} className="text-[#8b8fb0]" />
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={selection!.props.rx || 0}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        updateProp({ rx: val, ry: val });
+                      }}
+                      className="w-20 h-1 accent-[#4ecdc4] cursor-pointer"
+                    />
+                    <span className="text-xs text-[#8b8fb0] w-8 tabular-nums">{selection!.props.rx || 0}</span>
+                  </div>
+                </>
+              )}
+
+              <ToolbarSeparator />
+
+              <OpacitySlider
+                value={selection!.props.opacity ?? 100}
+                onChange={(v) => updateProp({ opacity: v / 100 })}
+              />
+            </>
+          )}
+
+          {/* ── Image controls ── */}
+          {isImage && (
+            <>
+              <ToolbarButton
+                onClick={() => fileInputRef.current?.click()}
+                title="Substituir imagem"
+              >
+                <Replace size={15} />
+              </ToolbarButton>
+
+              <ToolbarSeparator />
+
+              <OpacitySlider
+                value={selection!.props.opacity ?? 100}
+                onChange={(v) => updateProp({ opacity: v / 100 })}
+              />
+            </>
+          )}
+        </div>
       )}
-
-      {/* ── RIGHT: Always visible ── */}
-      <div className="flex items-center gap-0.5 bg-[#141736] rounded-lg p-1">
-        <ToolbarButton
-          onClick={bringForward}
-          disabled={!selection}
-          title="Mover para frente"
-        >
-          <ChevronUp size={15} />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={sendBackward}
-          disabled={!selection}
-          title="Mover para tras"
-        >
-          <ChevronDown size={15} />
-        </ToolbarButton>
-      </div>
-
-      <ToolbarButton
-        onClick={() => canvasRef.current?.deleteSelected()}
-        disabled={!selection}
-        title="Excluir (Delete)"
-      >
-        <Trash2 size={15} />
-      </ToolbarButton>
     </div>
   );
 }
