@@ -830,79 +830,103 @@ export default function AnalyticsPage() {
       {/* Profile Card */}
       <ProfileCard data={data} onRefresh={handleRefresh} refreshing={refreshing} />
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-        <KPICard
-          icon={<Users size={18} />}
-          label="Seguidores"
-          value={formatNumber(profile.followers_count)}
-          color="#3b82f6"
-          index={0}
-        />
-        <KPICard
-          icon={<TrendingUp size={18} />}
-          label="Taxa de Engajamento"
-          value={engagement.engagement_rate.toFixed(1)}
-          suffix="%"
-          color="#4ecdc4"
-          index={1}
-        />
-        <KPICard
-          icon={<Eye size={18} />}
-          label="Alcance Medio"
-          value={avgReach > 0 ? formatNumber(avgReach) : "--"}
-          color="#6c5ce7"
-          index={2}
-        />
-        <KPICard
-          icon={<BarChart3 size={18} />}
-          label="Visualizacoes"
-          value={totalViews > 0 ? formatNumber(totalViews) : "--"}
-          color="#fbbf24"
-          index={3}
-        />
-        <KPICard
-          icon={<Zap size={18} />}
-          label="Interacoes Totais"
-          value={(data.account_insights?.total_interactions ?? 0) > 0 ? formatNumber(data.account_insights.total_interactions) : formatNumber(engagement.total_likes + engagement.total_comments + (engagement.total_saves ?? 0) + (engagement.total_shares ?? 0))}
-          color="#f97316"
-          index={4}
-        />
-        <KPICard
-          icon={<Heart size={18} />}
-          label="Media de Curtidas"
-          value={formatNumber(engagement.avg_likes)}
-          color="#e1306c"
-          index={5}
-        />
-        <KPICard
-          icon={<MessageCircle size={18} />}
-          label="Media de Comentarios"
-          value={formatNumber(engagement.avg_comments)}
-          color="#34d399"
-          index={6}
-        />
-        <KPICard
-          icon={<Bookmark size={18} />}
-          label="Media de Saves"
-          value={(engagement.avg_saves ?? 0) > 0 ? formatNumber(engagement.avg_saves ?? 0) : "--"}
-          color="#a855f7"
-          index={7}
-        />
-        <KPICard
-          icon={<Share2 size={18} />}
-          label="Media de Shares"
-          value={(engagement.avg_shares ?? 0) > 0 ? formatNumber(engagement.avg_shares ?? 0) : "--"}
-          color="#06b6d4"
-          index={8}
-        />
-        <KPICard
-          icon={<Eye size={18} />}
-          label="Alcance Total"
-          value={totalReach > 0 ? formatNumber(totalReach) : "--"}
-          color="#10b981"
-          index={9}
-        />
+      {/* KPI Cards — Perfil (dados gerais da conta) */}
+      <div>
+        <span className="text-[11px] font-medium text-text-muted uppercase tracking-wider mb-2 block">Perfil</span>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <KPICard
+            icon={<Users size={18} />}
+            label="Seguidores"
+            value={formatNumber(profile.followers_count)}
+            color="#3b82f6"
+            index={0}
+          />
+          <KPICard
+            icon={<Eye size={18} />}
+            label="Alcance Medio/Dia"
+            value={avgReach > 0 ? formatNumber(avgReach) : "--"}
+            color="#6c5ce7"
+            index={1}
+          />
+          <KPICard
+            icon={<Eye size={18} />}
+            label="Alcance Total"
+            value={totalReach > 0 ? formatNumber(totalReach) : "--"}
+            color="#10b981"
+            index={2}
+          />
+          <KPICard
+            icon={<Camera size={18} />}
+            label="Total de Posts"
+            value={formatNumber(profile.media_count)}
+            color="#8b5cf6"
+            index={3}
+          />
+          <KPICard
+            icon={<Users size={18} />}
+            label="Seguindo"
+            value={formatNumber(profile.follows_count)}
+            color="#64748b"
+            index={4}
+          />
+        </div>
+      </div>
+
+      {/* KPI Cards — Últimos 30 posts */}
+      <div>
+        <span className="text-[11px] font-medium text-text-muted uppercase tracking-wider mb-2 block">Ultimos 30 posts</span>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <KPICard
+            icon={<TrendingUp size={18} />}
+            label="Taxa de Engajamento"
+            value={engagement.engagement_rate.toFixed(1)}
+            suffix="%"
+            color="#4ecdc4"
+            index={0}
+          />
+          <KPICard
+            icon={<BarChart3 size={18} />}
+            label="Visualizacoes"
+            value={totalViews > 0 ? formatNumber(totalViews) : "--"}
+            color="#fbbf24"
+            index={1}
+          />
+          <KPICard
+            icon={<Zap size={18} />}
+            label="Interacoes Totais"
+            value={(data.account_insights?.total_interactions ?? 0) > 0 ? formatNumber(data.account_insights.total_interactions) : formatNumber(engagement.total_likes + engagement.total_comments + (engagement.total_saves ?? 0) + (engagement.total_shares ?? 0))}
+            color="#f97316"
+            index={2}
+          />
+          <KPICard
+            icon={<Heart size={18} />}
+            label="Media de Curtidas"
+            value={formatNumber(engagement.avg_likes)}
+            color="#e1306c"
+            index={3}
+          />
+          <KPICard
+            icon={<MessageCircle size={18} />}
+            label="Media de Comentarios"
+            value={formatNumber(engagement.avg_comments)}
+            color="#34d399"
+            index={4}
+          />
+          <KPICard
+            icon={<Bookmark size={18} />}
+            label="Media de Saves"
+            value={(engagement.avg_saves ?? 0) > 0 ? formatNumber(engagement.avg_saves ?? 0) : "0"}
+            color="#a855f7"
+            index={5}
+          />
+          <KPICard
+            icon={<Share2 size={18} />}
+            label="Media de Shares"
+            value={(engagement.avg_shares ?? 0) > 0 ? formatNumber(engagement.avg_shares ?? 0) : "0"}
+            color="#06b6d4"
+            index={6}
+          />
+        </div>
       </div>
 
       {/* Insights unavailable notice */}
