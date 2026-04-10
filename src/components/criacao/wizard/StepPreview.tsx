@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   ImageIcon,
@@ -16,6 +16,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import type { WizardState } from "@/hooks/useCreationWizard";
+import type { RichSlide, SlideSection } from "@/types/copy-studio";
 import { PostCarouselPreview } from "@/components/criacao/PostPreview";
 
 interface StepPreviewProps {
@@ -115,6 +116,243 @@ function CarouselSlideCard({
   );
 }
 
+/* ─── Rich Slide Preview (visual canvas-like) ─── */
+function RichSlidePreview({
+  slide,
+  totalSlides,
+  isActive,
+  size = "small",
+  onClick,
+}: {
+  slide: RichSlide;
+  totalSlides: number;
+  isActive?: boolean;
+  size?: "small" | "large";
+  onClick?: () => void;
+}) {
+  const isSmall = size === "small";
+  const isCover = slide.contentType === "cover";
+  const isCta = slide.contentType === "cta";
+
+  // Render headline with highlighted words in accent color
+  const renderHeadline = () => {
+    if (!slide.headlineHighlights?.length) {
+      return <span className="text-[#e0e4f0]">{slide.headline}</span>;
+    }
+    // Join all highlights into one search string (case-insensitive)
+    const hlText = slide.headlineHighlights.join(" ").toLowerCase();
+    const idx = slide.headline.toLowerCase().indexOf(hlText);
+    if (idx === -1) {
+      return <span className="text-[#e0e4f0]">{slide.headline}</span>;
+    }
+
+    const before = slide.headline.slice(0, idx);
+    const highlighted = slide.headline.slice(idx, idx + hlText.length);
+    const after = slide.headline.slice(idx + hlText.length);
+
+    return (
+      <>
+        {before && <span className="text-[#e0e4f0]">{before}</span>}
+        <span className="text-[#3b82f6]">{highlighted}</span>
+        {after && <span className="text-[#e0e4f0]">{after}</span>}
+      </>
+    );
+  };
+
+  // Render a single section
+  const renderSection = (section: SlideSection, i: number) => {
+    switch (section.type) {
+      case "paragraph":
+        return (
+          <p
+            key={i}
+            className={`text-[#e0e4f0]/70 leading-relaxed ${isSmall ? "text-[7px]" : "text-xs"}`}
+          >
+            {section.content?.map((seg, j) => (
+              <span
+                key={j}
+                className={`${seg.highlight ? "text-[#3b82f6]" : ""} ${seg.bold ? "font-semibold" : ""}`}
+              >
+                {seg.text}
+              </span>
+            ))}
+          </p>
+        );
+      case "stat":
+        return (
+          <div key={i} className="space-y-0.5">
+            <div
+              className={`text-[#3b82f6] font-bold ${isSmall ? "text-base" : "text-2xl"}`}
+            >
+              {section.stat?.value}
+            </div>
+            <div
+              className={`text-[#e0e4f0]/60 ${isSmall ? "text-[6px]" : "text-[10px]"}`}
+            >
+              {section.stat?.label}
+            </div>
+            {section.stat?.source && !isSmall && (
+              <div className="text-[#6b7094]/50 text-[8px]">
+                {section.stat.source}
+              </div>
+            )}
+          </div>
+        );
+      case "callout":
+        return (
+          <div
+            key={i}
+            className={`bg-[#111528] border border-[#1e2348] rounded-lg border-l-2 border-l-[#3b82f6] ${isSmall ? "p-1.5" : "p-3"}`}
+          >
+            <p
+              className={`text-[#e0e4f0]/80 italic ${isSmall ? "text-[6px]" : "text-xs"}`}
+            >
+              {section.callout?.text}
+            </p>
+            {section.callout?.attribution && !isSmall && (
+              <span className="text-[#6b7094] text-[9px] mt-1 block">
+                -- {section.callout.attribution}
+              </span>
+            )}
+          </div>
+        );
+      case "list":
+        return (
+          <div key={i} className={`space-y-${isSmall ? "0.5" : "2"}`}>
+            {section.items?.map((item, j) => (
+              <div key={j} className="flex gap-2">
+                <span
+                  className={`text-[#3b82f6] font-bold shrink-0 ${isSmall ? "text-[6px]" : "text-xs"}`}
+                >
+                  {item.date || "\u25CF"}
+                </span>
+                <div>
+                  <span
+                    className={`text-[#e0e4f0] font-semibold ${isSmall ? "text-[6px]" : "text-xs"}`}
+                  >
+                    {item.title}
+                  </span>
+                  {item.description && !isSmall && (
+                    <p className="text-[#e0e4f0]/50 text-[10px]">
+                      {item.description}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      case "cta-button":
+        return (
+          <div key={i} className="flex justify-center">
+            <div
+              className={`border border-[#3b82f6] rounded-lg text-center ${isSmall ? "px-3 py-1" : "px-6 py-2"}`}
+            >
+              <span
+                className={`text-[#3b82f6] font-bold tracking-wider ${isSmall ? "text-[7px]" : "text-xs"}`}
+              >
+                {"\u25B8"} {section.buttonText}
+              </span>
+              {section.buttonSubtext && !isSmall && (
+                <p className="text-[#6b7094] text-[9px] mt-0.5">
+                  {section.buttonSubtext}
+                </p>
+              )}
+            </div>
+          </div>
+        );
+      case "divider":
+        return (
+          <div key={i} className="w-1/3 h-px bg-[#3b82f6]/30 mx-auto" />
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.3 }}
+      onClick={onClick}
+      className={`bg-[#080c1a] rounded-xl overflow-hidden flex flex-col shrink-0 cursor-pointer transition-shadow ${
+        isActive ? "ring-2 ring-[#3b82f6] shadow-lg shadow-[#3b82f6]/20" : ""
+      } ${
+        isSmall
+          ? "w-[160px] h-[200px] p-3"
+          : "w-[360px] h-[450px] p-6"
+      }`}
+    >
+      {/* Tag */}
+      {slide.tag && (
+        <span
+          className={`text-[#6b7094] uppercase tracking-widest font-semibold ${
+            isSmall ? "text-[6px] mb-1" : "text-[10px] mb-2"
+          }`}
+        >
+          {isCover ? slide.tag : `\u25CF ${slide.tag}`}
+        </span>
+      )}
+
+      {/* Headline */}
+      <div
+        className={`font-black leading-tight ${
+          isCover
+            ? isSmall
+              ? "text-sm"
+              : "text-3xl"
+            : isCta
+              ? isSmall
+                ? "text-sm"
+                : "text-2xl"
+              : isSmall
+                ? "text-[10px]"
+                : "text-xl"
+        } ${isSmall ? "mb-1" : "mb-3"}`}
+      >
+        {renderHeadline()}
+      </div>
+
+      {/* Sections */}
+      <div
+        className={`flex-1 overflow-hidden ${
+          isSmall ? "space-y-1" : "space-y-3"
+        }`}
+      >
+        {slide.sections?.map((section, i) => renderSection(section, i))}
+      </div>
+
+      {/* Navigation dots */}
+      <div
+        className={`flex justify-center gap-1 ${isSmall ? "mt-1" : "mt-3"}`}
+      >
+        {Array.from({ length: totalSlides }, (_, i) => (
+          <div
+            key={i}
+            className={`rounded-full ${
+              i === slide.slideNumber - 1
+                ? "bg-[#3b82f6]"
+                : "bg-[#6b7094]/30"
+            } ${isSmall ? "w-1 h-1" : "w-1.5 h-1.5"}`}
+          />
+        ))}
+      </div>
+
+      {/* Footnote */}
+      {slide.footnote && (
+        <span
+          className={`text-[#6b7094]/40 text-center mt-1 block ${
+            isSmall ? "text-[5px]" : "text-[9px]"
+          }`}
+        >
+          {slide.footnote}
+        </span>
+      )}
+    </motion.div>
+  );
+}
+
 export function StepPreview({
   state,
   setField,
@@ -165,6 +403,14 @@ export function StepPreview({
   };
 
   const { result, visualSlides, visualMode } = state;
+  const richSlides = (result as any)?.richSlides as RichSlide[] | undefined;
+  const hasRichSlides = richSlides && richSlides.length > 0;
+  const [activeRichSlide, setActiveRichSlide] = useState(0);
+
+  // Reset active rich slide when richSlides change
+  useEffect(() => {
+    setActiveRichSlide(0);
+  }, [richSlides?.length]);
 
   const platformLabel =
     state.platforms[0] === "instagram"
@@ -519,8 +765,186 @@ export function StepPreview({
         </div>
       )}
 
-      {/* ═══ CARROSSEL FORMAT ═══ */}
-      {state.format === "carrossel" && result.slides && (
+      {/* ═══ CARROSSEL FORMAT — Rich Slides ═══ */}
+      {state.format === "carrossel" && hasRichSlides && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="space-y-5"
+        >
+          {/* Thumbnail strip */}
+          <div className="space-y-3">
+            <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
+              Slides visuais
+            </label>
+            <div className="relative">
+              <div
+                className="flex gap-3 overflow-x-auto pb-3 scrollbar-none"
+                style={{ scrollbarWidth: "none" }}
+              >
+                {richSlides!.map((slide, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.08, duration: 0.35 }}
+                  >
+                    <RichSlidePreview
+                      slide={slide}
+                      totalSlides={richSlides!.length}
+                      isActive={activeRichSlide === i}
+                      size="small"
+                      onClick={() => setActiveRichSlide(i)}
+                    />
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Active slide large preview */}
+          <AnimatePresence mode="wait">
+            {richSlides![activeRichSlide] && (
+              <motion.div
+                key={`rich-${activeRichSlide}`}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                transition={{ duration: 0.25 }}
+                className="space-y-4"
+              >
+                {/* Navigation header */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center justify-center w-8 h-8 rounded-full bg-accent/15 text-accent-light text-xs font-bold">
+                      {richSlides![activeRichSlide].slideNumber}
+                    </span>
+                    <div>
+                      <span className="text-xs text-text-muted">
+                        Slide {activeRichSlide + 1} de {richSlides!.length}
+                      </span>
+                      <span className="text-[10px] text-text-muted/60 ml-2 uppercase">
+                        {richSlides![activeRichSlide].contentType}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() =>
+                        setActiveRichSlide(Math.max(0, activeRichSlide - 1))
+                      }
+                      disabled={activeRichSlide === 0}
+                      className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-input disabled:opacity-30 transition-all"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <button
+                      onClick={() =>
+                        setActiveRichSlide(
+                          Math.min(richSlides!.length - 1, activeRichSlide + 1)
+                        )
+                      }
+                      disabled={activeRichSlide === richSlides!.length - 1}
+                      className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-input disabled:opacity-30 transition-all"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Large preview centered */}
+                <div className="flex justify-center">
+                  <RichSlidePreview
+                    slide={richSlides![activeRichSlide]}
+                    totalSlides={richSlides!.length}
+                    isActive
+                    size="large"
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Editable caption */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-bg-card border border-border rounded-xl p-5 space-y-4"
+          >
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
+                Legenda
+              </label>
+              <textarea
+                value={result.conteudo}
+                onChange={(e) =>
+                  setField("result", {
+                    ...result,
+                    conteudo: e.target.value,
+                  } as any)
+                }
+                rows={3}
+                className="w-full bg-bg-input border border-border rounded-lg px-3 py-2.5 text-sm text-text-primary resize-none focus:outline-none focus:border-accent/50 transition-colors"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="flex items-center gap-1.5 text-xs font-medium text-text-muted uppercase tracking-wider">
+                <Zap size={12} />
+                CTA
+              </label>
+              <input
+                value={result.cta}
+                onChange={(e) =>
+                  setField("result", {
+                    ...result,
+                    cta: e.target.value,
+                  } as any)
+                }
+                className="w-full bg-bg-input border border-accent/30 rounded-lg px-3 py-2.5 text-sm text-accent-light font-medium focus:outline-none focus:border-accent/50 transition-colors"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="flex items-center gap-1.5 text-xs font-medium text-text-muted uppercase tracking-wider">
+                <Hash size={12} />
+                Hashtags
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {result.hashtags.map((tag, i) => (
+                  <motion.span
+                    key={i}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.25 + i * 0.03 }}
+                    className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-accent/10 text-accent-light hover:bg-accent/20 transition-colors"
+                  >
+                    #{tag.replace("#", "")}
+                    <button
+                      onClick={() =>
+                        setField("result", {
+                          ...result,
+                          hashtags: result.hashtags.filter(
+                            (_, idx) => idx !== i
+                          ),
+                        } as any)
+                      }
+                      className="hover:text-danger transition-colors ml-0.5"
+                    >
+                      <X size={10} />
+                    </button>
+                  </motion.span>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* ═══ CARROSSEL FORMAT — Basic (fallback) ═══ */}
+      {state.format === "carrossel" && !hasRichSlides && result.slides && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

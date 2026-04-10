@@ -71,7 +71,7 @@ const TONE_DESCRIPTIONS: Record<ContentTone, string> = {
 
 const FORMAT_MAX_TOKENS: Record<ContentFormat, number> = {
   post: 1000,
-  carrossel: 2500,
+  carrossel: 8000,
   reels: 1500,
   email: 2000,
   copy: 1500,
@@ -520,7 +520,7 @@ Responda APENAS em JSON válido puro (sem markdown, sem backticks), neste format
 }`;
 }
 
-export function buildCarouselPrompt(
+export function buildBasicCarouselPrompt(
   ctx: EmpresaContext,
   topic: string,
   tone: ContentTone,
@@ -576,6 +576,195 @@ Responda APENAS em JSON válido puro (sem markdown, sem backticks):
     }
   ],
   "imagePrompt": "prompt em inglês para a capa/thumbnail do carrossel"
+}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// DYNAMIC CAROUSEL — RichSlide[] com layouts decididos pela IA
+// ═══════════════════════════════════════════════════════════════════════
+
+export function buildDynamicCarouselPrompt(
+  ctx: EmpresaContext,
+  topic: string,
+  tone: ContentTone,
+  plataformas: string[]
+): string {
+  return `Você é um designer de informação sênior e diretor criativo com 20 anos criando carrosséis editoriais premiados. Você combina o rigor visual de revistas como Monocle e Bloomberg Businessweek com a linguagem nativa de redes sociais brasileiras.
+
+Sua missão: analisar o tema abaixo e COMPOR cada slide escolhendo a estrutura visual que melhor comunica aquela informação específica. Você NÃO segue templates — você PROJETA cada slide como uma peça editorial única.
+
+${buildContextBlock(ctx)}
+${buildDNABlock(ctx)}
+${buildStyleProfileBlock(ctx)}
+${buildPlatformConstraints(plataformas)}
+
+══════ DIRETRIZES DE TOM ══════
+TOM ESCOLHIDO: ${tone.toUpperCase()}
+${TONE_DESCRIPTIONS[tone]}
+
+══════════════════════════════════════════════════════════════════════════
+SISTEMA DE DESIGN — SEÇÕES DISPONÍVEIS POR SLIDE
+══════════════════════════════════════════════════════════════════════════
+
+Cada slide tem: tag (categoria), headline, headlineHighlights (palavras em destaque), e uma lista de SECTIONS.
+Você escolhe quais sections usar em cada slide. Pense como um editor de revista decidindo o layout de cada página.
+
+TIPOS DE SECTION:
+
+1. "paragraph" → Texto corrido rico. Use para editoriais, explicações, opiniões.
+   - content: array de segmentos { text, highlight?, bold? }
+   - highlight=true → texto aparece na cor de destaque da marca (use para termos-chave)
+   - bold=true → texto em negrito (use para ênfase estrutural)
+   QUANDO USAR: contexto narrativo, explicações, corpo de texto editorial.
+
+2. "stat" → Bloco de dado/métrica em destaque. Número grande + label.
+   - stat: { value: "47%", label: "dos leads são perdidos em 1h", source?: "Fonte: HubSpot 2025" }
+   QUANDO USAR: dados quantitativos, resultados, comparações numéricas. Impactante visualmente.
+
+3. "callout" → Caixa de destaque (citação, insight, alerta).
+   - callout: { text, attribution?, style: "quote" | "insight" | "warning" | "highlight" }
+   QUANDO USAR: frase de autoridade, ponto de destaque que quebra o fluxo, referências externas.
+
+4. "list" → Lista com itens (cada item tem título + descrição + data opcional).
+   - items: [{ title, description?, date? }]
+   QUANDO USAR: passos, dicas, marcos temporais, comparações item a item. Use date para timelines.
+
+5. "divider" → Separador visual entre blocos. Sem propriedades extras.
+   QUANDO USAR: entre seções distintas dentro do mesmo slide.
+
+6. "cta-button" → Botão de ação.
+   - buttonText: "Salve este carrossel"
+   - buttonSubtext?: "e mande pra quem precisa ver"
+   QUANDO USAR: apenas no slide final (CTA).
+
+══════════════════════════════════════════════════════════════════════════
+TIPOS DE SLIDE (contentType)
+══════════════════════════════════════════════════════════════════════════
+
+• "cover" → Slide de abertura. Headline grande em 2 cores, subtítulo, tag de categoria.
+  Composição típica: headline com headlineHighlights + 1 paragraph curto.
+
+• "content" → Slide editorial. Tag + headline + corpo misto.
+  Composição típica: paragraph + callout, ou paragraph + paragraph.
+
+• "data" → Slide focado em números/estatísticas. Impacto visual de dados.
+  Composição típica: 2-3 blocos stat, opcionalmente 1 paragraph de contexto.
+
+• "timeline" → Slide com progressão temporal. Marcos e evolução.
+  Composição típica: 1 list com items que têm date preenchido.
+
+• "quote" → Slide de citação/depoimento em destaque.
+  Composição típica: 1 callout estilo "quote" + opcionalmente 1 paragraph.
+
+• "list" → Slide com itens/dicas/passos enumerados.
+  Composição típica: 1 list com 3-5 items (título em negrito + descrição).
+
+• "cta" → Slide final de chamada para ação.
+  Composição típica: headline impactante com highlights + 1 paragraph + 1 cta-button.
+
+══════════════════════════════════════════════════════════════════════════
+PRINCÍPIOS DE COMPOSIÇÃO — O QUE SEPARA UM CARROSSEL MEDÍOCRE DE UM EXCEPCIONAL
+══════════════════════════════════════════════════════════════════════════
+
+1. VARIEDADE VISUAL: Dois slides consecutivos NUNCA devem ter o mesmo contentType.
+   Se o slide 2 é "data", o slide 3 deve ser "content", "list" ou "quote".
+   Alterne entre slides densos e slides respiráveis.
+
+2. HIERARQUIA DE INFORMAÇÃO: Cada slide tem UMA ideia dominante.
+   Não empilhe 3 stats + 2 paragraphs + 1 list no mesmo slide. Escolha o que importa.
+
+3. RITMO NARRATIVO: O carrossel deve ter um arco — abertura provocativa, desenvolvimento que constrói valor, e fechamento que inspira ação.
+   - Slide 1: PROVOCAÇÃO (cover) — prenda a atenção em 2 segundos
+   - Slides 2-3: CONTEXTO (content/data) — mostre por que o tema importa
+   - Slides 4-5: APROFUNDAMENTO (list/timeline/data) — entregue valor concreto
+   - Slide 6: SÍNTESE (content/quote) — amarre tudo com uma conclusão memorável
+   - Slide 7: AÇÃO (cta) — diga exatamente o que fazer agora
+
+4. HIGHLIGHTS ESTRATÉGICOS: Em cada headline, destaque 1-3 palavras-chave em headlineHighlights.
+   São as palavras que aparecerão na cor de destaque. Escolha palavras de IMPACTO, não conectivos.
+   BOM: headline "O erro que custa R$ 50 mil por ano", highlights: ["R$ 50 mil"]
+   RUIM: highlights: ["O erro", "que custa"]
+
+5. TAGS CONSISTENTES: Cada slide deve ter um tag de categoria (uppercase, 1-2 palavras).
+   Ex: "DADOS", "ESTRATÉGIA", "CASE", "PASSO A PASSO", "CONCLUSÃO", "AÇÃO".
+   O tag ajuda o leitor a localizar-se no carrossel.
+
+6. FOOTNOTES: Use footnote para fontes de dados ("Fonte: IBGE 2025") ou créditos.
+   NÃO use footnote em slides sem dados.
+
+══════════════════════════════════════════════════════════════════════════
+EXEMPLO — CARROSSEL BOM vs CARROSSEL RUIM
+══════════════════════════════════════════════════════════════════════════
+
+❌ RUIM (todos os slides iguais, sem variedade):
+  Slide 1: cover → headline + paragraph
+  Slide 2: content → headline + paragraph
+  Slide 3: content → headline + paragraph
+  Slide 4: content → headline + paragraph
+  Slide 5: cta → headline + cta-button
+  → Monótono. Parece uma apresentação de PowerPoint genérica. Sem dados. Sem destaque.
+
+✅ BOM (cada slide tem layout diferente, fluxo editorial):
+  Slide 1: cover → headline "5 erros que MATAM suas vendas" (highlights: ["MATAM"]) + paragraph teaser
+  Slide 2: data → headline "O custo do silêncio" + 2 stats (47% leads perdidos, R$12k/mês desperdiçado) + footnote fonte
+  Slide 3: list → headline "Os 5 erros mais comuns" + list com 5 items (título + descrição)
+  Slide 4: content → headline "O que empresas TOP fazem diferente" + paragraph + callout insight
+  Slide 5: timeline → headline "A jornada da transformação" + list com datas/marcos
+  Slide 6: quote → headline "Nas palavras de quem viveu" + callout quote com atribuição
+  Slide 7: cta → headline "Sua vez de AGIR" (highlights: ["AGIR"]) + paragraph + cta-button
+  → Ritmo dinâmico. Alterna dados e narrativa. Cada slide surpreende com layout diferente.
+
+══════════════════════════════════════════════════════════════════════════
+TAREFA
+══════════════════════════════════════════════════════════════════════════
+
+Crie um carrossel de 7 slides sobre: "${topic}"
+
+PROCESSO MENTAL (siga na ordem antes de gerar):
+1. Analise o tema — quais são os sub-temas, dados possíveis, e arco narrativo ideal?
+2. Decida o contentType de cada slide ANTES de escrever o conteúdo.
+3. Para cada slide, escolha as sections que melhor comunicam AQUELA informação.
+4. Revise: dois slides consecutivos têm o mesmo contentType? Mude.
+5. Revise: algum slide tem mais de 3 sections? Simplifique.
+6. Revise: os headlines têm headlineHighlights estratégicos? Adicione.
+
+REGRAS INVIOLÁVEIS:
+• Slide 1 DEVE ser contentType "cover". Slide 7 DEVE ser contentType "cta".
+• NENHUM slide intermediário pode repetir o contentType do slide anterior ou seguinte.
+• Cada headline deve ter no MÁXIMO 12 palavras.
+• headlineHighlights deve conter entre 1 e 3 palavras que EXISTEM no headline.
+• Cada slide deve ter entre 1 e 3 sections (não mais).
+• Texto de paragraph: máximo 2 segmentos RichText por content array (brevidade!).
+• Tags em UPPERCASE, sem acento, 1-2 palavras.
+• Dados em stats devem ser plausíveis e relevantes ao tema.
+
+Responda APENAS em JSON válido puro (sem markdown, sem backticks), neste formato exato:
+{
+  "titulo": "titulo chamativo para a legenda do post",
+  "conteudo": "legenda completa do post (complementa o carrossel, storytelling, 3-5 linhas, gancho forte na primeira frase)",
+  "hashtags": ["hashtag1", "hashtag2", "hashtag3", "hashtag4", "hashtag5", "hashtag6", "hashtag7"],
+  "cta": "call to action da legenda",
+  "richSlides": [
+    {
+      "slideNumber": 1,
+      "contentType": "cover",
+      "tag": "CATEGORIA",
+      "headline": "Headline impactante do slide",
+      "headlineHighlights": ["palavras", "destaque"],
+      "sections": [
+        {
+          "type": "paragraph",
+          "content": [
+            { "text": "Texto normal " },
+            { "text": "texto destacado", "highlight": true },
+            { "text": " mais texto." }
+          ]
+        }
+      ],
+      "footnote": "Fonte se aplicavel"
+    }
+  ],
+  "imagePrompt": "prompt em ingles para o background visual do carrossel — estilo editorial, clean, com espaco para texto. Descreva paleta de cores, texturas e mood."
 }`;
 }
 
@@ -734,7 +923,7 @@ export function getPromptForFormat(
     case "post":
       return buildPostPrompt(ctx, topic, tone, plataformas);
     case "carrossel":
-      return buildCarouselPrompt(ctx, topic, tone, 7);
+      return buildDynamicCarouselPrompt(ctx, topic, tone, plataformas);
     case "reels":
       return buildReelsPrompt(ctx, topic, tone);
     case "email":

@@ -3,13 +3,76 @@
 
 import { ContentFormat, ContentTone } from "./ai";
 
-// Copy content structure — what the AI produces and iterates on
+// ── Rich Slide Types (professional carousel layouts) ───────────────────────
+
+/** Content section types for rich slide layouts */
+export type SlideContentType = "cover" | "content" | "data" | "timeline" | "quote" | "list" | "cta";
+
+/** A text segment that may have highlights */
+export interface RichText {
+  text: string;
+  highlight?: boolean;  // Should this segment be visually emphasized?
+  bold?: boolean;
+  color?: string;       // Optional accent color override
+}
+
+/** A stat/metric to display prominently */
+export interface StatBlock {
+  value: string;        // e.g. "R$ 100 bi", "47%", "3x"
+  label: string;        // e.g. "em impostos estimados"
+  source?: string;      // e.g. "Fonte: IBGE 2025"
+}
+
+/** A callout/quote box */
+export interface CalloutBlock {
+  text: string;
+  attribution?: string; // Who said it or source
+  style?: "quote" | "insight" | "warning" | "highlight";
+}
+
+/** A list item (for timeline or bullet lists) */
+export interface ListItem {
+  title: string;        // Bold/highlighted part
+  description?: string; // Regular text
+  date?: string;        // For timeline items
+}
+
+/** A rich content section within a slide */
+export interface SlideSection {
+  type: "paragraph" | "stat" | "callout" | "list" | "divider" | "cta-button";
+  // For paragraph:
+  content?: RichText[];   // Array of text segments (some highlighted, some not)
+  // For stat:
+  stat?: StatBlock;
+  // For callout:
+  callout?: CalloutBlock;
+  // For list:
+  items?: ListItem[];
+  // For cta-button:
+  buttonText?: string;
+  buttonSubtext?: string;
+}
+
+/** Enhanced slide structure for professional carousels */
+export interface RichSlide {
+  slideNumber: number;
+  contentType: SlideContentType;
+  tag?: string;           // Small category label (e.g. "TRIBUTACAO")
+  headline: string;
+  headlineHighlights?: string[];  // Words within headline to highlight in accent color
+  sections: SlideSection[];
+  footnote?: string;      // Small attribution/source at bottom
+}
+
+// ── Copy content structure — what the AI produces and iterates on ──────────
+
 export interface CopyContent {
   headline: string;
   caption: string;
   hashtags: string[];
   cta: string;
-  slides?: CopySlide[];       // for carousels
+  slides?: CopySlide[];       // for carousels (basic)
+  richSlides?: RichSlide[];   // for carousels (rich professional layout)
   reelsScript?: ReelsScript;  // for reels
   imagePrompt?: string;       // for DALL-E generation later
 }
@@ -19,6 +82,12 @@ export interface CopySlide {
   headline: string;
   body: string;
   imagePrompt?: string;
+  // Rich fields (optional for backward compat)
+  contentType?: SlideContentType;
+  tag?: string;
+  headlineHighlights?: string[];
+  sections?: SlideSection[];
+  footnote?: string;
 }
 
 export interface ReelsScript {

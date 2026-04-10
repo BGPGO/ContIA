@@ -93,9 +93,10 @@ export async function POST(request: NextRequest) {
     const systemPrompt = getSystemPrompt(hasDNA);
     const temperature = getTemperature(format, tone);
     const maxTokens = getMaxTokens(format);
+    const model = format === "carrossel" ? "gpt-4o" : "gpt-4o-mini";
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: model,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: prompt },
@@ -113,6 +114,11 @@ export async function POST(request: NextRequest) {
     }
 
     const generated: GeneratedContent = JSON.parse(cleanJson);
+
+    // If carousel returned richSlides, pass them through
+    if (generated.richSlides) {
+      console.log("[generate] Rich carousel with", generated.richSlides.length, "slides");
+    }
 
     // Anti-duplicidade: verificar similaridade com posts anteriores
     const empresaKey = body.empresaContext?.nome || "unknown";

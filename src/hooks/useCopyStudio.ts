@@ -401,6 +401,7 @@ export function useCopyStudio() {
                       hashtags: (rawCopy.hashtags as string[]) || [],
                       cta: (rawCopy.cta as string) || "",
                       slides: rawCopy.slides as CopyContent["slides"],
+                      richSlides: rawCopy.richSlides as CopyContent["richSlides"],
                       reelsScript: rawCopy.reelsScript as CopyContent["reelsScript"],
                       imagePrompt: rawCopy.imagePrompt as string | undefined,
                     };
@@ -467,6 +468,7 @@ export function useCopyStudio() {
               hashtags: (rc.hashtags as string[]) || [],
               cta: (rc.cta as string) || "",
               slides: rc.slides as CopyContent["slides"],
+              richSlides: rc.richSlides as CopyContent["richSlides"],
               reelsScript: rc.reelsScript as CopyContent["reelsScript"],
               imagePrompt: rc.imagePrompt as string | undefined,
             };

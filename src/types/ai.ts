@@ -1,3 +1,5 @@
+import type { RichSlide } from "./copy-studio";
+
 export type ContentFormat = "post" | "carrossel" | "reels" | "email" | "copy";
 export type ContentTone = "formal" | "casual" | "tecnico" | "divertido" | "inspirador";
 
@@ -30,6 +32,7 @@ export interface GeneratedContent {
   hashtags: string[];
   cta: string;
   slides?: CarouselSlide[];
+  richSlides?: RichSlide[];
   reelsScript?: ReelsScript;
   emailSubject?: string;
   emailBody?: string;

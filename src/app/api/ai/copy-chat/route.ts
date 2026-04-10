@@ -178,7 +178,97 @@ Mencione dados concretos (curtidas, comentarios, formatos) para mostrar que voce
   // Format-specific rules
   prompt += `\n\n## Formato: ${format}`;
   if (format === "carrossel") {
-    prompt += `\nGere tambem slides com headline + body para cada slide.`;
+    prompt += `
+Gere um carrossel PROFISSIONAL com slides variados. Cada slide deve ter um TIPO DIFERENTE de layout.
+
+## Estrutura obrigatoria para carrossel (richSlides)
+
+IMPORTANTE: Gere o campo "richSlides" (NAO "slides") com esta estrutura:
+
+"richSlides": [
+  {
+    "slideNumber": 1,
+    "contentType": "cover",
+    "tag": "CATEGORIA EM CAPS",
+    "headline": "Titulo principal impactante",
+    "headlineHighlights": ["palavra1", "palavra2"],
+    "sections": [
+      { "type": "paragraph", "content": [
+        { "text": "Subtitulo ou contexto breve do carrossel" }
+      ]}
+    ]
+  },
+  {
+    "slideNumber": 2,
+    "contentType": "content",
+    "headline": "Titulo do conceito",
+    "headlineHighlights": ["palavra-chave"],
+    "sections": [
+      { "type": "paragraph", "content": [
+        { "text": "Texto normal " },
+        { "text": "texto em destaque", "highlight": true },
+        { "text": " continuacao do texto." }
+      ]},
+      { "type": "callout", "callout": {
+        "text": "Insight importante em destaque",
+        "style": "insight"
+      }}
+    ]
+  },
+  {
+    "slideNumber": 3,
+    "contentType": "data",
+    "headline": "Titulo sobre os dados",
+    "sections": [
+      { "type": "stat", "stat": {
+        "value": "47%",
+        "label": "de aumento nos impostos",
+        "source": "Fonte: IBGE 2025"
+      }},
+      { "type": "paragraph", "content": [
+        { "text": "Contexto sobre esse dado..." }
+      ]}
+    ]
+  },
+  {
+    "slideNumber": 4,
+    "contentType": "list",
+    "headline": "Titulo da lista",
+    "sections": [
+      { "type": "list", "items": [
+        { "title": "Item 1", "description": "Descricao" },
+        { "title": "Item 2", "description": "Descricao" },
+        { "title": "Item 3", "description": "Descricao" }
+      ]}
+    ]
+  },
+  {
+    "slideNumber": N,
+    "contentType": "cta",
+    "headline": "Frase de impacto final",
+    "headlineHighlights": ["palavra-forte"],
+    "sections": [
+      { "type": "paragraph", "content": [
+        { "text": "Subtexto motivador" }
+      ]},
+      { "type": "cta-button", "buttonText": "ACAO AQUI", "buttonSubtext": "texto complementar" }
+    ],
+    "footnote": "@nomedamarca"
+  }
+]
+
+REGRAS dos slides:
+- Slide 1 SEMPRE "cover" — headline grande + subtitulo
+- Slide final SEMPRE "cta" — frase impactante + botao
+- Slides intermediarios variam entre: "content", "data", "quote", "list", "timeline"
+- NUNCA repita o mesmo contentType em slides consecutivos
+- headlineHighlights: 1-3 palavras do headline que devem ter cor de destaque
+- Cada slide deve ter 2-4 sections (nunca apenas 1)
+- Stats devem ter valor numerico forte e fonte
+- Callouts devem ser insights memoraveis
+- Paragraphs usam RichText com highlights inline para enfase
+
+IMPORTANTE: Alem de richSlides, mantenha tambem os campos basicos (headline, caption, hashtags, cta) para compatibilidade.`;
   } else if (format === "reels") {
     prompt += `\nGere tambem um reelsScript com hook, corpo (pontos), cta, duracao e musica_sugerida.`;
   }
@@ -199,7 +289,7 @@ Mencione dados concretos (curtidas, comentarios, formatos) para mostrar que voce
   "caption": "legenda completa",
   "hashtags": ["#tag1", "#tag2", ...],
   "cta": "call-to-action"${format === "carrossel" ? `,
-  "slides": [{ "slideNumber": 1, "headline": "...", "body": "..." }, ...]` : ""}${format === "reels" ? `,
+  "richSlides": [{ "slideNumber": 1, "contentType": "cover", "headline": "...", "headlineHighlights": ["..."], "sections": [...] }, ...]` : ""}${format === "reels" ? `,
   "reelsScript": { "hook": "...", "corpo": ["..."], "cta": "...", "duracao": "30-45s", "musica_sugerida": "..." }` : ""}
 }
 
@@ -494,7 +584,7 @@ export async function POST(request: NextRequest) {
       model: "gpt-4o-mini",
       messages,
       temperature,
-      max_tokens: 2500,
+      max_tokens: 4000,
       stream: true,
     });
 
