@@ -1165,7 +1165,8 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
     return (
       <div
         ref={containerRef}
-        className={`relative flex items-center justify-center w-full h-full overflow-hidden ${className}`}
+        className={`relative flex items-center justify-center overflow-hidden rounded-lg ${className}`}
+        style={{ width: "92%", height: "92%", maxWidth: "92%", maxHeight: "92%" }}
         data-can-undo={canUndo}
         data-can-redo={canRedo}
         onDrop={handleDrop}

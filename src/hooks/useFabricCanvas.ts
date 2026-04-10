@@ -313,6 +313,8 @@ export function useFabricCanvas(): UseFabricCanvasReturn {
     if (!fabricCanvas) return;
 
     const objects = fabricCanvas.getObjects();
+
+    // Build role map with all copy fields (lowercased keys for case-insensitive matching)
     const roleMap: Record<string, string | undefined> = {
       headline: copy.headline,
       subheadline: copy.subheadline,
@@ -329,12 +331,32 @@ export function useFabricCanvas(): UseFabricCanvasReturn {
         : String(copy.slideNumber);
     }
 
+    // Debug: log what roles the canvas has vs what copy provides
+    const canvasRoles = objects
+      .map((o: any) => o.data?.role)
+      .filter(Boolean);
+    const copyRoles = Object.entries(roleMap)
+      .filter(([, v]) => v !== undefined)
+      .map(([k]) => k);
+    console.log('[applyCopy] Roles found in canvas:', canvasRoles);
+    console.log('[applyCopy] Roles in copy:', copyRoles);
+    console.log('[applyCopy] Total canvas objects:', objects.length);
+
+    let matchedCount = 0;
+
     for (const obj of objects) {
       const data = (obj as any).data;
-      const role = data?.role;
-      if (!role || roleMap[role] === undefined) continue;
+      // Case-insensitive role matching — templates may use "Headline", "HEADLINE", etc.
+      const role = (data?.role || '').toLowerCase();
+      if (!role) continue;
 
-      const newText = roleMap[role]!;
+      // Check against lowercased roleMap
+      const matchedValue = Object.entries(roleMap).find(
+        ([k, v]) => k.toLowerCase() === role && v !== undefined
+      );
+      if (!matchedValue) continue;
+
+      const newText = matchedValue[1]!;
 
       // Only inject into text-type objects (Textbox, IText, Text)
       if ((obj as any).text !== undefined) {
@@ -348,7 +370,64 @@ export function useFabricCanvas(): UseFabricCanvasReturn {
 
         // Force re-render of cached object
         (obj as any).dirty = true;
+        matchedCount++;
       }
+    }
+
+    console.log('[applyCopy] Matched and replaced:', matchedCount, 'objects');
+
+    // ── Heuristic fallback: if no roles matched, assign by font-size hierarchy ──
+    // This handles templates that were saved without proper data.role metadata.
+    if (matchedCount === 0) {
+      console.log('[applyCopy] No role matches — falling back to font-size heuristic');
+
+      const textObjects = objects
+        .filter((o: any) =>
+          o.text !== undefined &&
+          o.data?.role !== 'background-image' &&
+          o.data?.role !== 'decoration'
+        )
+        .sort((a: any, b: any) => (b.fontSize || 0) - (a.fontSize || 0));
+
+      console.log('[applyCopy] Heuristic text objects (by fontSize desc):', textObjects.map((o: any) => ({
+        text: ((o as any).text || '').slice(0, 30),
+        fontSize: (o as any).fontSize,
+        role: (o as any).data?.role,
+      })));
+
+      // Largest font size → headline
+      if (textObjects.length > 0 && copy.headline) {
+        (textObjects[0] as any).set({ text: copy.headline });
+        (textObjects[0] as any).dirty = true;
+        matchedCount++;
+      }
+
+      // Second largest → subheadline (or body if no subheadline)
+      if (textObjects.length > 1) {
+        const secondText = copy.subheadline || copy.body;
+        if (secondText) {
+          (textObjects[1] as any).set({ text: secondText });
+          (textObjects[1] as any).dirty = true;
+          matchedCount++;
+        }
+      }
+
+      // Third → body (if we have more than 2 distinct text objects)
+      if (textObjects.length > 2 && copy.body && copy.subheadline) {
+        (textObjects[2] as any).set({ text: copy.body });
+        (textObjects[2] as any).dirty = true;
+        matchedCount++;
+      }
+
+      // Last text object → cta (if available and different from above)
+      const lastIdx = textObjects.length - 1;
+      if (lastIdx > 0 && copy.cta) {
+        (textObjects[lastIdx] as any).set({ text: copy.cta });
+        (textObjects[lastIdx] as any).dirty = true;
+        matchedCount++;
+      }
+
+      console.log('[applyCopy] Heuristic matched:', matchedCount, 'objects');
     }
 
     fabricCanvas.requestRenderAll();

@@ -232,9 +232,11 @@ function EditorContent() {
     if (!copyData || !canvasReady) return;
     // Only auto-apply if template is already loaded (not loading)
     if (isLoadingTemplate) return;
-    requestAnimationFrame(() => {
+    console.log('[Editor] Auto-applying copy (copyData or canvasReady changed):', copyData);
+    // Use 300ms delay to ensure canvas has fully rendered all objects
+    setTimeout(() => {
       applyCopy(copyData);
-    });
+    }, 300);
   }, [copyData, canvasReady, isLoadingTemplate, applyCopy]);
 
   // ── Load template from URL param ──
@@ -261,10 +263,13 @@ function EditorContent() {
           if (template.aspect_ratio) {
             setAspectRatio(template.aspect_ratio);
           }
-          // Apply copy after canvas finishes rendering
-          requestAnimationFrame(() => {
-            if (copyData) applyCopy(copyData);
-          });
+          // Use 300ms delay to ensure canvas has fully rendered all objects
+          if (copyData) {
+            console.log('[Editor] Applying copy after URL template load:', copyData);
+            setTimeout(() => {
+              applyCopy(copyData);
+            }, 300);
+          }
         }
       } catch (err) {
         console.warn("[Editor] Error loading template:", err);
@@ -286,10 +291,13 @@ function EditorContent() {
           setAspectRatio(template.aspect_ratio as "1:1" | "4:5" | "9:16");
         }
       }
-      // Wait a tick for canvas to finish rendering before applying copy
-      requestAnimationFrame(() => {
-        if (copyData) applyCopy(copyData);
-      });
+      // Use 300ms delay to ensure canvas has fully rendered all objects
+      if (copyData) {
+        console.log('[Editor] Applying copy after template gallery select:', copyData);
+        setTimeout(() => {
+          applyCopy(copyData);
+        }, 300);
+      }
       setShowGallery(false);
     },
     [loadTemplate, setAspectRatio, applyCopy, copyData]
@@ -299,10 +307,13 @@ function EditorContent() {
   const handlePresetSelect = useCallback(
     async (presetId: string) => {
       await loadPreset(presetId, state.aspectRatio);
-      // Wait a tick for canvas to finish rendering before applying copy
-      requestAnimationFrame(() => {
-        if (copyData) applyCopy(copyData);
-      });
+      // Use 300ms delay to ensure canvas has fully rendered all objects
+      if (copyData) {
+        console.log('[Editor] Applying copy after preset select:', presetId, copyData);
+        setTimeout(() => {
+          applyCopy(copyData);
+        }, 300);
+      }
       setShowGallery(false);
     },
     [loadPreset, state.aspectRatio, applyCopy, copyData]
@@ -323,20 +334,26 @@ function EditorContent() {
         const allSlides = convertPsdCarouselToFabricSlides(template);
         await loadCarousel(allSlides);
 
-        // Apply copy to each slide if carousel copy is available
-        // (copy injection per-slide happens via the current slide's applyCopy)
-        requestAnimationFrame(() => {
-          if (copyData) applyCopy(copyData);
-        });
+        // Apply copy to the first (current) slide — use 300ms delay for canvas render
+        if (copyData) {
+          console.log('[Editor] Applying copy after PSD carousel load:', copyData);
+          setTimeout(() => {
+            applyCopy(copyData);
+          }, 300);
+        }
       } else {
         // Single slide: existing logic
         const { convertPsdToFabricJson } = await import("@/lib/psd-to-fabric");
         const canvasJson = convertPsdToFabricJson(template, { slideIndex });
         await loadTemplate(canvasJson);
 
-        requestAnimationFrame(() => {
-          if (copyData) applyCopy(copyData);
-        });
+        // Use 300ms delay to ensure canvas has fully rendered all objects
+        if (copyData) {
+          console.log('[Editor] Applying copy after PSD single slide load:', copyData);
+          setTimeout(() => {
+            applyCopy(copyData);
+          }, 300);
+        }
       }
 
       setShowGallery(false);
@@ -465,27 +482,18 @@ function EditorContent() {
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           {/* Canvas area — takes remaining space, centers the canvas, NO scroll */}
           <div className="flex-1 flex items-center justify-center bg-[#080b1e] overflow-hidden relative">
-            <div
-              className="relative shadow-2xl shadow-black/50 rounded-lg overflow-hidden"
-              style={{
-                width: Math.min(dims.width * 0.5, 540),
-                height: Math.min(dims.height * 0.5, isCarousel ? 800 : 960),
-                maxWidth: "85%",
-                maxHeight: isCarousel ? "80%" : "85%",
-              }}
-            >
-              <FabricCanvas
-                ref={canvasRef}
-                width={dims.width}
-                height={dims.height}
-                aspectRatio={state.aspectRatio}
-                onSelectionChange={setSelection}
-                onCanvasChange={markDirty}
-                onReady={handleCanvasReady}
-                onTextEditingChange={setIsEditingText}
-                onTextSelectionChange={setTextSelection}
-              />
-            </div>
+            <FabricCanvas
+              ref={canvasRef}
+              width={dims.width}
+              height={dims.height}
+              aspectRatio={state.aspectRatio}
+              onSelectionChange={setSelection}
+              onCanvasChange={markDirty}
+              onReady={handleCanvasReady}
+              onTextEditingChange={setIsEditingText}
+              onTextSelectionChange={setTextSelection}
+              className="shadow-2xl shadow-black/50"
+            />
 
             {/* Exporter popover */}
             {showExporter && (
