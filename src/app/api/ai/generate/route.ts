@@ -120,6 +120,37 @@ export async function POST(request: NextRequest) {
       console.log("[generate] Rich carousel with", generated.richSlides.length, "slides");
     }
 
+    // Backward compat: if richSlides exist, also generate basic slides[]
+    if (generated.richSlides && generated.richSlides.length > 0 && (!generated.slides || generated.slides.length === 0)) {
+      generated.slides = generated.richSlides.map((rs: any) => ({
+        slideNumber: rs.slideNumber,
+        titulo: rs.headline || "",
+        conteudo: (rs.sections || [])
+          .map((sec: any) => {
+            if (sec.type === "paragraph" && sec.content) {
+              return sec.content.map((c: any) => c.text).join("");
+            }
+            if (sec.type === "stat" && sec.stat) {
+              return `${sec.stat.value} — ${sec.stat.label}`;
+            }
+            if (sec.type === "callout" && sec.callout) {
+              return sec.callout.text;
+            }
+            if (sec.type === "list" && sec.items) {
+              return sec.items.map((item: any) => `${item.title}${item.description ? ': ' + item.description : ''}`).join('\n');
+            }
+            if (sec.type === "cta-button") {
+              return sec.buttonText || "";
+            }
+            return "";
+          })
+          .filter(Boolean)
+          .join("\n"),
+        imagePrompt: "",
+      }));
+      console.log("[generate] Auto-generated", generated.slides.length, "basic slides from richSlides");
+    }
+
     // Anti-duplicidade: verificar similaridade com posts anteriores
     const empresaKey = body.empresaContext?.nome || "unknown";
     const contentToCheck = generated.conteudo || generated.titulo || "";

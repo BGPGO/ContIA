@@ -610,6 +610,44 @@ export async function POST(request: NextRequest) {
           // Parse completed response to extract copy JSON
           const { text, copy } = parseAIResponse(fullContent);
 
+          // Backward compat: generate basic slides from richSlides
+          if (copy) {
+            const anyCopy = copy as unknown as Record<string, unknown>;
+            const richSlides = anyCopy.richSlides as Array<Record<string, unknown>> | undefined;
+            const existingSlides = anyCopy.slides as Array<unknown> | undefined;
+            if (richSlides && richSlides.length > 0 && (!existingSlides || existingSlides.length === 0)) {
+              anyCopy.slides = richSlides.map((rs: Record<string, unknown>) => ({
+                slideNumber: rs.slideNumber,
+                headline: (rs.headline as string) || "",
+                body: ((rs.sections as Array<Record<string, unknown>>) || [])
+                  .map((sec: Record<string, unknown>) => {
+                    if (sec.type === "paragraph" && sec.content) {
+                      return (sec.content as Array<Record<string, unknown>>).map((c) => c.text).join("");
+                    }
+                    if (sec.type === "stat" && sec.stat) {
+                      const stat = sec.stat as Record<string, unknown>;
+                      return `${stat.value} — ${stat.label}`;
+                    }
+                    if (sec.type === "callout" && sec.callout) {
+                      return (sec.callout as Record<string, unknown>).text;
+                    }
+                    if (sec.type === "list" && sec.items) {
+                      return (sec.items as Array<Record<string, unknown>>).map((item) =>
+                        `${item.title}${item.description ? ': ' + item.description : ''}`
+                      ).join('\n');
+                    }
+                    if (sec.type === "cta-button") {
+                      return (sec.buttonText as string) || "";
+                    }
+                    return "";
+                  })
+                  .filter(Boolean)
+                  .join("\n"),
+                imagePrompt: "",
+              }));
+            }
+          }
+
           // Send the extracted copy as a separate event
           if (copy) {
             controller.enqueue(

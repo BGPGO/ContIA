@@ -17,7 +17,15 @@ import {
   Clock,
   AlertCircle,
 } from "lucide-react";
-import type { CopyContent, CopySlide } from "@/types/copy-studio";
+import type { CopyContent, CopySlide, RichSlide, SlideSection } from "@/types/copy-studio";
+import {
+  Layout,
+  BarChart3,
+  List,
+  BookOpen,
+  Target,
+  Quote,
+} from "lucide-react";
 import type { ContentFormat } from "@/types/ai";
 
 /* ── Character limits per platform ── */
@@ -293,8 +301,264 @@ function PostPreview({
   );
 }
 
-/* ── Carousel preview ── */
-function CarouselPreview({
+/* ── Content type badge config ── */
+const CONTENT_TYPE_CONFIG: Record<string, { icon: React.ElementType; label: string; color: string }> = {
+  cover: { icon: Layout, label: "Capa", color: "text-[#6c5ce7] bg-[#6c5ce7]/10" },
+  content: { icon: BookOpen, label: "Conteudo", color: "text-[#4ecdc4] bg-[#4ecdc4]/10" },
+  data: { icon: BarChart3, label: "Dados", color: "text-[#f39c12] bg-[#f39c12]/10" },
+  list: { icon: List, label: "Lista", color: "text-[#3498db] bg-[#3498db]/10" },
+  timeline: { icon: Clock, label: "Timeline", color: "text-[#e17055] bg-[#e17055]/10" },
+  quote: { icon: Quote, label: "Citacao", color: "text-[#a29bfe] bg-[#a29bfe]/10" },
+  cta: { icon: Target, label: "CTA", color: "text-[#00cec9] bg-[#00cec9]/10" },
+};
+
+/* ── Render headline with highlighted words ── */
+function HighlightedHeadline({
+  headline,
+  highlights,
+}: {
+  headline: string;
+  highlights?: string[];
+}) {
+  if (!highlights || highlights.length === 0) {
+    return <span>{headline}</span>;
+  }
+
+  const pattern = highlights
+    .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|");
+  const regex = new RegExp(`(${pattern})`, "gi");
+  const parts = headline.split(regex);
+
+  return (
+    <>
+      {parts.map((part, i) => {
+        const isHighlighted = highlights.some(
+          (h) => h.toLowerCase() === part.toLowerCase()
+        );
+        return isHighlighted ? (
+          <span key={i} className="text-[#4ecdc4]">
+            {part}
+          </span>
+        ) : (
+          <span key={i}>{part}</span>
+        );
+      })}
+    </>
+  );
+}
+
+/* ── Render a single rich section ── */
+function RichSectionPreview({ section }: { section: SlideSection }) {
+  switch (section.type) {
+    case "stat":
+      if (!section.stat) return null;
+      return (
+        <div className="flex flex-col items-center text-center py-2">
+          <span className="text-2xl font-extrabold text-[#4ecdc4]">
+            {section.stat.value}
+          </span>
+          <span className="text-xs text-text-secondary mt-0.5">
+            {section.stat.label}
+          </span>
+          {section.stat.source && (
+            <span className="text-[10px] text-text-muted mt-1 italic">
+              {section.stat.source}
+            </span>
+          )}
+        </div>
+      );
+
+    case "callout":
+      if (!section.callout) return null;
+      return (
+        <div className="border-l-2 border-[#6c5ce7]/50 bg-[#6c5ce7]/5 rounded-r-lg px-3 py-2.5">
+          <p className="text-sm text-text-primary italic leading-relaxed">
+            &ldquo;{section.callout.text}&rdquo;
+          </p>
+          {section.callout.attribution && (
+            <p className="text-[10px] text-text-muted mt-1">
+              — {section.callout.attribution}
+            </p>
+          )}
+        </div>
+      );
+
+    case "list":
+      if (!section.items || section.items.length === 0) return null;
+      return (
+        <ul className="space-y-1.5">
+          {section.items.map((item, i) => (
+            <li key={i} className="flex items-start gap-2 text-sm">
+              <span className="shrink-0 mt-1 w-1.5 h-1.5 rounded-full bg-[#4ecdc4]" />
+              <div>
+                <span className="font-semibold text-text-primary">
+                  {item.title}
+                </span>
+                {item.description && (
+                  <span className="text-text-secondary ml-1">
+                    {item.description}
+                  </span>
+                )}
+                {item.date && (
+                  <span className="text-text-muted text-[10px] ml-1.5">
+                    {item.date}
+                  </span>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      );
+
+    case "paragraph":
+      if (!section.content || section.content.length === 0) return null;
+      return (
+        <p className="text-sm text-text-secondary leading-relaxed">
+          {section.content.map((seg, i) => (
+            <span
+              key={i}
+              className={`${seg.highlight ? "text-[#4ecdc4] font-semibold" : ""} ${seg.bold ? "font-bold text-text-primary" : ""}`}
+              style={seg.color ? { color: seg.color } : undefined}
+            >
+              {seg.text}
+            </span>
+          ))}
+        </p>
+      );
+
+    case "cta-button":
+      return (
+        <div className="flex flex-col items-center gap-1 pt-1">
+          <div className="px-4 py-2 rounded-lg bg-gradient-to-r from-[#6c5ce7] to-[#4ecdc4] text-white text-sm font-semibold text-center">
+            {section.buttonText || "Saiba mais"}
+          </div>
+          {section.buttonSubtext && (
+            <span className="text-[10px] text-text-muted">
+              {section.buttonSubtext}
+            </span>
+          )}
+        </div>
+      );
+
+    case "divider":
+      return <hr className="border-border/30 my-1" />;
+
+    default:
+      return null;
+  }
+}
+
+/* ── Rich carousel preview (richSlides) ── */
+function RichCarouselPreview({
+  copy,
+  onEdit,
+}: {
+  copy: CopyContent;
+  onEdit: (field: keyof CopyContent, value: unknown) => void;
+}) {
+  const [activeSlide, setActiveSlide] = useState(0);
+  const richSlides = copy.richSlides!;
+
+  // Build a minimal CopySlide[] for CarouselNav compatibility
+  const navSlides: CopySlide[] = richSlides.map((s) => ({
+    slideNumber: s.slideNumber,
+    headline: s.headline,
+    body: "",
+  }));
+
+  const slide = richSlides[activeSlide];
+  const typeConfig = CONTENT_TYPE_CONFIG[slide.contentType] || CONTENT_TYPE_CONFIG.content;
+  const TypeIcon = typeConfig.icon;
+
+  return (
+    <div className="space-y-3">
+      <CarouselNav
+        slides={navSlides}
+        activeIndex={activeSlide}
+        onIndexChange={setActiveSlide}
+      />
+
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeSlide}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -20 }}
+          transition={{ duration: 0.2 }}
+          className="space-y-3"
+        >
+          {/* Slide header: number + content type badge */}
+          <div className="flex items-center gap-2 mb-2">
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-accent/15 text-accent-light text-[10px] font-bold">
+              {slide.slideNumber}
+            </span>
+            <span className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${typeConfig.color}`}>
+              <TypeIcon size={10} />
+              {typeConfig.label}
+            </span>
+            {slide.tag && (
+              <span className="text-[10px] text-text-muted bg-white/5 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                {slide.tag}
+              </span>
+            )}
+            <span className="text-xs text-text-muted ml-auto">
+              {activeSlide + 1}/{richSlides.length}
+            </span>
+          </div>
+
+          {/* Headline with highlights */}
+          <h3 className="text-base font-bold text-white leading-snug">
+            <HighlightedHeadline
+              headline={slide.headline}
+              highlights={slide.headlineHighlights}
+            />
+          </h3>
+
+          {/* Sections */}
+          <div className="space-y-3">
+            {slide.sections.map((section, i) => (
+              <RichSectionPreview key={i} section={section} />
+            ))}
+          </div>
+
+          {/* Footnote */}
+          {slide.footnote && (
+            <p className="text-[10px] text-text-muted italic pt-1 border-t border-border/30">
+              {slide.footnote}
+            </p>
+          )}
+        </motion.div>
+      </AnimatePresence>
+
+      {/* Caption + Hashtags for entire carousel */}
+      <div className="pt-3 border-t border-border/50 space-y-3">
+        <EditableField
+          value={copy.caption || ""}
+          onChange={(val) => onEdit("caption", val)}
+          className="text-sm text-[#e8eaff] leading-relaxed"
+          multiline
+          placeholder="Legenda do carrossel..."
+        />
+        {(copy.hashtags?.length ?? 0) > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {copy.hashtags!.map((tag, i) => (
+              <span
+                key={i}
+                className="text-xs px-2 py-0.5 rounded-full bg-accent/10 text-[#4ecdc4]"
+              >
+                #{tag.replace("#", "")}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Basic carousel preview (CopySlide[]) ── */
+function BasicCarouselPreview({
   copy,
   onEdit,
 }: {
@@ -391,6 +655,20 @@ function CarouselPreview({
       </div>
     </div>
   );
+}
+
+/* ── Carousel preview (delegates to rich or basic) ── */
+function CarouselPreview({
+  copy,
+  onEdit,
+}: {
+  copy: CopyContent;
+  onEdit: (field: keyof CopyContent, value: unknown) => void;
+}) {
+  if (copy.richSlides && copy.richSlides.length > 0) {
+    return <RichCarouselPreview copy={copy} onEdit={onEdit} />;
+  }
+  return <BasicCarouselPreview copy={copy} onEdit={onEdit} />;
 }
 
 /* ── Reels script preview ── */
