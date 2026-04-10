@@ -30,6 +30,208 @@ import { TemplateBuilder } from "@/components/post-design/TemplateBuilder";
 import { useCustomTemplates } from "@/hooks/useCustomTemplates";
 import { useMarcaDNA } from "@/hooks/useMarcaDNA";
 import type { CustomTemplate } from "@/types/custom-template";
+import type { RichSlide, SlideSection } from "@/types/copy-studio";
+import React from "react";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Rich Slide Canvas — renders a RichSlide as styled HTML (dark navy design)
+   Exportable via html2canvas. Matches smart-layout.ts design system.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const RICH_DIMS: Record<string, { w: number; h: number }> = {
+  "1:1": { w: 400, h: 400 },
+  "4:5": { w: 400, h: 500 },
+  "9:16": { w: 400, h: 711 },
+};
+
+const CONTENT_TYPE_LABELS: Record<string, string> = {
+  cover: "CAPA", content: "CONTEUDO", data: "DADOS",
+  timeline: "TIMELINE", quote: "CITACAO", list: "LISTA", cta: "CTA",
+};
+
+function RichHeadline({ text, highlights, isCover, isCta }: {
+  text: string; highlights?: string[]; isCover?: boolean; isCta?: boolean;
+}) {
+  const fontSize = isCover
+    ? (text.length > 40 ? "text-[28px]" : text.length > 25 ? "text-[32px]" : "text-[38px]")
+    : isCta
+      ? (text.length > 40 ? "text-[24px]" : "text-[30px]")
+      : (text.length > 50 ? "text-[18px]" : text.length > 30 ? "text-[20px]" : "text-[24px]");
+
+  if (!highlights?.length) {
+    return <div className={`${fontSize} font-black leading-[1.05] text-[#e0e4f0]`}>{text}</div>;
+  }
+
+  const phrase = highlights.join(" ");
+  const idx = text.toLowerCase().indexOf(phrase.toLowerCase());
+  if (idx === -1) {
+    return <div className={`${fontSize} font-black leading-[1.05] text-[#e0e4f0]`}>{text}</div>;
+  }
+
+  const before = text.slice(0, idx);
+  const highlighted = text.slice(idx, idx + phrase.length);
+  const after = text.slice(idx + phrase.length);
+
+  return (
+    <div className={`${fontSize} font-black leading-[1.05]`}>
+      {before && <span className="text-[#e0e4f0]">{before}</span>}
+      <span className="text-[#3b82f6]">{highlighted}</span>
+      {after && <span className="text-[#e0e4f0]">{after}</span>}
+    </div>
+  );
+}
+
+function RichSection({ section }: { section: SlideSection }) {
+  switch (section.type) {
+    case "paragraph":
+      return (
+        <p className="text-[11px] leading-[1.5] text-[#e0e4f0]/70">
+          {section.content?.map((seg, i) => (
+            <span key={i} className={`${seg.highlight ? "text-[#3b82f6] font-semibold" : ""} ${seg.bold ? "font-bold" : ""}`}>
+              {seg.text}
+            </span>
+          ))}
+        </p>
+      );
+    case "stat":
+      if (!section.stat) return null;
+      return (
+        <div className="space-y-0.5">
+          <div className="text-[24px] font-extrabold text-[#3b82f6] leading-tight">{section.stat.value}</div>
+          <div className="text-[10px] text-[#e0e4f0]/60">{section.stat.label}</div>
+          {section.stat.source && <div className="text-[8px] text-[#6b7094]/50">{section.stat.source}</div>}
+        </div>
+      );
+    case "callout":
+      if (!section.callout) return null;
+      return (
+        <div className="bg-[#111528] border border-[#1e2348] rounded-[6px] p-3 border-l-[3px] border-l-[#3b82f6]/60">
+          <p className="text-[10px] text-[#e0e4f0]/80 italic leading-relaxed">{section.callout.text}</p>
+          {section.callout.attribution && (
+            <p className="text-[8px] text-[#6b7094] mt-1">— {section.callout.attribution}</p>
+          )}
+        </div>
+      );
+    case "list":
+      if (!section.items?.length) return null;
+      return (
+        <div className="space-y-2">
+          {section.items.map((item, j) => (
+            <div key={j} className="flex gap-2">
+              <span className="text-[10px] font-bold text-[#3b82f6] shrink-0 min-w-[20px]">
+                {item.date || "●"}
+              </span>
+              <div className="min-w-0">
+                <span className="text-[10px] font-bold text-[#e0e4f0]">{item.title}</span>
+                {item.description && (
+                  <p className="text-[9px] text-[#e0e4f0]/50 leading-relaxed">{item.description}</p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    case "cta-button":
+      return (
+        <div className="flex justify-center">
+          <div className="border-[1.5px] border-[#3b82f6] rounded-[6px] px-8 py-2 text-center">
+            <span className="text-[10px] font-bold text-[#3b82f6] tracking-[0.15em]">
+              ▸  {section.buttonText || "SAIBA MAIS"}
+            </span>
+          </div>
+          {section.buttonSubtext && (
+            <p className="text-[8px] text-[#6b7094]/50 text-center mt-1">{section.buttonSubtext}</p>
+          )}
+        </div>
+      );
+    case "divider":
+      return <div className="w-1/3 h-[1px] bg-[#3b82f6]/30" />;
+    default:
+      return null;
+  }
+}
+
+const RichSlideCanvas = React.forwardRef<HTMLDivElement, {
+  slide: RichSlide;
+  totalSlides: number;
+  aspectRatio: "1:1" | "4:5" | "9:16";
+  brandAccent?: string;
+}>(({ slide, totalSlides, aspectRatio, brandAccent }, ref) => {
+  const { w, h } = RICH_DIMS[aspectRatio] || RICH_DIMS["4:5"];
+  const isCover = slide.contentType === "cover";
+  const isCta = slide.contentType === "cta";
+
+  return (
+    <div
+      ref={ref}
+      className="relative overflow-hidden flex flex-col"
+      style={{
+        width: w, height: h,
+        background: "#080c1a",
+        padding: isCta ? "0 26px" : "22px 26px 18px",
+        fontFamily: "Inter, Helvetica, Arial, sans-serif",
+      }}
+    >
+      {/* Tag */}
+      {slide.tag && (
+        <div className="mb-2" style={{ letterSpacing: "0.15em" }}>
+          <span className="text-[8px] font-semibold text-[#6b7094]">
+            {isCover ? slide.tag : `●  ${slide.tag}`}
+          </span>
+        </div>
+      )}
+
+      {/* Headline */}
+      <div className={isCta ? "flex-1 flex items-center" : "mb-3"}>
+        <RichHeadline
+          text={slide.headline}
+          highlights={slide.headlineHighlights}
+          isCover={isCover}
+          isCta={isCta}
+        />
+      </div>
+
+      {/* Sections */}
+      <div className={`flex-1 flex flex-col gap-3 ${isCta ? "" : "overflow-hidden"}`}>
+        {slide.sections?.map((sec, i) => {
+          if (isCta && sec.type === "cta-button") {
+            return (
+              <div key={i} className="mt-auto mb-6">
+                <RichSection section={sec} />
+              </div>
+            );
+          }
+          return <RichSection key={i} section={sec} />;
+        })}
+      </div>
+
+      {/* Dots at bottom */}
+      {totalSlides > 1 && (
+        <div className="flex justify-center gap-[5px] mt-auto pt-2">
+          {Array.from({ length: totalSlides }, (_, i) => (
+            <div
+              key={i}
+              className="rounded-full"
+              style={{
+                width: 6, height: 6,
+                background: i === slide.slideNumber - 1 ? (brandAccent || "#3b82f6") : "#6b7094",
+                opacity: i === slide.slideNumber - 1 ? 1 : 0.3,
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Footnote */}
+      {slide.footnote && (
+        <div className="text-center mt-1">
+          <span className="text-[7px] text-[#6b7094]/40">{slide.footnote}</span>
+        </div>
+      )}
+    </div>
+  );
+});
+RichSlideCanvas.displayName = "RichSlideCanvas";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Constants
@@ -86,6 +288,8 @@ export function StepVisualizar({ state, setField, empresa, onRegenerate }: StepV
   const [exportingAll, setExportingAll] = useState(false);
 
   const isCarousel = state.format === "carrossel";
+  const richSlides = state.result?.richSlides as RichSlide[] | undefined;
+  const hasRichSlides = !!(richSlides && richSlides.length > 0);
 
   /* ── Brand DNA — auto-apply brand colors and style ────────────────── */
 
@@ -174,6 +378,8 @@ export function StepVisualizar({ state, setField, empresa, onRegenerate }: StepV
   });
 
   const [activeSlide, setActiveSlide] = useState(0);
+  const [activeRichSlide, setActiveRichSlide] = useState(0);
+  const richCanvasRef = useRef<HTMLDivElement>(null);
 
   const addSlide = () => {
     setCarouselSlides((prev) => [
@@ -336,6 +542,267 @@ export function StepVisualizar({ state, setField, empresa, onRegenerate }: StepV
   };
 
   /* ── Render ─────────────────────────────────────────────────────────── */
+
+  /* ── Rich carousel export handler ────────────────────────────────── */
+  const handleRichExport = async () => {
+    if (!richCanvasRef.current) return;
+    setExporting(true);
+    try {
+      const html2canvas = (await import("html2canvas-pro")).default;
+      const canvas = await html2canvas(richCanvasRef.current, { scale: 3, useCORS: true, backgroundColor: null });
+      const url = canvas.toDataURL("image/png");
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `slide-${activeRichSlide + 1}-${empresa?.nome || "contia"}.png`;
+      a.click();
+    } catch (err) { console.error("Export failed:", err); }
+    finally { setExporting(false); }
+  };
+
+  const handleRichExportAll = async () => {
+    if (!richSlides?.length) return;
+    setExportingAll(true);
+    try {
+      const html2canvas = (await import("html2canvas-pro")).default;
+      for (let i = 0; i < richSlides.length; i++) {
+        setActiveRichSlide(i);
+        await new Promise((r) => setTimeout(r, 250));
+        if (!richCanvasRef.current) continue;
+        const canvas = await html2canvas(richCanvasRef.current, { scale: 3, useCORS: true, backgroundColor: null });
+        const url = canvas.toDataURL("image/png");
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `slide-${i + 1}-${empresa?.nome || "contia"}.png`;
+        a.click();
+        await new Promise((r) => setTimeout(r, 300));
+      }
+    } catch (err) { console.error("Export all failed:", err); }
+    finally { setExportingAll(false); }
+  };
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     RICH SLIDES MODE — when AI generated dynamic layouts
+     ═══════════════════════════════════════════════════════════════════════ */
+  if (hasRichSlides && isCarousel) {
+    const currentRich = richSlides![activeRichSlide] || richSlides![0];
+    return (
+      <div className="space-y-6">
+        {/* ── Badge: Layout Dinamico ──────────────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-2"
+        >
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#3b82f6]/10 border border-[#3b82f6]/20">
+            <Layers size={14} className="text-[#3b82f6]" />
+            <span className="text-xs font-semibold text-[#3b82f6]">Layout Dinamico</span>
+          </div>
+          <span className="text-[11px] text-text-muted">
+            {richSlides!.length} slides com layouts variados
+          </span>
+        </motion.div>
+
+        {/* ── Slide Navigator ────────────────────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="space-y-3"
+        >
+          <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2" style={{ scrollbarWidth: "none" }}>
+            {richSlides!.map((rs, idx) => {
+              const isActive = activeRichSlide === idx;
+              return (
+                <motion.button
+                  key={idx}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setActiveRichSlide(idx)}
+                  className={`shrink-0 relative rounded-lg border-2 p-2 transition-all min-w-[140px] text-left ${
+                    isActive ? "border-[#3b82f6] bg-[#3b82f6]/5" : "border-border bg-bg-card hover:border-border-light"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span
+                      className="flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold"
+                      style={{ background: isActive ? "#3b82f6" : "rgba(255,255,255,0.06)", color: isActive ? "#fff" : "rgba(255,255,255,0.4)" }}
+                    >
+                      {idx + 1}
+                    </span>
+                    <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                      isActive ? "bg-[#3b82f6]/20 text-[#3b82f6]" : "bg-white/5 text-text-muted"
+                    }`}>
+                      {CONTENT_TYPE_LABELS[rs.contentType] || rs.contentType}
+                    </span>
+                  </div>
+                  <p className="text-[11px] font-medium text-text-primary truncate">{rs.headline}</p>
+                  {rs.tag && <p className="text-[8px] text-text-muted mt-0.5">{rs.tag}</p>}
+                </motion.button>
+              );
+            })}
+          </div>
+        </motion.div>
+
+        {/* ── Main Rich Preview ──────────────────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="flex flex-col items-center gap-3"
+        >
+          {/* Navigation */}
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setActiveRichSlide((p) => Math.max(0, p - 1))}
+              disabled={activeRichSlide === 0}
+              className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-card disabled:opacity-30 transition-all"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <span className="text-xs font-bold text-text-secondary tabular-nums">
+              Slide {activeRichSlide + 1} de {richSlides!.length}
+            </span>
+            <button
+              onClick={() => setActiveRichSlide((p) => Math.min(richSlides!.length - 1, p + 1))}
+              disabled={activeRichSlide === richSlides!.length - 1}
+              className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-card disabled:opacity-30 transition-all"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+
+          {/* Canvas */}
+          <div className="bg-bg-card border border-border rounded-2xl p-4">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeRichSlide}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+              >
+                <RichSlideCanvas
+                  ref={richCanvasRef}
+                  slide={currentRich}
+                  totalSlides={richSlides!.length}
+                  aspectRatio={state.designAspectRatio}
+                  brandAccent={brandColor}
+                />
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
+          {/* Dots */}
+          <div className="flex gap-1.5">
+            {richSlides!.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => setActiveRichSlide(idx)}
+                className="transition-all"
+                style={{
+                  width: activeRichSlide === idx ? 20 : 6,
+                  height: 6, borderRadius: 3,
+                  background: activeRichSlide === idx ? "#3b82f6" : "rgba(255,255,255,0.15)",
+                }}
+              />
+            ))}
+          </div>
+        </motion.div>
+
+        {/* ── Controls + Actions ──────────────────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="flex flex-col sm:flex-row items-center gap-4 bg-bg-card border border-border rounded-xl p-4"
+        >
+          {/* Aspect ratio */}
+          <div className="flex items-center gap-1.5">
+            {(["1:1", "4:5", "9:16"] as const).map((r) => {
+              const icons = { "1:1": Square, "4:5": RectangleVertical, "9:16": Smartphone };
+              const Icon = icons[r];
+              const active = state.designAspectRatio === r;
+              return (
+                <button
+                  key={r}
+                  onClick={() => setField("designAspectRatio", r)}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium transition-all ${
+                    active ? "bg-[#3b82f6]/10 text-[#3b82f6]" : "text-text-muted hover:text-text-secondary"
+                  }`}
+                >
+                  <Icon size={12} />
+                  {r}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="w-px h-6 bg-border hidden sm:block" />
+
+          <div className="flex items-center gap-2 ml-auto">
+            <button
+              onClick={onRegenerate}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-text-secondary hover:text-text-primary border border-border hover:border-border-light transition-all"
+            >
+              <RefreshCw size={12} />
+              Regenerar
+            </button>
+            <button
+              onClick={handleRichExportAll}
+              disabled={exportingAll}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-[#3b82f6]/30 text-[#3b82f6] hover:bg-[#3b82f6]/10 disabled:opacity-50 transition-all"
+            >
+              {exportingAll ? <Loader2 size={12} className="animate-spin" /> : <Layers size={12} />}
+              Baixar Todos
+            </button>
+            <button
+              onClick={handleRichExport}
+              disabled={exporting}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-[#3b82f6] to-[#6366f1] text-white hover:shadow-[0_0_20px_rgba(59,130,246,0.25)] transition-all disabled:opacity-50"
+            >
+              {exporting ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+              Baixar Slide
+            </button>
+          </div>
+        </motion.div>
+
+        {/* ── Caption Editor ──────────────────────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="bg-bg-card border border-border rounded-xl p-4 space-y-3"
+        >
+          <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+            Legenda do post
+          </h3>
+          <textarea
+            value={state.result?.conteudo || ""}
+            onChange={(e) => {
+              if (state.result) {
+                setField("result", { ...state.result, conteudo: e.target.value } as WizardState["result"]);
+              }
+            }}
+            rows={4}
+            className="w-full bg-bg-input border border-border rounded-lg px-3 py-2.5 text-sm text-text-primary resize-none focus:outline-none focus:border-accent/50 transition-colors"
+            placeholder="Legenda do post..."
+          />
+          {state.result?.hashtags && state.result.hashtags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {state.result.hashtags.map((tag, i) => (
+                <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-[#3b82f6]/10 text-[#3b82f6]">
+                  #{tag.replace("#", "")}
+                </span>
+              ))}
+            </div>
+          )}
+        </motion.div>
+      </div>
+    );
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     TEMPLATE MODE — original PostCanvas-based rendering
+     ═══════════════════════════════════════════════════════════════════════ */
 
   return (
     <div className="space-y-6">
