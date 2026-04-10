@@ -272,6 +272,45 @@ export function useCopyStudio() {
       setStreamingText("");
       setError(null);
 
+      // ── Auto-create session if none exists ──
+      let activeSessionId = sessionId;
+      if (!activeSessionId && configured) {
+        try {
+          const supabase = createClient();
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data: newSess, error: sessErr } = await supabase
+              .from("copy_sessions")
+              .insert({
+                empresa_id: empresaId,
+                user_id: user.id,
+                title: topic || text.trim().slice(0, 60),
+                format,
+                tone,
+                platforms,
+                topic,
+                current_copy: null,
+                messages: [],
+                dna_context: dna ? (dna as any) : null,
+                style_profile: styleProfile ? (styleProfile as any) : null,
+                status: "draft",
+              })
+              .select("id")
+              .single();
+
+            if (sessErr) {
+              console.warn("[CopyStudio] Auto-create session failed:", sessErr.message);
+            } else if (newSess) {
+              activeSessionId = newSess.id;
+              setSessionId(newSess.id);
+              console.log("[CopyStudio] Auto-created session:", newSess.id);
+            }
+          }
+        } catch (e) {
+          console.warn("[CopyStudio] Auto-create session error:", e);
+        }
+      }
+
       const userMessage: CopyChatMessage = {
         id: crypto.randomUUID(),
         role: "user",
@@ -291,7 +330,7 @@ export function useCopyStudio() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            session_id: sessionId,
+            session_id: activeSessionId,
             message: text.trim(),
             format,
             tone,
@@ -448,8 +487,35 @@ export function useCopyStudio() {
           setMessages((prev) => [...prev, assistantMessage]);
         }
 
-        // Trigger auto-save
-        debouncedSave();
+        // Trigger immediate save (not debounced) using latest ref values
+        // debouncedSave would use stale closure values, so save via ref instead
+        if (configured) {
+          // Wait a tick for React state to flush
+          setTimeout(async () => {
+            const s = latestStateRef.current;
+            if (s.sessionId && s.empresaId) {
+              try {
+                const supabase = createClient();
+                await supabase
+                  .from("copy_sessions")
+                  .update({
+                    format: s.format,
+                    tone: s.tone,
+                    platforms: s.platforms,
+                    topic: s.topic,
+                    current_copy: s.currentCopy,
+                    messages: s.messages,
+                    status: s.status,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq("id", s.sessionId);
+                console.log("[CopyStudio] Immediate save after message OK, session:", s.sessionId);
+              } catch (e) {
+                console.warn("[CopyStudio] Immediate save failed:", e);
+              }
+            }
+          }, 500);
+        }
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") {
           // User cancelled, not an error
@@ -477,7 +543,7 @@ export function useCopyStudio() {
         abortControllerRef.current = null;
       }
     },
-    [empresaId, sessionId, format, tone, platforms, topic, currentCopy, messages, debouncedSave]
+    [empresaId, sessionId, format, tone, platforms, topic, currentCopy, messages, configured, dna, styleProfile]
   );
 
   // ── Send quick action ──
