@@ -18,6 +18,7 @@ const AUTH_ROUTES = ["/login", "/register", "/auth"];
 function AppContent({ children, pathname }: { children: React.ReactNode; pathname: string }) {
   const { empresas, loading } = useEmpresa();
   const supabaseConfigured = isSupabaseConfigured();
+  const isEditorPage = pathname.startsWith("/studio/editor");
 
   // Show wizard automatically when Supabase is configured but user has no empresas
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -38,7 +39,7 @@ function AppContent({ children, pathname }: { children: React.ReactNode; pathnam
     <>
       <div className="flex min-h-screen bg-bg-primary">
         <Sidebar />
-        <main className="flex-1 overflow-auto bg-bg-primary pt-14 md:pt-0">
+        <main className={`flex-1 bg-bg-primary pt-14 md:pt-0 ${isEditorPage ? 'overflow-hidden' : 'overflow-auto'}`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={pathname}
@@ -46,7 +47,9 @@ function AppContent({ children, pathname }: { children: React.ReactNode; pathnam
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-              className="mx-auto max-w-[1400px] px-4 py-4 sm:px-6 sm:py-6 md:px-8 md:py-8"
+              className={isEditorPage
+                ? "h-[calc(100vh-3.5rem)] md:h-screen"
+                : "mx-auto max-w-[1400px] px-4 py-4 sm:px-6 sm:py-6 md:px-8 md:py-8"}
             >
               {children}
             </motion.div>

@@ -133,11 +133,41 @@ export function useCopyStudio() {
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Refs for flush-on-unmount (avoid stale closures in cleanup)
+  const latestStateRef = useRef({
+    sessionId: null as string | null,
+    format: "post" as ContentFormat,
+    tone: "casual" as ContentTone,
+    platforms: ["instagram"] as string[],
+    topic: "",
+    currentCopy: null as CopyContent | null,
+    messages: [] as CopyChatMessage[],
+    status: "draft" as CopySessionStatus,
+    empresaId: undefined as string | undefined,
+    configured: false,
+  });
+
   const configured = isSupabaseConfigured();
 
   // ── Derived ──
   const hasDNA = !!dna;
   const hasPatterns = !!styleProfile;
+
+  // Keep latestStateRef in sync for cleanup
+  useEffect(() => {
+    latestStateRef.current = {
+      sessionId,
+      format,
+      tone,
+      platforms,
+      topic,
+      currentCopy,
+      messages,
+      status,
+      empresaId,
+      configured,
+    };
+  }, [sessionId, format, tone, platforms, topic, currentCopy, messages, status, empresaId, configured]);
 
   // ── Auto-save (debounced) ──
   const debouncedSave = useCallback(() => {
@@ -176,16 +206,60 @@ export function useCopyStudio() {
     }, 2000);
   }, [sessionId, empresaId, configured, format, tone, platforms, topic, currentCopy, messages, status]);
 
-  // ── Cleanup debounce on unmount ──
+  // ── Flush save on unmount ──
   useEffect(() => {
     return () => {
+      // Cancel any pending debounced save
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
+      // Abort any in-flight streaming request
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
+      // Immediately save current state before unmounting
+      const s = latestStateRef.current;
+      if (s.sessionId && s.configured && s.empresaId && s.messages.length > 0) {
+        const supabase = createClient();
+        supabase
+          .from("copy_sessions")
+          .update({
+            format: s.format,
+            tone: s.tone,
+            platforms: s.platforms,
+            topic: s.topic,
+            current_copy: s.currentCopy,
+            messages: s.messages,
+            status: s.status,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", s.sessionId)
+          .then(() => {});
+      }
     };
+  }, []);
+
+  // ── Save on browser close / tab navigation ──
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const s = latestStateRef.current;
+      if (s.sessionId && s.configured && s.empresaId && s.messages.length > 0) {
+        // sendBeacon is fire-and-forget, reliable on page unload
+        const payload = JSON.stringify({
+          sessionId: s.sessionId,
+          format: s.format,
+          tone: s.tone,
+          platforms: s.platforms,
+          topic: s.topic,
+          currentCopy: s.currentCopy,
+          messages: s.messages,
+          status: s.status,
+        });
+        navigator.sendBeacon("/api/copy-sessions/save", payload);
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, []);
 
   // ── Send message ──

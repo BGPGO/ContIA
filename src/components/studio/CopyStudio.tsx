@@ -6,11 +6,17 @@ import { motion, AnimatePresence } from "motion/react";
 import {
   MessageSquareText,
   ChevronDown,
+  ChevronRight,
   Pencil,
   Check,
   X,
   Send,
   Sparkles,
+  FileText,
+  Layers,
+  Video,
+  Mail,
+  PenTool,
 } from "lucide-react";
 import type { ContentFormat, ContentTone } from "@/types/ai";
 import type {
@@ -36,14 +42,6 @@ const FORMAT_OPTIONS: { value: ContentFormat; label: string }[] = [
   { value: "copy", label: "Copy" },
 ];
 
-const TONE_OPTIONS: { value: ContentTone; label: string }[] = [
-  { value: "casual", label: "Casual" },
-  { value: "formal", label: "Formal" },
-  { value: "tecnico", label: "Tecnico" },
-  { value: "divertido", label: "Divertido" },
-  { value: "inspirador", label: "Inspirador" },
-];
-
 const PLATFORM_OPTIONS = [
   { value: "instagram", label: "IG", color: "var(--color-instagram)" },
   { value: "facebook", label: "FB", color: "var(--color-facebook)" },
@@ -58,6 +56,37 @@ const WELCOME_CHIPS = [
   { label: "Reels trending", message: "Sugira um reels baseado em tendencias do meu nicho, usando o tom da minha marca." },
   { label: "Story urgente", message: "Preciso de um story rapido para hoje. O que sugere baseado nos meus temas?" },
 ];
+
+const DRAFT_FORMAT_ICON: Record<ContentFormat, typeof FileText> = {
+  post: FileText,
+  carrossel: Layers,
+  reels: Video,
+  email: Mail,
+  copy: PenTool,
+};
+
+const DRAFT_FORMAT_LABEL: Record<ContentFormat, string> = {
+  post: "Post",
+  carrossel: "Carrossel",
+  reels: "Reels",
+  email: "Email",
+  copy: "Copy",
+};
+
+function formatDraftDate(dateStr: string) {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (minutes < 1) return "Agora";
+  if (minutes < 60) return `${minutes}min`;
+  if (hours < 24) return `${hours}h`;
+  if (days < 7) return `${days}d`;
+  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+}
 
 function MiniSelect<T extends string>({
   value,
@@ -363,13 +392,6 @@ export function CopyStudio() {
             onChange={studio.setFormat}
             label="Formato"
           />
-          <MiniSelect
-            value={studio.tone}
-            options={TONE_OPTIONS}
-            onChange={studio.setTone}
-            label="Tom"
-          />
-
           {/* Platform toggles */}
           <div className="flex items-center gap-0.5 ml-1">
             {PLATFORM_OPTIONS.map((plat) => {
@@ -466,6 +488,49 @@ export function CopyStudio() {
                     </button>
                   ))}
                 </div>
+
+                {/* Recent drafts */}
+                {(() => {
+                  const draftSessions = sessions
+                    .filter((s) => s.status === "draft")
+                    .slice(0, 5);
+
+                  if (draftSessions.length === 0) return null;
+
+                  return (
+                    <div className="w-full space-y-2">
+                      <p className="text-xs font-medium text-text-muted uppercase tracking-wider">
+                        Rascunhos
+                      </p>
+                      <div className="space-y-1.5">
+                        {draftSessions.map((draft) => {
+                          const FmtIcon = DRAFT_FORMAT_ICON[draft.format] || FileText;
+                          return (
+                            <button
+                              key={draft.id}
+                              type="button"
+                              onClick={() => studio.selectSession(draft.id)}
+                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
+                                bg-[#141736] border border-white/5
+                                hover:border-[#4ecdc4]/20 transition-all cursor-pointer text-left"
+                            >
+                              <FmtIcon size={14} className="text-text-muted shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-text-primary truncate">
+                                  {draft.title || "Sem titulo"}
+                                </p>
+                                <p className="text-[10px] text-text-muted">
+                                  {formatDraftDate(draft.updated_at)} · {DRAFT_FORMAT_LABEL[draft.format]}
+                                </p>
+                              </div>
+                              <ChevronRight size={14} className="text-text-muted" />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Input bar */}
                 <div className="w-full flex items-center gap-2 mt-2">

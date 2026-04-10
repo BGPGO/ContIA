@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useEmpresa } from "@/hooks/useEmpresa";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/client";
@@ -54,6 +54,7 @@ export function useCopySessions(): UseCopySessionsReturn {
   const [sessions, setSessions] = useState<CopySessionSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const draftCleanupRunning = useRef(false);
 
   // ── Fetch sessions ──
   const fetchSessions = useCallback(async () => {
@@ -89,6 +90,43 @@ export function useCopySessions(): UseCopySessionsReturn {
   useEffect(() => {
     fetchSessions();
   }, [fetchSessions]);
+
+  // ── Cleanup old drafts (keep max 5) ──
+  useEffect(() => {
+    if (!configured || !empresaId) return;
+    if (draftCleanupRunning.current) return;
+
+    const drafts = sessions.filter((s) => s.status === "draft");
+    if (drafts.length <= 5) return;
+
+    // Sessions are ordered by updated_at DESC, so oldest drafts are at the end
+    const draftsToDelete = drafts.slice(5);
+    draftCleanupRunning.current = true;
+
+    (async () => {
+      try {
+        const supabase = createClient();
+        const idsToDelete = draftsToDelete.map((d) => d.id);
+        const { error: err } = await supabase
+          .from("copy_sessions")
+          .delete()
+          .in("id", idsToDelete);
+
+        if (err) {
+          console.warn("[CopySessions] Draft cleanup error:", err.message);
+          return;
+        }
+
+        // Remove from local state
+        const deleteSet = new Set(idsToDelete);
+        setSessions((prev) => prev.filter((s) => !deleteSet.has(s.id)));
+      } catch (e) {
+        console.warn("[CopySessions] Draft cleanup failed:", e);
+      } finally {
+        draftCleanupRunning.current = false;
+      }
+    })();
+  }, [sessions, configured, empresaId]);
 
   // ── Create session ──
   const createSession = useCallback(

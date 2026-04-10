@@ -28,7 +28,21 @@ import type { PsdTemplate } from "@/lib/psd-templates";
    Helper: Convert CopyContent → CopyToTemplatePayload
    ═══════════════════════════════════════════════════════════════════════════ */
 
-function copyToCopyPayload(copy: CopyContent, empresa?: { nome?: string } | null): CopyToTemplatePayload {
+function copyToCopyPayload(copy: CopyContent, empresa?: { nome?: string } | null, slideIndex?: number): CopyToTemplatePayload {
+  // Per-slide payload for carousels
+  if (slideIndex !== undefined && copy.slides && copy.slides[slideIndex]) {
+    const slide = copy.slides[slideIndex];
+    return {
+      headline: slide.headline,
+      body: slide.body,
+      cta: slideIndex === (copy.slides.length - 1) ? copy.cta : undefined,
+      brandName: empresa?.nome,
+      hashtags: slideIndex === 0 ? copy.hashtags : undefined,
+      slideNumber: slide.slideNumber,
+      totalSlides: copy.slides.length,
+    };
+  }
+  // Original behavior for non-carousel / fallback
   return {
     headline: copy.headline,
     subheadline: copy.slides?.[0]?.headline || undefined, // First slide headline as subheadline
@@ -182,6 +196,28 @@ function EditorContent() {
   // ── Canvas dimensions based on aspect ratio ──
   const dims = CANVAS_DIMENSIONS[state.aspectRatio] || CANVAS_DIMENSIONS["1:1"];
 
+  // ── Apply carousel copy: iterate slides and apply per-slide content ──
+  const applyCarouselCopy = useCallback(
+    async (copy: CopyContent, numCanvasSlides: number) => {
+      if (!copy.slides || copy.slides.length === 0) return false;
+      const totalSlides = Math.min(numCanvasSlides, copy.slides.length);
+      for (let i = 0; i < totalSlides; i++) {
+        await new Promise(r => setTimeout(r, 300));
+        switchSlide(i);
+        await new Promise(r => setTimeout(r, 300));
+        const slidePayload = copyToCopyPayload(copy, empresa, i);
+        applyCopy(slidePayload);
+      }
+      // Return to first slide
+      if (totalSlides > 1) {
+        await new Promise(r => setTimeout(r, 200));
+        switchSlide(0);
+      }
+      return true;
+    },
+    [switchSlide, applyCopy, empresa]
+  );
+
   // ── Load copy from session ──
   useEffect(() => {
     if (!sessionId) return;
@@ -291,8 +327,12 @@ function EditorContent() {
           setAspectRatio(template.aspect_ratio as "1:1" | "4:5" | "9:16");
         }
       }
-      // Use 300ms delay to ensure canvas has fully rendered all objects
-      if (copyData) {
+      // Apply per-slide copy for carousels, single copy otherwise
+      if (rawCopyContent && rawCopyContent.slides && rawCopyContent.slides.length > 0 && template.format === "carousel") {
+        console.log('[Editor] Applying per-slide copy after template gallery select');
+        const slideCount = (template.canvas_json as { slides?: unknown[] })?.slides?.length || rawCopyContent.slides.length;
+        await applyCarouselCopy(rawCopyContent, slideCount);
+      } else if (copyData) {
         console.log('[Editor] Applying copy after template gallery select:', copyData);
         setTimeout(() => {
           applyCopy(copyData);
@@ -300,15 +340,18 @@ function EditorContent() {
       }
       setShowGallery(false);
     },
-    [loadTemplate, setAspectRatio, applyCopy, copyData]
+    [loadTemplate, setAspectRatio, applyCopy, copyData, rawCopyContent, applyCarouselCopy]
   );
 
   // ── Handle preset selection ──
   const handlePresetSelect = useCallback(
     async (presetId: string) => {
       await loadPreset(presetId, state.aspectRatio);
-      // Use 300ms delay to ensure canvas has fully rendered all objects
-      if (copyData) {
+      // Apply per-slide copy for carousels if available
+      if (rawCopyContent && rawCopyContent.slides && rawCopyContent.slides.length > 0) {
+        console.log('[Editor] Applying per-slide copy after preset select:', presetId);
+        await applyCarouselCopy(rawCopyContent, rawCopyContent.slides.length);
+      } else if (copyData) {
         console.log('[Editor] Applying copy after preset select:', presetId, copyData);
         setTimeout(() => {
           applyCopy(copyData);
@@ -316,7 +359,7 @@ function EditorContent() {
       }
       setShowGallery(false);
     },
-    [loadPreset, state.aspectRatio, applyCopy, copyData]
+    [loadPreset, state.aspectRatio, applyCopy, copyData, rawCopyContent, applyCarouselCopy]
   );
 
   // ── Handle PSD template selection ──
@@ -334,9 +377,12 @@ function EditorContent() {
         const allSlides = convertPsdCarouselToFabricSlides(template);
         await loadCarousel(allSlides);
 
-        // Apply copy to the first (current) slide — use 300ms delay for canvas render
-        if (copyData) {
-          console.log('[Editor] Applying copy after PSD carousel load:', copyData);
+        // Apply copy per-slide if carousel copy exists, otherwise fallback to single apply
+        if (rawCopyContent && rawCopyContent.slides && rawCopyContent.slides.length > 0) {
+          console.log('[Editor] Applying per-slide copy after PSD carousel load');
+          await applyCarouselCopy(rawCopyContent, allSlides.length);
+        } else if (copyData) {
+          console.log('[Editor] Applying single copy after PSD carousel load:', copyData);
           setTimeout(() => {
             applyCopy(copyData);
           }, 300);
@@ -358,7 +404,7 @@ function EditorContent() {
 
       setShowGallery(false);
     },
-    [loadTemplate, loadCarousel, setAspectRatio, applyCopy, copyData]
+    [loadTemplate, loadCarousel, setAspectRatio, applyCopy, copyData, rawCopyContent, applyCarouselCopy]
   );
 
   // ── Handle aspect ratio change ──
