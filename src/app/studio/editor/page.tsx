@@ -2,7 +2,7 @@
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState, useEffect, useCallback, Suspense, useRef } from "react";
-import { Loader2, ClipboardCopy, RefreshCw, Type } from "lucide-react";
+import { Loader2, ClipboardCopy, RefreshCw, Type, Sparkles } from "lucide-react";
 import { FabricCanvas } from "@/components/canvas/FabricCanvas";
 import type { FabricCanvasRef, SelectionInfo, TextSelectionInfo } from "@/components/canvas/FabricCanvas";
 import { CanvasToolbar } from "@/components/canvas/CanvasToolbar";
@@ -141,10 +141,12 @@ function CopyTextPanel({
   copy,
   copyData,
   onApply,
+  onGenerateLayout,
 }: {
   copy: CopyContent | null;
   copyData: CopyToTemplatePayload | null;
   onApply: () => void;
+  onGenerateLayout?: () => void;
 }) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
@@ -176,6 +178,19 @@ function CopyTextPanel({
         <RefreshCw size={12} />
         Aplicar Copy no Template
       </button>
+
+      {/* Generate smart layout from copy */}
+      {onGenerateLayout && (
+        <button
+          type="button"
+          onClick={onGenerateLayout}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold
+            text-[#e8eaff] bg-[#141736] border border-white/10 cursor-pointer transition-all hover:border-[#4ecdc4]/30"
+        >
+          <Sparkles size={12} className="text-[#4ecdc4]" />
+          Gerar Layout Inteligente
+        </button>
+      )}
 
       {/* Headline */}
       {copy.headline && (
@@ -634,6 +649,28 @@ function EditorContent() {
     setCanvasReady(true);
   }, []);
 
+  // ── Generate smart layout from copy content ──
+  const handleGenerateLayout = useCallback(async () => {
+    if (!rawCopyContent) return;
+    const { generateSmartLayout, generateCarouselLayout } = await import("@/lib/smart-layout");
+    const brand = {
+      primaryColor: empresa?.cor_primaria || "#4ecdc4",
+      secondaryColor: empresa?.cor_secundaria || "#6c5ce7",
+      brandName: empresa?.nome,
+    };
+    const format = state.aspectRatio === "9:16" ? "reels" as const : "post" as const;
+    const options = { aspectRatio: state.aspectRatio, format };
+
+    if (rawCopyContent.slides && rawCopyContent.slides.length > 0) {
+      const slideJsons = generateCarouselLayout(rawCopyContent, brand, options);
+      await loadCarousel(slideJsons);
+    } else {
+      const canvasJson = generateSmartLayout(rawCopyContent, brand, options);
+      await loadTemplate(canvasJson);
+    }
+    markDirty();
+  }, [rawCopyContent, empresa, state.aspectRatio, loadTemplate, loadCarousel, markDirty]);
+
   // ── Re-apply copy handler (for CopyTextPanel) ──
   const handleReapplyCopy = useCallback(() => {
     if (rawCopyContent && rawCopyContent.slides && rawCopyContent.slides.length > 0 && isCarousel) {
@@ -781,6 +818,7 @@ function EditorContent() {
                 copy={rawCopyContent}
                 copyData={copyData}
                 onApply={handleReapplyCopy}
+                onGenerateLayout={handleGenerateLayout}
               />
             ) : rightPanelTab === "properties" ? (
               <PropertyPanel

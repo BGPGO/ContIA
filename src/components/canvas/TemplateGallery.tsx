@@ -23,6 +23,10 @@ import {
   ListOrdered,
   Copy,
   Trash2,
+  Megaphone,
+  TrendingUp,
+  List,
+  MousePointerClick,
   Sparkles,
   Image as ImageIcon,
   PenTool,
@@ -32,6 +36,8 @@ import {
 } from "lucide-react";
 import type { VisualTemplate, VisualTemplateSummary } from "@/types/canvas";
 import type { PsdTemplate } from "@/lib/psd-templates";
+import { usePresetPreviews } from "@/hooks/usePresetPreviews";
+import { ALL_PRESET_IDS } from "@/lib/preset-templates";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Preset template metadata
@@ -59,6 +65,10 @@ const PRESETS: PresetMeta[] = [
   { id: "tweet-quote", name: "Tweet/Quote", description: "Card de tweet destacado", icon: MessageSquare, bgColor: "#0c0f24", accentColor: "#4ecdc4" },
   { id: "vitor-thread", name: "Thread", description: "Slide de thread numerada", icon: Hash, bgColor: "#080b1e", accentColor: "#6c5ce7" },
   { id: "vitor-quote", name: "Frase Autoral", description: "Frase com barra e autor", icon: Quote, bgColor: "#080b1e", accentColor: "#6c5ce7" },
+  { id: "brand-hero", name: "Brand Hero", description: "Destaque de marca com gradiente", icon: Megaphone, bgColor: "#080b1e", accentColor: "#6c5ce7" },
+  { id: "data-card", name: "Card de Dados", description: "Numeros e metricas em destaque", icon: TrendingUp, bgColor: "#080b1e", accentColor: "#4ecdc4" },
+  { id: "list-tips", name: "Lista de Dicas", description: "Layout numerado tipo listicle", icon: List, bgColor: "#080b1e", accentColor: "#4ecdc4" },
+  { id: "cta-action", name: "CTA / Acao", description: "Foco em conversao com botao", icon: MousePointerClick, bgColor: "#080b1e", accentColor: "#4ecdc4" },
 ];
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -134,6 +144,12 @@ export function TemplateGallery({
   const [formatFilter, setFormatFilter] = useState<FormatFilter>("todos");
   const [ratioFilter, setRatioFilter] = useState<RatioFilter>("todos");
   const [hoveredPreset, setHoveredPreset] = useState<string | null>(null);
+
+  // Generate real canvas previews for presets
+  const presetPreviews = usePresetPreviews(
+    isOpen ? ALL_PRESET_IDS : [],
+    aspectRatio || "1:1"
+  );
   const [hoveredBrand, setHoveredBrand] = useState<string | null>(null);
   const [psdTemplates, setPsdTemplates] = useState<PsdTemplate[]>([]);
   const [hoveredPsd, setHoveredPsd] = useState<string | null>(null);
@@ -368,6 +384,7 @@ export function TemplateGallery({
                   {filteredPresets.map((preset) => {
                     const Icon = preset.icon;
                     const isHovered = hoveredPreset === preset.id;
+                    const previewUrl = presetPreviews.get(preset.id);
 
                     return (
                       <motion.button
@@ -379,55 +396,63 @@ export function TemplateGallery({
                         whileTap={{ scale: 0.97 }}
                         className="group relative bg-[#141736] rounded-xl overflow-hidden hover:ring-2 hover:ring-[#4ecdc4]/50 cursor-pointer transition-all duration-200"
                       >
-                        {/* Thumbnail area */}
-                        <div
-                          className="aspect-square flex flex-col items-center justify-center gap-2 relative"
-                          style={{ backgroundColor: preset.bgColor }}
-                        >
-                          {/* Accent bar */}
-                          <div
-                            className="absolute top-0 left-0 right-0 h-1 opacity-80"
-                            style={{ backgroundColor: preset.accentColor }}
+                        {/* Thumbnail area — real preview or icon fallback */}
+                        {previewUrl ? (
+                          <img
+                            src={previewUrl}
+                            alt={preset.name}
+                            className="w-full aspect-square object-cover rounded-t-lg bg-[#080b1e]"
                           />
-
-                          {/* Icon */}
+                        ) : (
                           <div
-                            className="w-10 h-10 rounded-lg flex items-center justify-center transition-transform duration-200"
-                            style={{
-                              backgroundColor: `${preset.accentColor}20`,
-                              transform: isHovered ? "scale(1.1)" : "scale(1)",
-                            }}
+                            className="aspect-square flex flex-col items-center justify-center gap-2 relative"
+                            style={{ backgroundColor: preset.bgColor }}
                           >
-                            <Icon
-                              size={20}
-                              style={{ color: preset.accentColor }}
+                            {/* Accent bar */}
+                            <div
+                              className="absolute top-0 left-0 right-0 h-1 opacity-80"
+                              style={{ backgroundColor: preset.accentColor }}
                             />
-                          </div>
 
-                          {/* Preview lines */}
-                          <div className="flex flex-col items-center gap-1 px-4 w-full">
+                            {/* Icon */}
                             <div
-                              className="h-2 rounded-full w-3/4"
+                              className="w-10 h-10 rounded-lg flex items-center justify-center transition-transform duration-200"
                               style={{
-                                backgroundColor:
-                                  preset.bgColor === "#ffffff"
-                                    ? "#1a1a2e"
-                                    : "#e8eaff",
-                                opacity: 0.3,
+                                backgroundColor: `${preset.accentColor}20`,
+                                transform: isHovered ? "scale(1.1)" : "scale(1)",
                               }}
-                            />
-                            <div
-                              className="h-1.5 rounded-full w-1/2"
-                              style={{
-                                backgroundColor:
-                                  preset.bgColor === "#ffffff"
-                                    ? "#1a1a2e"
-                                    : "#e8eaff",
-                                opacity: 0.15,
-                              }}
-                            />
+                            >
+                              <Icon
+                                size={20}
+                                style={{ color: preset.accentColor }}
+                              />
+                            </div>
+
+                            {/* Loading shimmer */}
+                            <div className="flex flex-col items-center gap-1 px-4 w-full">
+                              <div
+                                className="h-2 rounded-full w-3/4 animate-pulse"
+                                style={{
+                                  backgroundColor:
+                                    preset.bgColor === "#ffffff"
+                                      ? "#1a1a2e"
+                                      : "#e8eaff",
+                                  opacity: 0.15,
+                                }}
+                              />
+                              <div
+                                className="h-1.5 rounded-full w-1/2 animate-pulse"
+                                style={{
+                                  backgroundColor:
+                                    preset.bgColor === "#ffffff"
+                                      ? "#1a1a2e"
+                                      : "#e8eaff",
+                                  opacity: 0.1,
+                                }}
+                              />
+                            </div>
                           </div>
-                        </div>
+                        )}
 
                         {/* Label */}
                         <div className="p-2.5">

@@ -358,6 +358,98 @@ export function PropertyPanel({
     updateProp({ fill: 'transparent', stroke: obj.stroke || '#4ecdc4', strokeWidth: Math.max(obj.strokeWidth || 0, 2) });
   }, [canvasRef, updateProp]);
 
+  // ── Gradient helpers ──
+  // Read gradient properties from the currently selected object
+  const obj = canvasRef.current?.getSelectedObject();
+  const objFill = obj?.fill;
+  let gradientColor1 = '#4ecdc4';
+  let gradientColor2 = '#6c5ce7';
+  let gradientAngle = 135;
+  let gradientType: 'linear' | 'radial' = 'linear';
+
+  if (objFill && typeof objFill === 'object' && 'colorStops' in objFill) {
+    const stops = (objFill as any).colorStops;
+    if (stops?.[0]?.color) gradientColor1 = stops[0].color;
+    if (stops?.[1]?.color) gradientColor2 = stops[1].color;
+    const coords = (objFill as any).coords;
+    if (coords && !('r1' in coords)) {
+      const angle = Math.round(Math.atan2((coords.y2 || 0) - (coords.y1 || 0), (coords.x2 || 0) - (coords.x1 || 0)) * (180 / Math.PI));
+      gradientAngle = angle < 0 ? angle + 360 : angle;
+    }
+    gradientType = (objFill as any).type || 'linear';
+  }
+
+  const fillType = selection?.props.fill === '__gradient__'
+    ? 'gradient'
+    : selection?.props.fill === 'transparent'
+      ? 'none'
+      : 'solid';
+
+  const applyGradient = useCallback(async (changes: { type?: 'linear' | 'radial'; color1?: string; color2?: string; angle?: number }) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !selection) return;
+
+    const { Gradient } = await import('fabric');
+    const fabricCanvas = canvas.getCanvas();
+    const activeObj = fabricCanvas.getActiveObject();
+    if (!activeObj) return;
+
+    // Read current values from the object's fill
+    const currentFill = activeObj.fill;
+    let c1 = changes.color1 || gradientColor1;
+    let c2 = changes.color2 || gradientColor2;
+    let type = changes.type || gradientType;
+    let angle = changes.angle ?? gradientAngle;
+
+    if (currentFill && typeof currentFill === 'object' && 'colorStops' in currentFill) {
+      const stops = (currentFill as any).colorStops;
+      if (!changes.color1 && stops?.[0]?.color) c1 = stops[0].color;
+      if (!changes.color2 && stops?.[1]?.color) c2 = stops[1].color;
+      if (changes.type === undefined) {
+        type = (currentFill as any).type || 'linear';
+      }
+      if (changes.angle === undefined && !('r1' in ((currentFill as any).coords || {}))) {
+        const coords = (currentFill as any).coords;
+        if (coords) {
+          const a = Math.round(Math.atan2((coords.y2 || 0) - (coords.y1 || 0), (coords.x2 || 0) - (coords.x1 || 0)) * (180 / Math.PI));
+          angle = a < 0 ? a + 360 : a;
+        }
+      }
+    }
+
+    const w = (activeObj as any).width || 100;
+    const h = (activeObj as any).height || 100;
+
+    let coords;
+    if (type === 'radial') {
+      coords = { x1: w / 2, y1: h / 2, x2: w / 2, y2: h / 2, r1: 0, r2: Math.max(w, h) / 2 };
+    } else {
+      const rad = (angle * Math.PI) / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+      coords = {
+        x1: w / 2 - (cos * w) / 2,
+        y1: h / 2 - (sin * h) / 2,
+        x2: w / 2 + (cos * w) / 2,
+        y2: h / 2 + (sin * h) / 2,
+      };
+    }
+
+    const gradient = new Gradient({
+      type,
+      gradientUnits: 'pixels',
+      coords,
+      colorStops: [
+        { offset: 0, color: c1 },
+        { offset: 1, color: c2 },
+      ],
+    });
+
+    activeObj.set({ fill: gradient });
+    (activeObj as any).dirty = true;
+    fabricCanvas.requestRenderAll();
+  }, [canvasRef, selection, gradientColor1, gradientColor2, gradientType, gradientAngle]);
+
   if (!selection) {
     return (
       <div className="w-full shrink-0 bg-[#0c0f24] flex flex-col">
@@ -520,7 +612,7 @@ export function PropertyPanel({
                   type="button"
                   onClick={() => setFillSolid()}
                   className={`flex-1 px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-all cursor-pointer border ${
-                    selection.props.fill !== "transparent" && selection.props.fill !== "__gradient__"
+                    fillType === 'solid'
                       ? "bg-[#4ecdc4]/15 border-[#4ecdc4]/30 text-[#4ecdc4]"
                       : "bg-[#141736] border-white/10 text-[#8b8fb0] hover:bg-white/5"
                   }`}
@@ -531,7 +623,7 @@ export function PropertyPanel({
                   type="button"
                   onClick={setFillGradient}
                   className={`flex-1 px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-all cursor-pointer border ${
-                    selection.props.fill === "__gradient__"
+                    fillType === 'gradient'
                       ? "bg-[#6c5ce7]/15 border-[#6c5ce7]/30 text-[#6c5ce7]"
                       : "bg-[#141736] border-white/10 text-[#8b8fb0] hover:bg-white/5"
                   }`}
@@ -542,7 +634,7 @@ export function PropertyPanel({
                   type="button"
                   onClick={setNoFill}
                   className={`flex-1 px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-all cursor-pointer border ${
-                    selection.props.fill === "transparent"
+                    fillType === 'none'
                       ? "bg-white/10 border-white/20 text-[#e8eaff]"
                       : "bg-[#141736] border-white/10 text-[#8b8fb0] hover:bg-white/5"
                   }`}
@@ -550,15 +642,112 @@ export function PropertyPanel({
                   Sem
                 </button>
               </div>
+
+              {/* Gradient editor controls */}
+              {fillType === 'gradient' && (
+                <div className="space-y-3 mt-3">
+                  {/* Type toggle: Linear / Radial */}
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => applyGradient({ type: 'linear' })}
+                      className={`flex-1 py-1.5 rounded-lg text-[10px] font-medium transition-all cursor-pointer ${
+                        gradientType === 'linear'
+                          ? 'bg-[#4ecdc4]/15 text-[#4ecdc4] border border-[#4ecdc4]/20'
+                          : 'text-[#8b8fb0] border border-transparent hover:bg-white/5'
+                      }`}
+                    >Linear</button>
+                    <button
+                      type="button"
+                      onClick={() => applyGradient({ type: 'radial' })}
+                      className={`flex-1 py-1.5 rounded-lg text-[10px] font-medium transition-all cursor-pointer ${
+                        gradientType === 'radial'
+                          ? 'bg-[#4ecdc4]/15 text-[#4ecdc4] border border-[#4ecdc4]/20'
+                          : 'text-[#8b8fb0] border border-transparent hover:bg-white/5'
+                      }`}
+                    >Radial</button>
+                  </div>
+
+                  {/* Color stops */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 space-y-1">
+                      <label className="text-[9px] text-[#8b8fb0]">Cor 1</label>
+                      <input
+                        type="color"
+                        value={gradientColor1}
+                        onChange={(e) => applyGradient({ color1: e.target.value })}
+                        className="w-full h-7 rounded cursor-pointer bg-transparent"
+                      />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <label className="text-[9px] text-[#8b8fb0]">Cor 2</label>
+                      <input
+                        type="color"
+                        value={gradientColor2}
+                        onChange={(e) => applyGradient({ color2: e.target.value })}
+                        className="w-full h-7 rounded cursor-pointer bg-transparent"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Angle slider (linear only) */}
+                  {gradientType === 'linear' && (
+                    <div className="space-y-1">
+                      <div className="flex justify-between">
+                        <label className="text-[9px] text-[#8b8fb0]">Angulo</label>
+                        <span className="text-[9px] text-[#5e6388]">{gradientAngle}°</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="360"
+                        value={gradientAngle}
+                        onChange={(e) => applyGradient({ angle: Number(e.target.value) })}
+                        className="w-full h-1 rounded-full appearance-none bg-white/10 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#4ecdc4] cursor-pointer"
+                      />
+                      {/* Quick angle presets */}
+                      <div className="flex gap-1">
+                        {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => (
+                          <button
+                            key={a}
+                            type="button"
+                            onClick={() => applyGradient({ angle: a })}
+                            className={`flex-1 py-1 rounded text-[9px] cursor-pointer transition-all ${
+                              gradientAngle === a
+                                ? 'bg-[#4ecdc4]/15 text-[#4ecdc4]'
+                                : 'text-[#8b8fb0] hover:bg-white/5'
+                            }`}
+                          >
+                            {a}°
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Preview bar */}
+                  <div
+                    className="h-4 rounded-lg border border-white/10"
+                    style={{
+                      background: gradientType === 'linear'
+                        ? `linear-gradient(${gradientAngle}deg, ${gradientColor1}, ${gradientColor2})`
+                        : `radial-gradient(circle, ${gradientColor1}, ${gradientColor2})`,
+                    }}
+                  />
+                </div>
+              )}
             </div>
           )}
 
-          <ColorSwatches
-            label="Preenchimento"
-            value={selection.props.fill === "__gradient__" ? "#4ecdc4" : (selection.props.fill || "#4ecdc4")}
-            onChange={(color) => updateProp({ fill: color })}
-            colors={defaultBrandColors}
-          />
+          {/* Color swatches: only show for solid fill or non-shape objects */}
+          {(!isShape || fillType === 'solid') && (
+            <ColorSwatches
+              label="Preenchimento"
+              value={selection.props.fill === "__gradient__" ? "#4ecdc4" : (selection.props.fill || "#4ecdc4")}
+              onChange={(color) => updateProp({ fill: color })}
+              colors={defaultBrandColors}
+            />
+          )}
 
           {/* Corner radius for Rects */}
           {isRect && (
