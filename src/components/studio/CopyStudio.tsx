@@ -333,6 +333,7 @@ export function CopyStudio() {
   };
 
   const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
+  const [draftsOpen, setDraftsOpen] = useState(false);
   const [quickInput, setQuickInput] = useState("");
 
   // Determine layout state:
@@ -432,6 +433,70 @@ export function CopyStudio() {
 
         {/* Right-side buttons */}
         <div className="flex items-center gap-1.5 ml-auto">
+          {/* Drafts dropdown */}
+          {(() => {
+            const draftSessions = sessions
+              .filter((s) => s.status === "draft")
+              .slice(0, 5);
+
+            if (draftSessions.length === 0) return null;
+
+            return (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setDraftsOpen(!draftsOpen)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium
+                    bg-bg-input border border-border text-text-secondary
+                    hover:border-border-light hover:text-text-primary transition-all cursor-pointer"
+                >
+                  <FileText size={12} />
+                  Rascunhos
+                  <span className="ml-0.5 w-4 h-4 rounded-full bg-accent/20 text-accent text-[10px] font-bold flex items-center justify-center">
+                    {draftSessions.length}
+                  </span>
+                </button>
+
+                <AnimatePresence>
+                  {draftsOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setDraftsOpen(false)} />
+                      <motion.div
+                        initial={{ opacity: 0, y: -4, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -4, scale: 0.96 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute top-full right-0 mt-1 z-50 bg-[#141736] border border-white/10 rounded-xl shadow-xl w-[280px] py-2 max-h-[300px] overflow-y-auto"
+                      >
+                        <p className="px-3 py-1 text-[10px] font-medium text-[#5e6388] uppercase tracking-wider">Rascunhos recentes</p>
+                        {draftSessions.map((draft) => {
+                          const FmtIcon = DRAFT_FORMAT_ICON[draft.format] || FileText;
+                          return (
+                            <button
+                              key={draft.id}
+                              type="button"
+                              onClick={() => {
+                                studio.selectSession(draft.id);
+                                setDraftsOpen(false);
+                              }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-white/5 transition-colors cursor-pointer text-left"
+                            >
+                              <FmtIcon size={13} className="text-[#5e6388] shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-[#e8eaff] truncate">{draft.title || "Sem titulo"}</p>
+                                <p className="text-[10px] text-[#5e6388]">{formatDraftDate(draft.updated_at)} · {DRAFT_FORMAT_LABEL[draft.format]}</p>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })()}
+
           {/* Mobile preview toggle */}
           {studio.currentCopy && (
             <button

@@ -2,7 +2,7 @@
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState, useEffect, useCallback, Suspense, useRef } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, ClipboardCopy, RefreshCw, Type } from "lucide-react";
 import { FabricCanvas } from "@/components/canvas/FabricCanvas";
 import type { FabricCanvasRef, SelectionInfo, TextSelectionInfo } from "@/components/canvas/FabricCanvas";
 import { CanvasToolbar } from "@/components/canvas/CanvasToolbar";
@@ -134,6 +134,156 @@ function SaveTemplateModal({
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   Copy Text Panel — shows session copy for manual copy/paste + re-apply
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function CopyTextPanel({
+  copy,
+  copyData,
+  onApply,
+}: {
+  copy: CopyContent | null;
+  copyData: CopyToTemplatePayload | null;
+  onApply: () => void;
+}) {
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  if (!copy) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full px-4 py-8 text-center">
+        <Type size={24} className="text-[#5e6388] mb-2" />
+        <p className="text-xs text-[#5e6388]">Nenhuma copy carregada</p>
+        <p className="text-[10px] text-[#5e6388]/60 mt-1">Crie uma copy no Copy Studio primeiro</p>
+      </div>
+    );
+  }
+
+  const copyToClipboard = (text: string, field: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 1500);
+  };
+
+  return (
+    <div className="p-3 space-y-4">
+      {/* Re-apply button */}
+      <button
+        type="button"
+        onClick={onApply}
+        className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-white cursor-pointer transition-all hover:opacity-90"
+        style={{ background: "linear-gradient(135deg, #6c5ce7 0%, #4ecdc4 100%)" }}
+      >
+        <RefreshCw size={12} />
+        Aplicar Copy no Template
+      </button>
+
+      {/* Headline */}
+      {copy.headline && (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <label className="text-[10px] font-medium text-[#5e6388] uppercase tracking-wider">Headline</label>
+            <button
+              onClick={() => copyToClipboard(copy.headline!, "headline")}
+              className="p-1 rounded text-[#5e6388] hover:text-[#4ecdc4] cursor-pointer transition-colors"
+              title="Copiar headline"
+            >
+              <ClipboardCopy size={10} className={copiedField === "headline" ? "text-[#4ecdc4]" : ""} />
+            </button>
+          </div>
+          <p className="text-sm font-semibold text-[#e8eaff] select-all cursor-text bg-[#080b1e] rounded-lg px-3 py-2 border border-white/5">
+            {copy.headline}
+          </p>
+        </div>
+      )}
+
+      {/* Caption */}
+      {copy.caption && (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <label className="text-[10px] font-medium text-[#5e6388] uppercase tracking-wider">Legenda</label>
+            <button
+              onClick={() => copyToClipboard(copy.caption!, "caption")}
+              className="p-1 rounded text-[#5e6388] hover:text-[#4ecdc4] cursor-pointer transition-colors"
+              title="Copiar legenda"
+            >
+              <ClipboardCopy size={10} className={copiedField === "caption" ? "text-[#4ecdc4]" : ""} />
+            </button>
+          </div>
+          <p className="text-xs text-[#e8eaff]/80 select-all cursor-text bg-[#080b1e] rounded-lg px-3 py-2 border border-white/5 whitespace-pre-line max-h-[120px] overflow-y-auto">
+            {copy.caption}
+          </p>
+        </div>
+      )}
+
+      {/* Slides (carousel) */}
+      {copy.slides && copy.slides.length > 0 && (
+        <div className="space-y-2">
+          <label className="text-[10px] font-medium text-[#5e6388] uppercase tracking-wider">Slides</label>
+          {copy.slides.map((slide, i) => (
+            <div key={i} className="bg-[#080b1e] rounded-lg px-3 py-2 border border-white/5 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-[#4ecdc4]">Slide {slide.slideNumber || i + 1}</span>
+                <button
+                  onClick={() => copyToClipboard(`${slide.headline}\n\n${slide.body}`, `slide-${i}`)}
+                  className="p-1 rounded text-[#5e6388] hover:text-[#4ecdc4] cursor-pointer transition-colors"
+                  title={`Copiar slide ${i + 1}`}
+                >
+                  <ClipboardCopy size={10} className={copiedField === `slide-${i}` ? "text-[#4ecdc4]" : ""} />
+                </button>
+              </div>
+              <p className="text-xs font-semibold text-[#e8eaff] select-all cursor-text">{slide.headline}</p>
+              <p className="text-[11px] text-[#e8eaff]/70 select-all cursor-text whitespace-pre-line">{slide.body}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Hashtags */}
+      {copy.hashtags && copy.hashtags.length > 0 && (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <label className="text-[10px] font-medium text-[#5e6388] uppercase tracking-wider">Hashtags</label>
+            <button
+              onClick={() => copyToClipboard(copy.hashtags!.map((t: string) => `#${t.replace('#', '')}`).join(' '), "hashtags")}
+              className="p-1 rounded text-[#5e6388] hover:text-[#4ecdc4] cursor-pointer transition-colors"
+              title="Copiar hashtags"
+            >
+              <ClipboardCopy size={10} className={copiedField === "hashtags" ? "text-[#4ecdc4]" : ""} />
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {copy.hashtags.map((tag: string, i: number) => (
+              <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-[#4ecdc4]/10 text-[#4ecdc4] select-all cursor-text">
+                #{tag.replace('#', '')}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* CTA */}
+      {copy.cta && (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <label className="text-[10px] font-medium text-[#5e6388] uppercase tracking-wider">CTA</label>
+            <button
+              onClick={() => copyToClipboard(copy.cta || '', "cta")}
+              className="p-1 rounded text-[#5e6388] hover:text-[#4ecdc4] cursor-pointer transition-colors"
+              title="Copiar CTA"
+            >
+              <ClipboardCopy size={10} className={copiedField === "cta" ? "text-[#4ecdc4]" : ""} />
+            </button>
+          </div>
+          <p className="text-xs font-medium text-[#6c5ce7] select-all cursor-text bg-[#080b1e] rounded-lg px-3 py-2 border border-white/5">
+            {copy.cta}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    Main Editor Content (inside Suspense)
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -188,7 +338,7 @@ function EditorContent() {
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [copyData, setCopyData] = useState<CopyToTemplatePayload | null>(null);
   const [rawCopyContent, setRawCopyContent] = useState<CopyContent | null>(null);
-  const [rightPanelTab, setRightPanelTab] = useState<"properties" | "assets">("properties");
+  const [rightPanelTab, setRightPanelTab] = useState<"properties" | "assets" | "copy">("properties");
   const [isLoadingSession, setIsLoadingSession] = useState(!!sessionId);
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(!!templateId);
   const [canvasReady, setCanvasReady] = useState(false);
@@ -484,6 +634,22 @@ function EditorContent() {
     setCanvasReady(true);
   }, []);
 
+  // ── Re-apply copy handler (for CopyTextPanel) ──
+  const handleReapplyCopy = useCallback(() => {
+    if (rawCopyContent && rawCopyContent.slides && rawCopyContent.slides.length > 0 && isCarousel) {
+      applyCarouselCopy(rawCopyContent, slides.length || rawCopyContent.slides.length);
+    } else if (copyData) {
+      applyCopy(copyData);
+    }
+  }, [rawCopyContent, copyData, isCarousel, slides.length, applyCarouselCopy, applyCopy]);
+
+  // ── Auto-show copy tab when copy data is available and no template pre-selected ──
+  useEffect(() => {
+    if (rawCopyContent && !templateId) {
+      setRightPanelTab("copy");
+    }
+  }, [rawCopyContent, templateId]);
+
   // ── Determine if loading ──
   const isLoading = isLoadingSession || isLoadingTemplate;
 
@@ -597,10 +763,26 @@ function EditorContent() {
             >
               Materiais
             </button>
+            <button
+              onClick={() => setRightPanelTab("copy")}
+              className={`flex-1 py-2 text-[10px] font-medium uppercase tracking-wider transition-all cursor-pointer
+                ${rightPanelTab === "copy"
+                  ? "text-[#4ecdc4] border-b-2 border-[#4ecdc4]"
+                  : "text-[#5e6388] hover:text-[#8b8fb0]"
+                }`}
+            >
+              Copy
+            </button>
           </div>
           {/* Tab content — scrolls independently */}
           <div className="flex-1 overflow-y-auto">
-            {rightPanelTab === "properties" ? (
+            {rightPanelTab === "copy" ? (
+              <CopyTextPanel
+                copy={rawCopyContent}
+                copyData={copyData}
+                onApply={handleReapplyCopy}
+              />
+            ) : rightPanelTab === "properties" ? (
               <PropertyPanel
                 selection={selection}
                 canvasRef={canvasRef}
