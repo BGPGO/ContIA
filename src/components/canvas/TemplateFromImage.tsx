@@ -121,7 +121,7 @@ async function processSvgFile(file: File): Promise<{
 
   const warnings: string[] = [];
 
-  // ── FIX 1: remover rect de fundo full-canvas (causa "fundo preto" em imagens)
+  // ── FIX 1a: remover rect de fundo full-canvas (fundo global da arte)
   // Heurística: primeiro objeto que é Rect, ocupa ~100% do viewBox e tem fill sólido não-transparente.
   const bgRectIdx = objects.findIndex((o, i) => {
     if (i > 2) return false; // só entre os primeiros
@@ -147,6 +147,92 @@ async function processSvgFile(file: File): Promise<{
       (options as any).__detectedBgColor = fill;
     }
   }
+
+  // ── FIX 1b: remover rects "backing plate" atrás de cada <image> individual
+  // Canva/Figma comumente colocam um <rect> imediatamente antes do <image>
+  // com as mesmas bounds — essa é a cor que aparece "vazando" onde o PNG
+  // tem alpha. Detectamos pares rect→image com overlap ≥ 75% e removemos o rect.
+  function getBounds(o: any): { left: number; top: number; width: number; height: number } | null {
+    if (!o) return null;
+    try {
+      if (typeof o.getBoundingRect === "function") {
+        const br = o.getBoundingRect();
+        return { left: br.left, top: br.top, width: br.width, height: br.height };
+      }
+    } catch {}
+    return {
+      left: o.left ?? 0,
+      top: o.top ?? 0,
+      width: (o.width ?? 0) * (o.scaleX ?? 1),
+      height: (o.height ?? 0) * (o.scaleY ?? 1),
+    };
+  }
+  function overlapRatio(a: { left: number; top: number; width: number; height: number }, b: typeof a): number {
+    const x1 = Math.max(a.left, b.left);
+    const y1 = Math.max(a.top, b.top);
+    const x2 = Math.min(a.left + a.width, b.left + b.width);
+    const y2 = Math.min(a.top + a.height, b.top + b.height);
+    if (x2 <= x1 || y2 <= y1) return 0;
+    const inter = (x2 - x1) * (y2 - y1);
+    const areaA = a.width * a.height;
+    const areaB = b.width * b.height;
+    return inter / Math.min(areaA, areaB);
+  }
+
+  const isImg = (o: any) => {
+    const t = o?.type;
+    return t === "Image" || t === "image" || t === "FabricImage";
+  };
+  const isRect = (o: any) => {
+    const t = o?.type;
+    return t === "Rect" || t === "rect";
+  };
+
+  const backingRectIdxs = new Set<number>();
+  const imageBounds: Array<{ idx: number; b: ReturnType<typeof getBounds> }> = [];
+  workingObjects.forEach((o, i) => {
+    if (isImg(o)) {
+      const b = getBounds(o);
+      if (b) imageBounds.push({ idx: i, b });
+    }
+  });
+
+  workingObjects.forEach((o, i) => {
+    if (!isRect(o)) return;
+    const rb = getBounds(o);
+    if (!rb || rb.width <= 0 || rb.height <= 0) return;
+    // Procura alguma imagem cujo overlap com este rect >= 0.75
+    for (const { idx: imgIdx, b: ib } of imageBounds) {
+      if (!ib) continue;
+      if (imgIdx === i) continue;
+      if (overlapRatio(rb, ib) >= 0.75) {
+        backingRectIdxs.add(i);
+        break;
+      }
+    }
+  });
+
+  if (backingRectIdxs.size > 0) {
+    const filteredObjs: typeof workingObjects = [];
+    const filteredEls: typeof workingElements = workingElements ? [] : undefined;
+    workingObjects.forEach((o, i) => {
+      if (backingRectIdxs.has(i)) return;
+      filteredObjs.push(o);
+      if (workingElements && filteredEls) filteredEls.push(workingElements[i]);
+    });
+    workingObjects = filteredObjs;
+    workingElements = filteredEls;
+  }
+
+  // ── FIX 1c: zerar qualquer fill/backgroundColor residual nos objetos Image
+  // (algumas versões do parser Fabric carregam propriedades que vazam na render)
+  workingObjects.forEach((o) => {
+    if (isImg(o)) {
+      try {
+        (o as any).set({ backgroundColor: "", fill: "" });
+      } catch {}
+    }
+  });
 
   // ── FIX 2 & 3: reagrupar por <g> e por baseline
   // 2a) reconstruir grupos <g> usando allElements + DOMParser
