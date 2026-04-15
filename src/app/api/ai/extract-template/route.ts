@@ -512,10 +512,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check base64 size (~4MB limit → base64 is ~1.33x so ~5.3MB string)
-    if (image.length > 6_000_000) {
+    // Check base64 size (~10MB raw limit → base64 is ~1.33x so ~13.3MB string, +folga = 14M)
+    if (image.length > 14_000_000) {
       return NextResponse.json(
-        { error: "Imagem muito grande. O limite e 4MB." },
+        { error: "Imagem muito grande. O limite e 10MB." },
         { status: 400 }
       );
     }

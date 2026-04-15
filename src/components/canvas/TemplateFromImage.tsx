@@ -52,7 +52,23 @@ interface ExtractionResult {
 
 type Step = "upload" | "analyzing" | "result" | "saved";
 
-const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB
+// Limites por tipo. SVG é processado no cliente (sem limite de API).
+// Raster/PDF vão para GPT-4o Vision — base64 infla 1.33x.
+const MAX_FILE_SIZE_BY_TYPE: Record<string, number> = {
+  "image/svg+xml": 50 * 1024 * 1024, // 50MB — client-side only
+  "application/pdf": 20 * 1024 * 1024, // 20MB — renderizado → PNG no cliente
+  "image/png": 10 * 1024 * 1024,
+  "image/jpeg": 10 * 1024 * 1024,
+  "image/webp": 10 * 1024 * 1024,
+};
+
+function getMaxFileSize(mimeType: string): number {
+  return MAX_FILE_SIZE_BY_TYPE[mimeType] ?? 10 * 1024 * 1024;
+}
+
+function formatMb(bytes: number): string {
+  return `${Math.round(bytes / (1024 * 1024))}MB`;
+}
 const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const ACCEPTED_TYPES = [...ACCEPTED_IMAGE_TYPES, "application/pdf", "image/svg+xml"];
 
@@ -383,8 +399,9 @@ export function TemplateFromImage({
       return;
     }
 
-    if (file.size > MAX_FILE_SIZE) {
-      setError("Arquivo muito grande. O limite e 4MB.");
+    const maxSize = getMaxFileSize(file.type);
+    if (file.size > maxSize) {
+      setError(`Arquivo muito grande. O limite para este formato e ${formatMb(maxSize)}.`);
       return;
     }
 
@@ -627,7 +644,7 @@ export function TemplateFromImage({
                         Arraste uma imagem aqui ou clique para selecionar
                       </p>
                       <p className="text-xs text-[#5e6388] mt-1">
-                        PNG, JPEG, WebP, PDF ou SVG - Maximo 4MB
+                        PNG/JPEG/WebP ate 10MB · PDF ate 20MB · SVG ate 50MB
                       </p>
                       <p className="text-xs text-[#4ecdc4]/70 mt-1">
                         Dica: Exporte do Canva como SVG para manter textos e camadas editaveis
