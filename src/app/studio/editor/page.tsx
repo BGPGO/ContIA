@@ -19,6 +19,7 @@ import { useVisualTemplates } from "@/hooks/useVisualTemplates";
 import { useEmpresa } from "@/hooks/useEmpresa";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/client";
+import { externalizeCanvasImages } from "@/lib/canvas-storage";
 import type { VisualTemplate, CopyToTemplatePayload } from "@/types/canvas";
 import { CANVAS_DIMENSIONS } from "@/types/canvas";
 import type { CopyContent } from "@/types/copy-studio";
@@ -586,13 +587,33 @@ function EditorContent() {
       setIsSavingTemplate(true);
       try {
         const json = getCanvasJson();
-        const thumbnail = exportImage({ format: "png", quality: 0.8, multiplier: 0.3 });
+        let thumbnail = exportImage({ format: "png", quality: 0.8, multiplier: 0.3 });
+
+        let canvasJsonToSave: unknown = isCarousel ? { slides, currentSlideIndex } : json;
+
+        if (isSupabaseConfigured()) {
+          const supabase = createClient();
+          // Externaliza imagens grandes do canvas_json
+          canvasJsonToSave = await externalizeCanvasImages(canvasJsonToSave, supabase, empresaId);
+          // Thumbnail: se grande (> 800KB base64), externaliza; senão deixa inline
+          if (thumbnail && thumbnail.length > 800_000) {
+            const tmpJson = await externalizeCanvasImages(
+              { objects: [{ src: thumbnail }] },
+              supabase,
+              empresaId
+            );
+            const extracted = (tmpJson as { objects?: Array<{ src?: string }> })?.objects?.[0]?.src;
+            if (typeof extracted === "string" && extracted.startsWith("http")) {
+              thumbnail = extracted;
+            }
+          }
+        }
 
         await saveTemplate({
           empresa_id: empresaId,
           name,
           description: "",
-          canvas_json: isCarousel ? { slides, currentSlideIndex } : json,
+          canvas_json: canvasJsonToSave as object,
           thumbnail_url: thumbnail || null,
           format: isCarousel ? "carousel" : "post",
           aspect_ratio: state.aspectRatio,
@@ -607,11 +628,13 @@ function EditorContent() {
         setShowSaveModal(false);
       } catch (err) {
         console.error("[Editor] Failed to save template:", err);
+        const msg = err instanceof Error ? err.message : String(err);
+        alert(`Falha ao salvar template: ${msg}`);
       } finally {
         setIsSavingTemplate(false);
       }
     },
-    [getCanvasJson, exportImage, saveTemplate, empresaId, state.aspectRatio, markClean]
+    [getCanvasJson, exportImage, saveTemplate, empresaId, state.aspectRatio, markClean, isCarousel, slides, currentSlideIndex]
   );
 
   // ── Export / Download ──
