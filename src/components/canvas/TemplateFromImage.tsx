@@ -110,9 +110,39 @@ async function processSvgFile(file: File): Promise<{
 
   // Parse SVG — v6 returns { objects, options, elements, allElements }
   const parsed = await fabricModule.loadSVGFromString(svgString);
-  const objects = parsed.objects.filter((o): o is NonNullable<typeof o> => !!o);
+  let rawObjects = parsed.objects.filter((o): o is NonNullable<typeof o> => !!o);
   const options = parsed.options as any;
-  const allElements = (parsed as any).allElements as SVGElement[] | undefined;
+  let rawElements = (parsed as any).allElements as SVGElement[] | undefined;
+
+  // ── FIX 0: filtrar elementos dentro de <defs>/<mask>/<clipPath>/<filter>/<symbol>/<pattern>
+  // Fabric.js v6 parseia TUDO dentro de <defs> como renderizável, incluindo
+  // imagens grayscale usadas como alpha masks. Isso cria "quadrados pretos"
+  // atrás de imagens com transparência. Filtramos esses não-renderizáveis.
+  if (rawElements && rawElements.length === rawObjects.length) {
+    const DEFINITION_TAGS = new Set(["defs", "mask", "clipPath", "filter", "symbol", "pattern", "marker"]);
+    function isInsideDefinition(el: SVGElement | null): boolean {
+      let node: Element | null = el;
+      while (node) {
+        const tagName = node.tagName ? node.tagName.toLowerCase().replace(/^svg:/, "") : "";
+        if (DEFINITION_TAGS.has(tagName)) return true;
+        node = node.parentElement;
+      }
+      return false;
+    }
+    const keepIdx: number[] = [];
+    rawElements.forEach((el, i) => {
+      if (!isInsideDefinition(el)) keepIdx.push(i);
+    });
+    if (keepIdx.length < rawObjects.length) {
+      const filteredObjs = keepIdx.map((i) => rawObjects[i]);
+      const filteredEls = keepIdx.map((i) => rawElements![i]);
+      rawObjects = filteredObjs;
+      rawElements = filteredEls;
+    }
+  }
+
+  const objects = rawObjects;
+  const allElements = rawElements;
 
   const svgW = options.width || options.viewBoxWidth || 1080;
   const svgH = options.height || options.viewBoxHeight || 1080;
