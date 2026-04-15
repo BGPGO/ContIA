@@ -100,13 +100,140 @@ async function pdfToImage(file: File): Promise<string> {
    SVG → Fabric.js direct import (preserves layers, text, shapes)
    ═══════════════════════════════════════════════════════════════════════════ */
 
+// Load an image from a data URL, promisified.
+function loadImg(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("failed to load image"));
+    img.src = src;
+  });
+}
+
+/**
+ * Pre-compose SVG masks into visible images.
+ *
+ * Canva/Figma export pattern: cada <image> com transparência vem wrappeado
+ * num <g mask="url(#id)">. A <mask> contém um PNG grayscale (ou colorido que
+ * é convertido via filter) que serve como alpha map. Fabric.js v6 não aplica
+ * masks SVG — ele renderiza o <image> direto, e a PNG visível geralmente tem
+ * fundo sólido (transparência "existe" só via mask).
+ *
+ * Aqui, antes do Fabric parsear, rescrevemos a SVG: para cada <g mask="...">,
+ * pegamos o <image> interno + o <image> do <mask>, compomos num canvas 2D
+ * (luminância do mask vira o canal alpha do visível), e substituímos o href
+ * do <image> visível pela PNG composta. Depois removemos o atributo `mask`.
+ */
+async function preComposeMasks(svgString: string): Promise<{ svg: string; composedCount: number }> {
+  let composedCount = 0;
+
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svgString, "image/svg+xml");
+
+    // Collect all groups with a mask attribute
+    const maskedGroups = Array.from(doc.querySelectorAll("g[mask]"));
+    if (maskedGroups.length === 0) return { svg: svgString, composedCount };
+
+    for (const group of maskedGroups) {
+      try {
+        const maskAttr = group.getAttribute("mask") || "";
+        const match = maskAttr.match(/url\(#([^)]+)\)/);
+        if (!match) continue;
+        const maskId = match[1];
+
+        const maskEl = doc.getElementById(maskId);
+        if (!maskEl) continue;
+
+        // Find innermost <image> inside the mask and inside the group
+        const maskImage = maskEl.querySelector("image");
+        const visibleImage = group.querySelector("image");
+        if (!maskImage || !visibleImage) continue;
+
+        const maskHref =
+          maskImage.getAttribute("xlink:href") ||
+          maskImage.getAttribute("href") ||
+          "";
+        const visibleHref =
+          visibleImage.getAttribute("xlink:href") ||
+          visibleImage.getAttribute("href") ||
+          "";
+        if (!maskHref.startsWith("data:") || !visibleHref.startsWith("data:")) continue;
+
+        // Load both images
+        const [vImg, mImg] = await Promise.all([loadImg(visibleHref), loadImg(maskHref)]);
+
+        // Use the visible image's natural dimensions as the canvas size
+        const cw = vImg.naturalWidth;
+        const ch = vImg.naturalHeight;
+        if (!cw || !ch) continue;
+
+        const canvas = document.createElement("canvas");
+        canvas.width = cw;
+        canvas.height = ch;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) continue;
+
+        // Draw visible image
+        ctx.drawImage(vImg, 0, 0, cw, ch);
+        const vData = ctx.getImageData(0, 0, cw, ch);
+
+        // Draw mask image (scaled to match visible dimensions)
+        ctx.clearRect(0, 0, cw, ch);
+        ctx.drawImage(mImg, 0, 0, cw, ch);
+        const mData = ctx.getImageData(0, 0, cw, ch);
+
+        // Apply mask luminance × mask alpha as final alpha channel
+        for (let i = 0; i < vData.data.length; i += 4) {
+          const r = mData.data[i];
+          const g = mData.data[i + 1];
+          const b = mData.data[i + 2];
+          const mA = mData.data[i + 3];
+          // ITU-R BT.709 luminance
+          const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+          const combined = (lum * mA) / 255;
+          // Multiply with existing alpha (preserve any native alpha in the PNG)
+          vData.data[i + 3] = Math.round((vData.data[i + 3] * combined) / 255);
+        }
+
+        ctx.clearRect(0, 0, cw, ch);
+        ctx.putImageData(vData, 0, 0);
+
+        const composedHref = canvas.toDataURL("image/png");
+
+        // Replace the visible image's href
+        visibleImage.setAttribute("xlink:href", composedHref);
+        visibleImage.setAttribute("href", composedHref);
+
+        // Remove the mask attribute so Fabric just renders the composed PNG
+        group.removeAttribute("mask");
+
+        composedCount++;
+      } catch (err) {
+        // Skip this group on failure and keep going
+        console.warn("preComposeMasks: skipped one group", err);
+      }
+    }
+
+    const serialized = new XMLSerializer().serializeToString(doc);
+    return { svg: serialized, composedCount };
+  } catch (err) {
+    console.warn("preComposeMasks: bailing out", err);
+    return { svg: svgString, composedCount: 0 };
+  }
+}
+
 async function processSvgFile(file: File): Promise<{
   canvasJson: ExtractionResult["canvas_json"];
   extractedText: Record<string, string>;
   warnings: string[];
 }> {
-  const svgString = await file.text();
+  const rawSvg = await file.text();
   const fabricModule = await import("fabric");
+
+  // Pre-compose masks into visible images (Canva/Figma transparency pattern)
+  const { svg: svgString, composedCount } = await preComposeMasks(rawSvg);
 
   // Parse SVG — v6 returns { objects, options, elements, allElements }
   const parsed = await fabricModule.loadSVGFromString(svgString);
@@ -150,6 +277,9 @@ async function processSvgFile(file: File): Promise<{
   const canvasH = Math.round(svgH * scale);
 
   const warnings: string[] = [];
+  if (composedCount > 0) {
+    console.info(`[SVG import] ${composedCount} mask(s) pré-compostas na imagem visível`);
+  }
 
   // ── FIX 1a: remover rect de fundo full-canvas (fundo global da arte)
   // Heurística: primeiro objeto que é Rect, ocupa ~100% do viewBox e tem fill sólido não-transparente.
