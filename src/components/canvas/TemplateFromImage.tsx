@@ -48,6 +48,7 @@ interface ExtractionResult {
   overall_style?: string | null;
   original_image_url?: string;
   photo_background_replaced?: boolean;
+  warnings?: string[];
 }
 
 type Step = "upload" | "analyzing" | "result" | "saved";
@@ -102,29 +103,156 @@ async function pdfToImage(file: File): Promise<string> {
 async function processSvgFile(file: File): Promise<{
   canvasJson: ExtractionResult["canvas_json"];
   extractedText: Record<string, string>;
+  warnings: string[];
 }> {
   const svgString = await file.text();
   const fabricModule = await import("fabric");
 
-  // Parse SVG using Fabric.js built-in parser
-  const { objects, options } = await fabricModule.loadSVGFromString(svgString);
+  // Parse SVG — v6 returns { objects, options, elements, allElements }
+  const parsed = await fabricModule.loadSVGFromString(svgString);
+  const objects = parsed.objects.filter((o): o is NonNullable<typeof o> => !!o);
+  const options = parsed.options as any;
+  const allElements = (parsed as any).allElements as SVGElement[] | undefined;
 
-  // Determine canvas dimensions from SVG viewBox
-  const svgW = (options as any).width || 1080;
-  const svgH = (options as any).height || 1080;
+  const svgW = options.width || options.viewBoxWidth || 1080;
+  const svgH = options.height || options.viewBoxHeight || 1080;
   const scale = 1080 / svgW;
   const canvasH = Math.round(svgH * scale);
 
+  const warnings: string[] = [];
+
+  // ── FIX 1: remover rect de fundo full-canvas (causa "fundo preto" em imagens)
+  // Heurística: primeiro objeto que é Rect, ocupa ~100% do viewBox e tem fill sólido não-transparente.
+  const bgRectIdx = objects.findIndex((o, i) => {
+    if (i > 2) return false; // só entre os primeiros
+    const t = (o as any).type;
+    if (t !== "Rect" && t !== "rect") return false;
+    const w = (o as any).width ?? 0;
+    const h = (o as any).height ?? 0;
+    const l = (o as any).left ?? 0;
+    const tp = (o as any).top ?? 0;
+    const coversAll = w >= svgW * 0.98 && h >= svgH * 0.98 && Math.abs(l) < 2 && Math.abs(tp) < 2;
+    return coversAll;
+  });
+  let workingObjects = objects;
+  let workingElements = allElements ? [...allElements] : undefined;
+  if (bgRectIdx >= 0) {
+    const removed = workingObjects[bgRectIdx];
+    workingObjects = workingObjects.filter((_, i) => i !== bgRectIdx);
+    if (workingElements) workingElements = workingElements.filter((_, i) => i !== bgRectIdx);
+    // Guarda fill como cor de fundo do canvas (se o usuário quiser manter)
+    const fill = (removed as any).fill;
+    if (typeof fill === "string" && fill !== "none") {
+      // Vamos aplicar como canvas background em vez de como objeto
+      (options as any).__detectedBgColor = fill;
+    }
+  }
+
+  // ── FIX 2 & 3: reagrupar por <g> e por baseline
+  // 2a) reconstruir grupos <g> usando allElements + DOMParser
+  const reGrouped: any[] = [];
+  const usedIdx = new Set<number>();
+
+  if (workingElements && workingElements.length === workingObjects.length) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svgString, "image/svg+xml");
+    const gNodes = Array.from(doc.querySelectorAll("g"));
+
+    for (const g of gNodes) {
+      // Pegar apenas descendentes diretos que são elementos de shape/text/image/path
+      const children = Array.from(g.children);
+      const fabricChildren: any[] = [];
+      const childIdxs: number[] = [];
+      for (const el of children) {
+        const idx = workingElements!.findIndex(
+          (e, i) => !usedIdx.has(i) && e === el
+        );
+        if (idx >= 0) {
+          fabricChildren.push(workingObjects[idx]);
+          childIdxs.push(idx);
+        }
+      }
+      if (fabricChildren.length >= 2) {
+        // Cria grupo Fabric preservando a geometria
+        const group = new (fabricModule as any).Group(fabricChildren, {
+          subTargetCheck: true,
+        });
+        (group as any).data = {
+          role: "decoration",
+          editable: true,
+          id: crypto.randomUUID(),
+          source: "svg-group",
+        };
+        reGrouped.push(group);
+        childIdxs.forEach((i) => usedIdx.add(i));
+      }
+    }
+  }
+
+  // 2b) objetos restantes (não caíram em nenhum <g>)
+  const leftovers: any[] = [];
+  workingObjects.forEach((o, i) => {
+    if (!usedIdx.has(i)) leftovers.push(o);
+  });
+
+  // ── FIX 3: agrupar leftovers de tipo Path por baseline (detecta texto-em-outline)
+  // Agrupa paths cujos bounding boxes compartilham baseline (top+height) ± 8px
+  // e têm largura similar a letras (entre 10 e 200 px no SVG original).
+  function isLetterCandidate(o: any): boolean {
+    const t = o.type;
+    if (t !== "Path" && t !== "path") return false;
+    const br = o.getBoundingRect ? o.getBoundingRect() : null;
+    if (!br) return false;
+    return br.width > 0 && br.width < 200 && br.height > 0 && br.height < 200;
+  }
+  const pathCandidates = leftovers.filter(isLetterCandidate);
+  const others = leftovers.filter((o) => !isLetterCandidate(o));
+
+  const lineBuckets: any[][] = [];
+  for (const p of pathCandidates) {
+    const br = p.getBoundingRect();
+    const baseline = br.top + br.height;
+    const bucket = lineBuckets.find((b) => {
+      const bb = b[0].getBoundingRect();
+      return Math.abs(bb.top + bb.height - baseline) < 8 &&
+             Math.abs(bb.height - br.height) < b[0].getBoundingRect().height * 0.4;
+    });
+    if (bucket) bucket.push(p);
+    else lineBuckets.push([p]);
+  }
+
+  const letterGroups: any[] = [];
+  for (const bucket of lineBuckets) {
+    if (bucket.length < 3) {
+      // linha curta (menos de 3 paths) — mantém soltos
+      letterGroups.push(...bucket);
+    } else {
+      bucket.sort((a: any, b: any) => a.getBoundingRect().left - b.getBoundingRect().left);
+      const group = new (fabricModule as any).Group(bucket, {
+        subTargetCheck: true,
+      });
+      (group as any).data = {
+        role: "headline",
+        editable: false,
+        id: crypto.randomUUID(),
+        source: "svg-outlined-text",
+        note: "Texto em outline — re-exporte do Canva/Figma como texto editável para editar string",
+      };
+      letterGroups.push(group);
+      warnings.push(
+        `Texto com ${bucket.length} caracteres em outline foi agrupado (não editável como string). Re-exporte do design tool com texto selecionável para editar.`
+      );
+    }
+  }
+
+  // ── Consolida e escala
+  const finalObjects = [...reGrouped, ...others, ...letterGroups];
   const extractedText: Record<string, string> = {};
   let headlineFound = false;
   let bodyCount = 0;
 
-  const fabricObjects: any[] = [];
-
-  for (const obj of objects) {
-    if (!obj) continue;
-
-    // Scale to 1080px base width
+  for (const obj of finalObjects) {
+    // escala global para 1080 base
     obj.set({
       left: (obj.left || 0) * scale,
       top: (obj.top || 0) * scale,
@@ -132,7 +260,6 @@ async function processSvgFile(file: File): Promise<{
       scaleY: (obj.scaleY || 1) * scale,
     });
 
-    // Assign roles to text objects (duck-type check)
     const isTextObj =
       typeof (obj as any).text === "string" &&
       typeof (obj as any).setSelectionStyles === "function";
@@ -149,29 +276,26 @@ async function processSvgFile(file: File): Promise<{
         (obj as any).data = { role, editable: true, id: crypto.randomUUID() };
         extractedText[role] = text;
       }
-    } else {
+    } else if (!(obj as any).data) {
       (obj as any).data = { role: "decoration", editable: true, id: crypto.randomUUID() };
     }
-
-    fabricObjects.push(obj);
   }
 
-  // Build a canvas JSON structure
-  // We need a temporary StaticCanvas (no DOM needed) to serialize properly
+  // ── Serializa via StaticCanvas com fundo transparente
   const tempCanvas = new fabricModule.StaticCanvas(undefined, {
     width: 1080,
     height: canvasH,
-    backgroundColor: "#080b1e",
+    backgroundColor: (options as any).__detectedBgColor || "transparent",
   });
 
-  for (const obj of fabricObjects) {
+  for (const obj of finalObjects) {
     tempCanvas.add(obj);
   }
 
   const canvasJson = (tempCanvas as any).toJSON(["data"]) as ExtractionResult["canvas_json"];
   tempCanvas.dispose();
 
-  return { canvasJson, extractedText };
+  return { canvasJson, extractedText, warnings };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -471,7 +595,7 @@ export function TemplateFromImage({
       setError(null);
       setProgressIdx(0);
       try {
-        const { canvasJson, extractedText } = await processSvgFile(imageFile);
+        const { canvasJson, extractedText, warnings } = await processSvgFile(imageFile);
         setResult({
           canvas_json: canvasJson,
           extracted_copy: extractedText,
@@ -481,6 +605,7 @@ export function TemplateFromImage({
           photo_description: null,
           visual_hierarchy: Object.keys(extractedText),
           overall_style: null,
+          warnings,
         });
         setTemplateName(`Template SVG - ${new Date().toLocaleDateString("pt-BR")}`);
         setStep("result");
@@ -766,6 +891,16 @@ export function TemplateFromImage({
                     <Eye size={14} />
                     Preview do template
                   </h3>
+                  {result.warnings && result.warnings.length > 0 && (
+                    <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                      <p className="text-xs font-medium text-amber-400 mb-2">Atenção</p>
+                      <ul className="space-y-1">
+                        {result.warnings.map((w, i) => (
+                          <li key={i} className="text-xs text-amber-300/80">• {w}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   <div className="rounded-xl overflow-hidden border border-[#4ecdc4]/20 bg-[#141736] aspect-square">
                     <CanvasPreview
                       canvasJson={result.canvas_json}
