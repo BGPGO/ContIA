@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getAdminSupabase } from "@/lib/supabase/admin";
 import { PROVIDER_DISPLAY_ORDER } from "@/lib/drivers/metadata";
 import type { ProviderKey } from "@/types/providers";
 import {
   fetchInstagramLive,
+  persistInstagramSnapshot,
   type InstagramLiveData,
 } from "@/lib/analytics/instagram-fetcher";
 
@@ -25,15 +27,28 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // Auth check com session client
   const supabase = await createClient();
 
-  // Auth check
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
   }
+
+  // Verificar que empresa pertence ao user
+  const { data: empresaCheck } = await supabase
+    .from("empresas")
+    .select("id")
+    .eq("id", empresaId)
+    .single();
+  if (!empresaCheck) {
+    return NextResponse.json({ error: "Empresa nao encontrada" }, { status: 403 });
+  }
+
+  // QUERIES DE DADOS usam admin client (bypass RLS)
+  const admin = getAdminSupabase();
 
   // Compute previous period (same duration)
   const start = new Date(periodStart);
@@ -53,14 +68,14 @@ export async function GET(req: NextRequest) {
     analysisRes,
   ] = await Promise.all([
     // Active connections
-    supabase
+    admin
       .from("social_connections")
       .select("id, provider")
       .eq("empresa_id", empresaId)
       .eq("is_active", true),
 
     // Current period snapshots
-    supabase
+    admin
       .from("provider_snapshots")
       .select("*")
       .eq("empresa_id", empresaId)
@@ -69,7 +84,7 @@ export async function GET(req: NextRequest) {
       .order("snapshot_date", { ascending: true }),
 
     // Previous period snapshots
-    supabase
+    admin
       .from("provider_snapshots")
       .select("*")
       .eq("empresa_id", empresaId)
@@ -78,7 +93,7 @@ export async function GET(req: NextRequest) {
       .order("snapshot_date", { ascending: true }),
 
     // Content items in period
-    supabase
+    admin
       .from("content_items")
       .select("*")
       .eq("empresa_id", empresaId)
@@ -88,7 +103,7 @@ export async function GET(req: NextRequest) {
       .limit(200),
 
     // Latest AI analysis
-    supabase
+    admin
       .from("ai_analyses")
       .select("analysis")
       .eq("empresa_id", empresaId)
@@ -111,7 +126,7 @@ export async function GET(req: NextRequest) {
   const connectedProviders = new Set(connections.map((c) => c.provider as string));
 
   if (!connectedProviders.has("instagram")) {
-    const { data: empresa } = await supabase
+    const { data: empresa } = await admin
       .from("empresas")
       .select("redes_sociais")
       .eq("id", empresaId)
@@ -141,7 +156,7 @@ export async function GET(req: NextRequest) {
     let igAccessToken: string | null = null;
     let igProviderUserId: string | null = null;
 
-    const { data: igConn, error: igConnError } = await supabase
+    const { data: igConn, error: igConnError } = await admin
       .from("social_connections")
       .select("access_token, provider_user_id")
       .eq("empresa_id", empresaId)
@@ -159,7 +174,7 @@ export async function GET(req: NextRequest) {
       igProviderUserId = igConn.provider_user_id;
     } else {
       // Fallback legado
-      const { data: empresa } = await supabase
+      const { data: empresa } = await admin
         .from("empresas")
         .select("redes_sociais")
         .eq("id", empresaId)
@@ -175,6 +190,12 @@ export async function GET(req: NextRequest) {
     if (igAccessToken && igProviderUserId) {
       try {
         igLiveData = await fetchInstagramLive(igAccessToken, igProviderUserId, 30);
+
+        // Persistir snapshot em background
+        const igConnId = connections.find((c) => c.provider === "instagram")?.id ?? `legacy-${empresaId}`;
+        persistInstagramSnapshot(empresaId, igConnId, igLiveData).catch((err) =>
+          console.error("[insights/dashboard] Falha ao persistir snapshot:", err)
+        );
 
         // Injetar dados live como synthetic content_items se nao tem conteudo IG
         if (!hasIgContent && igLiveData.media.length > 0) {
@@ -257,7 +278,7 @@ export async function GET(req: NextRequest) {
 
   const currentPosts = contentItems.length;
   const prevContentCount = (
-    await supabase
+    await admin
       .from("content_items")
       .select("id", { count: "exact", head: true })
       .eq("empresa_id", empresaId)
@@ -277,7 +298,7 @@ export async function GET(req: NextRequest) {
   const avgEngagement = currentPosts > 0 ? Math.round((currentEngagement / currentPosts) * 100) / 100 : 0;
 
   // Leads from CRM (metric_events)
-  const leadsRes = await supabase
+  const leadsRes = await admin
     .from("metric_events")
     .select("metric_value")
     .eq("empresa_id", empresaId)
@@ -287,7 +308,7 @@ export async function GET(req: NextRequest) {
 
   const currentLeads = (leadsRes.data ?? []).reduce((acc, e) => acc + (e.metric_value ?? 0), 0);
 
-  const prevLeadsRes = await supabase
+  const prevLeadsRes = await admin
     .from("metric_events")
     .select("metric_value")
     .eq("empresa_id", empresaId)

@@ -13,6 +13,7 @@ import {
   getMediaInsights,
 } from "@/lib/instagram";
 import type { IGMedia, IGInsight, IGProfile } from "@/lib/instagram";
+import { getAdminSupabase } from "@/lib/supabase/admin";
 import type { ProviderKey } from "@/types/providers";
 import type {
   AnalyticsKPI,
@@ -349,4 +350,63 @@ export function toProviderTimeSeries(data: InstagramLiveData): TimeSeriesDataPoi
       clicks: 0,
       leads: 0,
     }));
+}
+
+/* ── Persist snapshot to DB (background, non-blocking) ── */
+
+export async function persistInstagramSnapshot(
+  empresaId: string,
+  connectionId: string,
+  liveData: InstagramLiveData
+): Promise<void> {
+  const admin = getAdminSupabase();
+  const today = new Date().toISOString().split("T")[0];
+
+  // Upsert provider_snapshot do dia
+  await admin.from("provider_snapshots").upsert(
+    {
+      empresa_id: empresaId,
+      connection_id: connectionId,
+      provider: "instagram",
+      snapshot_date: today,
+      metrics: {
+        followers_count: liveData.profile.followers_count,
+        follows_count: liveData.profile.follows_count,
+        media_count: liveData.profile.media_count,
+        ...(liveData.kpis.reach > 0 ? { reach: liveData.kpis.reach } : {}),
+        ...(liveData.kpis.impressions > 0
+          ? { impressions: liveData.kpis.impressions }
+          : {}),
+      },
+    },
+    { onConflict: "connection_id,snapshot_date" }
+  );
+
+  // Upsert content_items (batch — nao faz um por um)
+  if (liveData.media.length > 0) {
+    const rows = liveData.media.map((media) => {
+      const mi = liveData.mediaInsightsMap.get(media.id);
+      return {
+        empresa_id: empresaId,
+        connection_id: connectionId,
+        provider: "instagram",
+        provider_content_id: media.id,
+        content_type: media.media_type === "VIDEO" ? "reel" : "post",
+        caption: media.caption ?? null,
+        url: media.permalink ?? null,
+        thumbnail_url: media.thumbnail_url ?? media.media_url ?? null,
+        published_at: media.timestamp ?? null,
+        metrics: {
+          likes: media.like_count ?? 0,
+          comments: media.comments_count ?? 0,
+          ...(mi ?? {}),
+        },
+        synced_at: new Date().toISOString(),
+      };
+    });
+
+    await admin
+      .from("content_items")
+      .upsert(rows, { onConflict: "connection_id,provider_content_id" });
+  }
 }

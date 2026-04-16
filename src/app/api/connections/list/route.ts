@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getAdminSupabase } from "@/lib/supabase/admin";
 
 /**
  * GET /api/connections/list?empresa_id=xxx
@@ -16,9 +17,9 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // Auth check com session client
   const supabase = await createClient();
 
-  // Verify authentication
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -26,8 +27,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
   }
 
-  // Fetch active connections for this empresa belonging to this user
-  const { data, error } = await supabase
+  // Verificar que empresa pertence ao user
+  const { data: empresaCheck } = await supabase
+    .from("empresas")
+    .select("id")
+    .eq("id", empresaId)
+    .single();
+  if (!empresaCheck) {
+    return NextResponse.json({ error: "Empresa nao encontrada" }, { status: 403 });
+  }
+
+  // QUERIES DE DADOS usam admin client (bypass RLS)
+  const admin = getAdminSupabase();
+
+  // Fetch active connections for this empresa
+  const { data, error } = await admin
     .from("social_connections")
     .select("*")
     .eq("empresa_id", empresaId)
@@ -47,7 +61,7 @@ export async function GET(req: NextRequest) {
   // ── FALLBACK: check empresa.redes_sociais for legacy connections ──
   const hasIg = connections.some((c) => c.provider === "instagram");
   if (!hasIg) {
-    const { data: empresa } = await supabase
+    const { data: empresa } = await admin
       .from("empresas")
       .select("id, user_id, redes_sociais, updated_at")
       .eq("id", empresaId)

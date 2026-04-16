@@ -12,6 +12,7 @@ import {
   findTopContent,
   findOutliers,
   computeInputsHash,
+  buildEnrichedAnalysis,
   type AggregatedProvider,
 } from "./report-aggregator";
 import {
@@ -190,7 +191,11 @@ function formatPeriodLabel(start: Date, end: Date): string {
 
 /* ── Build prompt data ───────────────────────────────────────────────────── */
 
-function buildPromptData(input: ReportInput, aggregated: Record<string, AggregatedProvider>): PromptDataInput {
+function buildPromptData(
+  input: ReportInput,
+  aggregated: Record<string, AggregatedProvider>,
+  enriched: ReturnType<typeof buildEnrichedAnalysis>
+): PromptDataInput {
   const topContent = findTopContent(input.content, 5);
   const outliers = findOutliers(input.content);
 
@@ -203,12 +208,13 @@ function buildPromptData(input: ReportInput, aggregated: Record<string, Aggregat
     topContent: topContent.map((c) => ({
       provider: c.provider,
       title: c.title,
-      caption: c.caption?.slice(0, 200) ?? null,
+      caption: c.caption?.slice(0, 300) ?? null,
       type: c.content_type,
       engagement:
         (c.metrics.likes ?? c.metrics.like_count ?? 0) +
         (c.metrics.comments ?? c.metrics.comments_count ?? 0) +
-        (c.metrics.shares ?? c.metrics.share_count ?? 0),
+        (c.metrics.shares ?? c.metrics.share_count ?? 0) +
+        (c.metrics.saves ?? c.metrics.saved ?? 0),
       metrics: c.metrics,
     })),
     outliers: {
@@ -228,6 +234,13 @@ function buildPromptData(input: ReportInput, aggregated: Record<string, Aggregat
       })),
     },
     empresaDna: input.empresaDna,
+
+    // Enriched analysis (v2)
+    contentPerformance: enriched.contentPerformance,
+    captionAnalysis: enriched.captionAnalysis,
+    engagementBreakdown: enriched.engagementBreakdown,
+    postingFrequency: enriched.postingFrequency,
+    growthMetrics: enriched.growthMetrics,
   };
 }
 
@@ -237,8 +250,14 @@ export async function generateReportAnalysis(input: ReportInput): Promise<Report
   // Lazy import to avoid issues in edge/build
   const supabaseImport = () => import("@/lib/supabase/server");
 
-  // 1. Pre-processamento
-  const currentAgg = aggregateByProvider(input.content, input.snapshots);
+  // 1. Pre-processamento enriquecido
+  const enriched = buildEnrichedAnalysis(
+    input.content,
+    input.snapshots,
+    input.previousContent,
+    input.previousSnapshots
+  );
+  const currentAgg = enriched.aggregated;
 
   // 2. Hash e cache check
   const inputsHash = computeInputsHash({
@@ -260,18 +279,11 @@ export async function generateReportAnalysis(input: ReportInput): Promise<Report
   );
   if (cached) return cached;
 
-  // 3. Preparar dados para prompts
-  const promptData = buildPromptData(input, currentAgg);
+  // 3. Preparar dados para prompts (com metricas enriquecidas)
+  const promptData = buildPromptData(input, currentAgg, enriched);
 
-  // 4. Calcular comparisons (pre-IA)
-  let rawComparisons: Comparison[] = [];
-  if (input.previousContent && input.previousContent.length > 0) {
-    const previousAgg = aggregateByProvider(
-      input.previousContent,
-      input.previousSnapshots ?? []
-    );
-    rawComparisons = calculateDeltas(currentAgg, previousAgg);
-  }
+  // 4. Usar comparisons ja calculados no enriched
+  const rawComparisons = enriched.deltas;
 
   // 5. 3 chamadas em paralelo
   const prompt1 = buildSummaryHighlightsRecommendationsPrompt(promptData);

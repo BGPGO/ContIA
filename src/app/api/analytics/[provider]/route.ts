@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getAdminSupabase } from "@/lib/supabase/admin";
 import { METADATA_BY_PROVIDER } from "@/lib/drivers/metadata";
 import type { ProviderKey } from "@/types/providers";
 import type {
@@ -12,6 +13,7 @@ import type {
 } from "@/types/analytics";
 import {
   fetchInstagramLive,
+  persistInstagramSnapshot,
   toProviderKPIs,
   toProviderPosts,
   toProviderBreakdown,
@@ -62,6 +64,7 @@ export async function GET(
     return NextResponse.json({ error: "Provider desconhecido" }, { status: 404 });
   }
 
+  // Auth check com session client (valida identidade)
   const supabase = await createClient();
 
   const {
@@ -71,8 +74,21 @@ export async function GET(
     return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
   }
 
+  // Verificar que empresa pertence ao user (seguranca)
+  const { data: empresaCheck } = await supabase
+    .from("empresas")
+    .select("id")
+    .eq("id", empresaId)
+    .single();
+  if (!empresaCheck) {
+    return NextResponse.json({ error: "Empresa nao encontrada" }, { status: 403 });
+  }
+
+  // QUERIES DE DADOS usam admin client (bypass RLS)
+  const admin = getAdminSupabase();
+
   // ── Passo 1: Tentar social_connections ──
-  const { data: connData, error: connError } = await supabase
+  const { data: connData, error: connError } = await admin
     .from("social_connections")
     .select("id, access_token, provider_user_id, username")
     .eq("empresa_id", empresaId)
@@ -93,7 +109,7 @@ export async function GET(
 
   // ── Passo 2: FALLBACK — buscar em empresa.redes_sociais (legado) ──
   if (!connection && provider === "instagram") {
-    const { data: empresa } = await supabase
+    const { data: empresa } = await admin
       .from("empresas")
       .select("redes_sociais")
       .eq("id", empresaId)
@@ -134,11 +150,65 @@ export async function GET(
     try {
       const liveData = await fetchInstagramLive(connection.access_token, connection.provider_user_id, 30);
 
+      // Persistir snapshot em background (nao bloqueia resposta)
+      persistInstagramSnapshot(empresaId, connection.id, liveData).catch((err) =>
+        console.error("[analytics/provider] Falha ao persistir snapshot:", err)
+      );
+
+      // Buscar snapshots historicos para time series com multiplos dias
+      const { data: historicalSnapshots } = await admin
+        .from("provider_snapshots")
+        .select("snapshot_date, metrics")
+        .eq("connection_id", connection.id)
+        .gte("snapshot_date", periodStart)
+        .lte("snapshot_date", periodEnd)
+        .order("snapshot_date", { ascending: true });
+
+      // Time series = historico + ponto live de hoje
+      const today = new Date().toISOString().split("T")[0];
+      const historicalTimeSeries: TimeSeriesDataPoint[] = (historicalSnapshots ?? []).map((s) => {
+        const m = s.metrics as Record<string, number>;
+        return {
+          date: s.snapshot_date as string,
+          followers: m.followers_count ?? 0,
+          reach: m.reach ?? 0,
+          impressions: m.impressions ?? 0,
+          engagement: 0,
+          sessions: 0,
+          users: 0,
+          spend: 0,
+          clicks: 0,
+          leads: 0,
+        };
+      });
+
+      // Se hoje nao esta no historico, adiciona ponto live
+      if (!historicalTimeSeries.some((p) => p.date === today)) {
+        historicalTimeSeries.push({
+          date: today,
+          followers: liveData.profile.followers_count,
+          reach: liveData.kpis.reach,
+          impressions: liveData.kpis.impressions,
+          engagement: 0,
+          sessions: 0,
+          users: 0,
+          spend: 0,
+          clicks: 0,
+          leads: 0,
+        });
+      }
+
+      // Se historico tem poucos pontos, complementar com time series baseado em media
+      const finalTimeSeries =
+        historicalTimeSeries.length > 1
+          ? historicalTimeSeries
+          : toProviderTimeSeries(liveData);
+
       return NextResponse.json({
         provider,
         connected: true,
         kpis: toProviderKPIs(liveData),
-        timeSeries: toProviderTimeSeries(liveData),
+        timeSeries: finalTimeSeries,
         posts: toProviderPosts(liveData),
         breakdown: toProviderBreakdown(liveData),
         heatmap: toProviderHeatmap(liveData),
@@ -164,7 +234,7 @@ export async function GET(
   const prevEndISO = prevEnd.toISOString().split("T")[0];
 
   const [snapshotsRes, prevSnapshotsRes, contentRes] = await Promise.all([
-    supabase
+    admin
       .from("provider_snapshots")
       .select("*")
       .eq("empresa_id", empresaId)
@@ -172,7 +242,7 @@ export async function GET(
       .gte("snapshot_date", periodStart)
       .lte("snapshot_date", periodEnd)
       .order("snapshot_date", { ascending: true }),
-    supabase
+    admin
       .from("provider_snapshots")
       .select("*")
       .eq("empresa_id", empresaId)
@@ -180,7 +250,7 @@ export async function GET(
       .gte("snapshot_date", prevStartISO)
       .lte("snapshot_date", prevEndISO)
       .order("snapshot_date", { ascending: true }),
-    supabase
+    admin
       .from("content_items")
       .select("*")
       .eq("empresa_id", empresaId)

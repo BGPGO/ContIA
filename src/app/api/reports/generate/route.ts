@@ -10,13 +10,14 @@ export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { getAdminSupabase } from "@/lib/supabase/admin";
 import { isAIConfigured } from "@/lib/ai/config";
 import { generateReportAnalysis, type ReportInput } from "@/lib/ai/report-generator";
 import { generateReportPDF } from "@/lib/reports/pdf-generator";
 import { uploadReportPdf, buildPdfPath } from "@/lib/reports/storage";
 import type { ProviderKey } from "@/types/providers";
 import type { ReportType } from "@/types/reports";
-import { fetchInstagramLive } from "@/lib/analytics/instagram-fetcher";
+import { fetchInstagramLive, persistInstagramSnapshot } from "@/lib/analytics/instagram-fetcher";
 
 /* ── Input validation ────────────────────────────────────────────────────── */
 
@@ -123,8 +124,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
   }
 
+  // Admin client para queries de dados (bypass RLS)
+  const admin = getAdminSupabase();
+
   // 4. Resolve empresa — usar empresaId do request se disponivel, senao primeira do user
-  let empresaQuery = supabase
+  let empresaQuery = admin
     .from("empresas")
     .select("id, nome")
     .eq("user_id", user.id);
@@ -155,7 +159,7 @@ export async function POST(req: NextRequest) {
 
   try {
     // 6. Buscar conteudo do periodo
-    const { data: contentRaw } = await supabase
+    const { data: contentRaw } = await admin
       .from("content_items")
       .select("*")
       .eq("empresa_id", empresa.id)
@@ -169,7 +173,7 @@ export async function POST(req: NextRequest) {
     // ── FALLBACK: se content_items vazio para instagram, buscar legado ──
     const hasIgContent = content.some((c) => c.provider === "instagram");
     if (!hasIgContent && providers.includes("instagram" as ProviderKey)) {
-      const { data: legacyMedia } = await supabase
+      const { data: legacyMedia } = await admin
         .from("instagram_media_cache")
         .select("*")
         .eq("empresa_id", empresa.id)
@@ -203,7 +207,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 7. Buscar snapshots do periodo
-    const { data: snapshotsRaw } = await supabase
+    const { data: snapshotsRaw } = await admin
       .from("provider_snapshots")
       .select("*")
       .eq("empresa_id", empresa.id)
@@ -217,7 +221,7 @@ export async function POST(req: NextRequest) {
     // ── FALLBACK: se snapshots vazio para instagram, buscar legado ──
     const hasIgSnaps = snapshots.some((s) => s.provider === "instagram");
     if (!hasIgSnaps && providers.includes("instagram" as ProviderKey)) {
-      const { data: legacyProfiles } = await supabase
+      const { data: legacyProfiles } = await admin
         .from("instagram_profile_cache")
         .select("*")
         .eq("empresa_id", empresa.id)
@@ -252,7 +256,7 @@ export async function POST(req: NextRequest) {
       let igProviderUserId: string | null = null;
 
       // Tentar social_connections
-      const { data: igConn, error: igConnError } = await supabase
+      const { data: igConn, error: igConnError } = await admin
         .from("social_connections")
         .select("access_token, provider_user_id")
         .eq("empresa_id", empresa.id)
@@ -270,7 +274,7 @@ export async function POST(req: NextRequest) {
         igProviderUserId = igConn.provider_user_id;
       } else {
         // Fallback legado empresa.redes_sociais
-        const { data: empresaRedes } = await supabase
+        const { data: empresaRedes } = await admin
           .from("empresas")
           .select("redes_sociais")
           .eq("id", empresa.id)
@@ -286,6 +290,11 @@ export async function POST(req: NextRequest) {
       if (igAccessToken && igProviderUserId) {
         try {
           const liveData = await fetchInstagramLive(igAccessToken, igProviderUserId, 30);
+
+          // Persistir snapshot em background
+          persistInstagramSnapshot(empresa.id, `live-ig-${empresa.id}`, liveData).catch((err) =>
+            console.error("[reports/generate] Falha ao persistir snapshot:", err)
+          );
 
           // Injetar content sintetico se nao tem
           if (!hasAnyIgContent && liveData.media.length > 0) {
@@ -349,7 +358,7 @@ export async function POST(req: NextRequest) {
     // 8. Periodo anterior
     const prev = getPreviousPeriod(pStart, pEnd, reportType);
 
-    const { data: previousContent } = await supabase
+    const { data: previousContent } = await admin
       .from("content_items")
       .select("*")
       .eq("empresa_id", empresa.id)
@@ -357,7 +366,7 @@ export async function POST(req: NextRequest) {
       .gte("published_at", prev.start.toISOString())
       .lte("published_at", prev.end.toISOString());
 
-    const { data: previousSnapshots } = await supabase
+    const { data: previousSnapshots } = await admin
       .from("provider_snapshots")
       .select("*")
       .eq("empresa_id", empresa.id)
@@ -366,7 +375,7 @@ export async function POST(req: NextRequest) {
       .lte("snapshot_date", prev.end.toISOString().split("T")[0]);
 
     // 9. DNA da marca (opcional)
-    const { data: dnaRow } = await supabase
+    const { data: dnaRow } = await admin
       .from("marca_dna")
       .select("dna_sintetizado")
       .eq("empresa_id", empresa.id)
@@ -376,7 +385,7 @@ export async function POST(req: NextRequest) {
     // 10. Criar registro do relatorio (status: generating)
     const reportName = name ?? generateReportName(reportType, pEnd);
 
-    const { data: report, error: insertError } = await supabase
+    const { data: report, error: insertError } = await admin
       .from("reports")
       .insert({
         empresa_id: empresa.id,
@@ -421,7 +430,7 @@ export async function POST(req: NextRequest) {
     const analysis = await generateReportAnalysis(reportInput);
 
     // 12. Atualizar relatorio com analise
-    await supabase
+    await admin
       .from("reports")
       .update({
         ai_analysis: analysis,
@@ -448,7 +457,7 @@ export async function POST(req: NextRequest) {
       pdfUrl = await uploadReportPdf(pdfResult.pdfBuffer, storagePath);
 
       // Atualizar pdf_url no registro
-      await supabase
+      await admin
         .from("reports")
         .update({ pdf_url: pdfUrl })
         .eq("id", report.id);

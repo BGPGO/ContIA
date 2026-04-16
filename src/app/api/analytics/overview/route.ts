@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getAdminSupabase } from "@/lib/supabase/admin";
 import {
   METADATA_BY_PROVIDER,
   PROVIDER_DISPLAY_ORDER,
@@ -13,6 +14,7 @@ import type {
 } from "@/types/analytics";
 import {
   fetchInstagramLive,
+  persistInstagramSnapshot,
   toOverviewKPIs,
   toRecentPosts,
 } from "@/lib/analytics/instagram-fetcher";
@@ -35,6 +37,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // Auth check com session client
   const supabase = await createClient();
 
   const {
@@ -43,6 +46,19 @@ export async function GET(req: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
   }
+
+  // Verificar que empresa pertence ao user
+  const { data: empresaCheck } = await supabase
+    .from("empresas")
+    .select("id")
+    .eq("id", empresaId)
+    .single();
+  if (!empresaCheck) {
+    return NextResponse.json({ error: "Empresa nao encontrada" }, { status: 403 });
+  }
+
+  // QUERIES DE DADOS usam admin client (bypass RLS)
+  const admin = getAdminSupabase();
 
   // Previous period computation
   const start = new Date(periodStart);
@@ -55,26 +71,26 @@ export async function GET(req: NextRequest) {
 
   const [connectionsRes, snapshotsCurrentRes, snapshotsPrevRes, contentRes, empresaRes] =
     await Promise.all([
-      supabase
+      admin
         .from("social_connections")
         .select("id, provider, username, display_name")
         .eq("empresa_id", empresaId)
         .eq("is_active", true),
-      supabase
+      admin
         .from("provider_snapshots")
         .select("*")
         .eq("empresa_id", empresaId)
         .gte("snapshot_date", periodStart)
         .lte("snapshot_date", periodEnd)
         .order("snapshot_date", { ascending: true }),
-      supabase
+      admin
         .from("provider_snapshots")
         .select("*")
         .eq("empresa_id", empresaId)
         .gte("snapshot_date", prevStartISO)
         .lte("snapshot_date", prevEndISO)
         .order("snapshot_date", { ascending: true }),
-      supabase
+      admin
         .from("content_items")
         .select("*")
         .eq("empresa_id", empresaId)
@@ -82,7 +98,7 @@ export async function GET(req: NextRequest) {
         .lte("published_at", periodEnd)
         .order("published_at", { ascending: false })
         .limit(200),
-      supabase
+      admin
         .from("empresas")
         .select("redes_sociais")
         .eq("id", empresaId)
@@ -115,7 +131,7 @@ export async function GET(req: NextRequest) {
     ];
 
     // Fallback: build snapshot from legacy profile cache
-    const { data: legacyProfiles } = await supabase
+    const { data: legacyProfiles } = await admin
       .from("instagram_profile_cache")
       .select("*")
       .eq("empresa_id", empresaId)
@@ -155,7 +171,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Fallback: content from legacy media cache
-    const { data: legacyMedia } = await supabase
+    const { data: legacyMedia } = await admin
       .from("instagram_media_cache")
       .select("*")
       .eq("empresa_id", empresaId)
@@ -198,7 +214,7 @@ export async function GET(req: NextRequest) {
   if (igConnection && (!igHasSnapshots || !igHasContent)) {
     try {
       // Fetch access_token from social_connections (full record)
-      const { data: igConn } = await supabase
+      const { data: igConn } = await admin
         .from("social_connections")
         .select("access_token, provider_user_id")
         .eq("id", igConnection.id)
@@ -211,6 +227,11 @@ export async function GET(req: NextRequest) {
       if (accessToken && providerUserId) {
         const liveData = await fetchInstagramLive(accessToken, providerUserId, 30);
         igLiveKPIs = toOverviewKPIs(liveData);
+
+        // Persistir snapshot em background
+        persistInstagramSnapshot(empresaId, igConnection.id, liveData).catch((err) =>
+          console.error("[overview] Falha ao persistir snapshot:", err)
+        );
 
         // Inject live data as synthetic snapshots if missing
         if (!igHasSnapshots) {
