@@ -5,14 +5,11 @@ import {
   Plus,
   X,
   Users,
-  RefreshCw,
-  Trash2,
   ExternalLink,
-  Heart,
-  MessageCircle,
-  Eye,
-  AlertTriangle,
+  Trash2,
   Loader2,
+  ImageIcon,
+  RefreshCw,
 } from "lucide-react";
 import { useEmpresa } from "@/hooks/useEmpresa";
 import {
@@ -21,20 +18,8 @@ import {
   ConcorrentePostsResult,
 } from "@/hooks/useConcorrentes";
 import { cn, formatNumber } from "@/lib/utils";
-import type { IGScrapedPost } from "@/lib/instagram-scraper";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
-
-function formatShortDate(dateStr: string): string {
-  if (!dateStr) return "-";
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-}
-
-function truncate(str: string, maxLen: number): string {
-  if (!str) return "";
-  return str.length > maxLen ? str.slice(0, maxLen) + "..." : str;
-}
 
 function getInstagramUsername(c: ConcorrenteDB): string | null {
   const ig = c.plataformas?.find((p) => p.rede === "instagram");
@@ -143,92 +128,47 @@ function AddConcorrenteModal({ onClose, onAdd }: AddModalProps) {
   );
 }
 
-// ─── Post Card ──────────────────────────────────────────────────────────────
+// ─── Instagram Embed Iframe ─────────────────────────────────────────────────
 
-interface PostCardProps {
-  post: IGScrapedPost;
+interface InstagramEmbedProps {
+  username: string;
 }
 
-function PostCard({ post }: PostCardProps) {
+function InstagramEmbed({ username }: InstagramEmbedProps) {
+  const [iframeLoaded, setIframeLoaded] = useState(false);
+
   return (
-    <a
-      href={post.permalink || `https://www.instagram.com/p/${post.shortcode}/`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group flex-shrink-0 w-[140px] rounded-lg border border-border-subtle bg-bg-card/50 overflow-hidden hover:border-accent/30 transition-all"
-    >
-      {/* Thumbnail */}
-      <div className="relative w-full aspect-square bg-bg-card overflow-hidden">
-        {post.imageUrl ? (
-          <img
-            src={post.imageUrl}
-            alt={truncate(post.caption, 40)}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            loading="lazy"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-text-muted">
-            <Eye size={20} />
-          </div>
-        )}
-        {post.isVideo && (
-          <div className="absolute top-1.5 right-1.5 bg-black/60 text-white text-[9px] px-1 py-0.5 rounded">
-            VIDEO
-          </div>
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-          <ExternalLink
-            size={14}
-            className="absolute top-1.5 right-1.5 text-white/80"
-          />
-        </div>
-      </div>
-
-      {/* Metrics */}
-      <div className="p-2 space-y-1">
-        <div className="flex items-center justify-between text-[10px]">
-          <span className="inline-flex items-center gap-0.5 text-danger/80">
-            <Heart size={9} />
-            {formatNumber(post.likes)}
-          </span>
-          <span className="inline-flex items-center gap-0.5 text-info/80">
-            <MessageCircle size={9} />
-            {formatNumber(post.comments)}
-          </span>
-        </div>
-        <p className="text-[10px] text-text-muted">
-          {formatShortDate(post.timestamp)}
-        </p>
-        {post.caption && (
-          <p className="text-[10px] text-text-secondary leading-tight line-clamp-2">
-            {truncate(post.caption, 80)}
-          </p>
-        )}
-      </div>
-    </a>
-  );
-}
-
-// ─── Post Grid Skeleton ─────────────────────────────────────────────────────
-
-function PostsSkeleton() {
-  return (
-    <div className="flex gap-2 overflow-hidden">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div
-          key={i}
-          className="flex-shrink-0 w-[140px] rounded-lg border border-border-subtle bg-bg-card/30 overflow-hidden animate-pulse"
-        >
-          <div className="w-full aspect-square bg-bg-card-hover" />
-          <div className="p-2 space-y-1.5">
-            <div className="flex justify-between">
-              <div className="h-2.5 w-10 bg-bg-card-hover rounded" />
-              <div className="h-2.5 w-8 bg-bg-card-hover rounded" />
-            </div>
-            <div className="h-2 w-12 bg-bg-card-hover rounded" />
+    <div className="relative w-full rounded-xl overflow-hidden border border-border-subtle bg-bg-card/30">
+      {/* Skeleton enquanto o iframe carrega */}
+      {!iframeLoaded && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-bg-card/60 z-10 animate-pulse">
+          <ImageIcon size={24} className="text-instagram/60" />
+          <span className="text-xs text-text-muted">Carregando posts...</span>
+          <div className="flex gap-1.5">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div
+                key={i}
+                className="w-24 h-24 rounded-lg bg-bg-card-hover"
+              />
+            ))}
           </div>
         </div>
-      ))}
+      )}
+
+      <iframe
+        src={`https://www.instagram.com/${username}/embed/`}
+        width="100%"
+        height="600"
+        frameBorder="0"
+        scrolling="yes"
+        allowTransparency={true}
+        onLoad={() => setIframeLoaded(true)}
+        className={cn(
+          "w-full transition-opacity duration-500 rounded-xl",
+          iframeLoaded ? "opacity-100" : "opacity-0"
+        )}
+        title={`Posts do Instagram de @${username}`}
+      />
     </div>
   );
 }
@@ -250,31 +190,30 @@ function ConcorrenteSection({
   onRemove,
   onFetchPosts,
 }: ConcorrenteSectionProps) {
-  const [postsData, setPostsData] = useState<ConcorrentePostsResult | null>(
-    null
-  );
-  const [loadingPosts, setLoadingPosts] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const [profileData, setProfileData] =
+    useState<ConcorrentePostsResult | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const [removing, setRemoving] = useState(false);
 
   const igUsername = getInstagramUsername(concorrente);
 
-  const loadPosts = useCallback(
+  const loadProfile = useCallback(
     async (force = false) => {
       if (!igUsername) return;
-      setLoadingPosts(true);
+      setLoadingProfile(true);
       const result = await onFetchPosts(concorrente.id, igUsername, force);
-      setPostsData(result);
-      setLoadingPosts(false);
-      setLoaded(true);
+      setProfileData(result);
+      setLoadingProfile(false);
+      setProfileLoaded(true);
     },
     [concorrente.id, igUsername, onFetchPosts]
   );
 
-  // Auto-load on mount
+  // Auto-load profile on mount
   useEffect(() => {
-    if (igUsername && !loaded && !loadingPosts) {
-      loadPosts();
+    if (igUsername && !profileLoaded && !loadingProfile) {
+      loadProfile();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [igUsername]);
@@ -285,17 +224,15 @@ function ConcorrenteSection({
     await onRemove(concorrente.id);
   };
 
-  const profile = postsData?.profile;
-  const posts = postsData?.posts || [];
-  const scrapeError = postsData?.error;
+  const profile = profileData?.profile;
 
   return (
     <div className="bg-bg-card backdrop-blur-xl border border-border rounded-xl overflow-hidden fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-border-subtle">
-        <div className="flex items-center gap-2.5 min-w-0">
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between p-4 border-b border-border-subtle">
+        <div className="flex items-center gap-3 min-w-0">
           {/* Avatar */}
-          <div className="w-9 h-9 rounded-full bg-accent/15 flex items-center justify-center shrink-0 overflow-hidden">
+          <div className="w-10 h-10 rounded-full bg-accent/15 flex items-center justify-center shrink-0 overflow-hidden ring-2 ring-border">
             {profile?.profilePicUrl ? (
               <img
                 src={profile.profilePicUrl}
@@ -309,41 +246,80 @@ function ConcorrenteSection({
             )}
           </div>
 
+          {/* Info */}
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h3 className="font-medium text-text-primary text-sm leading-tight truncate">
-                {concorrente.nome}
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-semibold text-text-primary text-sm leading-tight truncate">
+                {profile?.fullName || concorrente.nome}
               </h3>
               {igUsername && (
-                <a
-                  href={`https://www.instagram.com/${igUsername}/`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[11px] text-accent hover:underline shrink-0"
-                >
+                <span className="text-[11px] text-text-muted shrink-0">
                   @{igUsername}
-                </a>
+                </span>
               )}
             </div>
-            {profile && !profile.partial && (
-              <div className="flex items-center gap-3 text-[10px] text-text-muted mt-0.5">
-                <span>{formatNumber(profile.followers)} seguidores</span>
-                <span>{formatNumber(profile.postCount)} posts</span>
+
+            {/* Stats row */}
+            {profile && (
+              <div className="flex items-center gap-3 text-[11px] text-text-muted mt-0.5 flex-wrap">
+                {profile.followers > 0 && (
+                  <span>
+                    <span className="text-text-secondary font-medium">
+                      {formatNumber(profile.followers)}
+                    </span>{" "}
+                    seguidores
+                  </span>
+                )}
+                {profile.postCount > 0 && (
+                  <span>
+                    <span className="text-text-secondary font-medium">
+                      {formatNumber(profile.postCount)}
+                    </span>{" "}
+                    posts
+                  </span>
+                )}
+                {profile.following > 0 && (
+                  <span>
+                    <span className="text-text-secondary font-medium">
+                      {formatNumber(profile.following)}
+                    </span>{" "}
+                    seguindo
+                  </span>
+                )}
               </div>
+            )}
+
+            {/* Bio */}
+            {profile?.biography && (
+              <p className="text-[11px] text-text-muted mt-1 leading-relaxed line-clamp-2 max-w-lg">
+                {profile.biography}
+              </p>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        {/* Actions */}
+        <div className="flex items-center gap-1.5 shrink-0 ml-3">
+          {igUsername && (
+            <a
+              href={`https://www.instagram.com/${igUsername}/`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-accent border border-accent/25 hover:bg-accent/10 hover:border-accent/40 transition-colors"
+            >
+              <ExternalLink size={11} />
+              Ver no Instagram
+            </a>
+          )}
           <button
-            onClick={() => loadPosts(true)}
-            disabled={loadingPosts}
+            onClick={() => loadProfile(true)}
+            disabled={loadingProfile}
             className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-card-hover transition-colors disabled:opacity-40"
-            title="Atualizar posts"
+            title="Atualizar perfil"
           >
             <RefreshCw
               size={13}
-              className={cn(loadingPosts && "animate-spin")}
+              className={cn(loadingProfile && "animate-spin")}
             />
           </button>
           <button
@@ -357,42 +333,14 @@ function ConcorrenteSection({
         </div>
       </div>
 
-      {/* Content */}
-      <div className="p-3">
-        {/* Loading state */}
-        {loadingPosts && !loaded && <PostsSkeleton />}
-
-        {/* Error state */}
-        {scrapeError && !loadingPosts && (
-          <div className="flex items-center gap-2 text-warning text-xs py-2">
-            <AlertTriangle size={13} />
-            <span>{scrapeError}</span>
-          </div>
-        )}
-
-        {/* Posts grid */}
-        {loaded && posts.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-            {posts.map((post) => (
-              <PostCard key={post.id || post.shortcode} post={post} />
-            ))}
-          </div>
-        )}
-
-        {/* Empty posts (profile loaded but no posts) */}
-        {loaded && !loadingPosts && posts.length === 0 && !scrapeError && (
-          <p className="text-text-muted text-xs text-center py-4">
-            {profile?.partial
-              ? "Dados parciais obtidos. O Instagram pode estar limitando o acesso. Tente novamente mais tarde."
-              : "Nenhum post encontrado."}
-          </p>
-        )}
-
-        {/* No username configured */}
-        {!igUsername && (
-          <p className="text-text-muted text-xs text-center py-4">
+      {/* ── Instagram Embed ── */}
+      <div className="p-4">
+        {!igUsername ? (
+          <p className="text-text-muted text-xs text-center py-6">
             Sem username Instagram configurado.
           </p>
+        ) : (
+          <InstagramEmbed username={igUsername} />
         )}
       </div>
     </div>
@@ -421,7 +369,7 @@ export default function ConcorrentesPage() {
   }
 
   return (
-    <div className="fade-in space-y-4 p-4 max-w-6xl mx-auto">
+    <div className="fade-in space-y-4 p-4 max-w-5xl mx-auto">
       {/* Modal */}
       {showModal && (
         <AddConcorrenteModal
@@ -437,12 +385,12 @@ export default function ConcorrentesPage() {
             Monitoramento de Concorrentes
           </h1>
           <p className="text-xs text-text-muted mt-0.5">
-            Acompanhe os posts recentes dos concorrentes no Instagram
+            Visualize os posts recentes dos concorrentes via Instagram Embeds
           </p>
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/90 hover:bg-accent text-white transition-colors text-xs font-medium"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/90 hover:bg-accent text-white transition-colors text-xs font-medium shrink-0"
         >
           <Plus size={13} />
           Adicionar Concorrente
@@ -472,7 +420,7 @@ export default function ConcorrentesPage() {
 
       {/* Concorrentes list */}
       {!loading && concorrentes.length > 0 && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {concorrentes.map((c) => (
             <ConcorrenteSection
               key={c.id}
