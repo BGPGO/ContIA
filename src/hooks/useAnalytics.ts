@@ -119,7 +119,7 @@ export function useAnalytics(empresaId: string | undefined): UseAnalyticsReturn 
 
     try {
       const res = await fetch(
-        `/api/analytics/instagram?empresa_id=${encodeURIComponent(empresaId)}`,
+        `/api/analytics/instagram-legacy?empresa_id=${encodeURIComponent(empresaId)}`,
         { signal: controller.signal }
       );
 
