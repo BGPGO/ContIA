@@ -42,5 +42,48 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  return NextResponse.json({ connections: data ?? [] });
+  const connections = data ?? [];
+
+  // ── FALLBACK: check empresa.redes_sociais for legacy connections ──
+  const hasIg = connections.some((c) => c.provider === "instagram");
+  if (!hasIg) {
+    const { data: empresa } = await supabase
+      .from("empresas")
+      .select("id, user_id, redes_sociais, updated_at")
+      .eq("id", empresaId)
+      .single();
+
+    const legacyIg = (empresa?.redes_sociais as Record<string, unknown> | null)?.instagram as
+      | { conectado?: boolean; username?: string; access_token?: string; provider_user_id?: string; profile_picture_url?: string }
+      | undefined;
+
+    if (legacyIg?.conectado && legacyIg.access_token && empresa) {
+      connections.push({
+        id: `legacy-ig-${empresaId}`,
+        empresa_id: empresaId,
+        user_id: empresa.user_id,
+        provider: "instagram",
+        provider_user_id: legacyIg.provider_user_id ?? `legacy_${empresaId}`,
+        username: legacyIg.username ?? null,
+        display_name: legacyIg.username ?? null,
+        display_label: legacyIg.username ?? null,
+        profile_picture_url: legacyIg.profile_picture_url ?? null,
+        access_token: legacyIg.access_token,
+        refresh_token: null,
+        token_expires_at: null,
+        page_id: null,
+        page_access_token: null,
+        app_id: null,
+        scopes: ["instagram_business_basic"],
+        is_active: true,
+        last_verified_at: null,
+        last_error: null,
+        metadata: { migrated_from: "empresa.redes_sociais", fallback: true },
+        created_at: empresa.updated_at ?? new Date().toISOString(),
+        updated_at: empresa.updated_at ?? new Date().toISOString(),
+      } as typeof connections[number]);
+    }
+  }
+
+  return NextResponse.json({ connections });
 }

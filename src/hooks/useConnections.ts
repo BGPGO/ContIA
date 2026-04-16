@@ -39,6 +39,38 @@ export function useConnections(): UseConnectionsReturn {
         grouped[conn.provider].push(conn);
       }
 
+      // FALLBACK: if the API didn't return instagram but empresa.redes_sociais says connected,
+      // inject a synthetic connection so the UI shows IG as connected
+      if (!grouped["instagram"] && empresa.redes_sociais?.instagram?.conectado) {
+        const ig = empresa.redes_sociais.instagram;
+        grouped["instagram"] = [
+          {
+            id: `legacy-ig-${empresa.id}`,
+            empresa_id: empresa.id,
+            user_id: "",
+            provider: "instagram",
+            provider_user_id: ig.provider_user_id ?? `legacy_${empresa.id}`,
+            username: ig.username ?? null,
+            display_name: ig.username ?? null,
+            display_label: ig.username ?? null,
+            profile_picture_url: ig.profile_picture_url ?? null,
+            access_token: ig.access_token ?? "",
+            refresh_token: null,
+            token_expires_at: null,
+            page_id: null,
+            page_access_token: null,
+            app_id: null,
+            scopes: ["instagram_business_basic"],
+            is_active: true,
+            last_verified_at: null,
+            last_error: null,
+            metadata: { migrated_from: "empresa.redes_sociais", fallback: true },
+            created_at: empresa.updated_at ?? new Date().toISOString(),
+            updated_at: empresa.updated_at ?? new Date().toISOString(),
+          },
+        ];
+      }
+
       setConnections(grouped as Record<ProviderKey, Connection[]>);
     } catch (err) {
       console.error("[useConnections] fetch error:", err);
@@ -46,7 +78,7 @@ export function useConnections(): UseConnectionsReturn {
     } finally {
       setLoading(false);
     }
-  }, [empresa?.id]);
+  }, [empresa?.id, empresa?.redes_sociais]);
 
   useEffect(() => {
     fetchConnections();

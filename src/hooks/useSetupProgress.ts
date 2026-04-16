@@ -33,15 +33,19 @@ function safeSet(key: string, value: string) {
   }
 }
 
-export function useSetupProgress(cardIds: string[]) {
+export function useSetupProgress(
+  cardIds: string[],
+  defaultDone: Record<string, boolean> = {}
+) {
   const [steps, setSteps] = useState<Record<string, SetupStep>>({});
   const [loaded, setLoaded] = useState(false);
 
-  // Load from localStorage on mount
+  // Load from localStorage on mount; fall back to defaultDone when no stored value exists
   useEffect(() => {
     const initial: Record<string, SetupStep> = {};
     for (const id of cardIds) {
-      const done = safeGet(getKey(id, "done")) === "true";
+      const stored = safeGet(getKey(id, "done"));
+      const done = stored !== null ? stored === "true" : (defaultDone[id] ?? false);
       const notes = safeGet(getKey(id, "notes")) ?? "";
       initial[id] = { id, done, notes };
     }

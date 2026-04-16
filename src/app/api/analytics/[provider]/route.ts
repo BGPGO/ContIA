@@ -10,6 +10,15 @@ import type {
   HeatmapData,
   HashtagStat,
 } from "@/types/analytics";
+import {
+  fetchInstagramLive,
+  toProviderKPIs,
+  toProviderPosts,
+  toProviderBreakdown,
+  toProviderHeatmap,
+  toProviderHashtags,
+  toProviderTimeSeries,
+} from "@/lib/analytics/instagram-fetcher";
 
 const DAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
 const HOUR_LABELS = Array.from({ length: 24 }, (_, i) => `${i}h`);
@@ -88,6 +97,41 @@ export async function GET(
       topPages: null,
       campaigns: null,
     });
+  }
+
+  // ── INSTAGRAM LIVE: buscar dados ao vivo da API ──
+  if (provider === "instagram") {
+    try {
+      const { data: igConn } = await supabase
+        .from("social_connections")
+        .select("access_token, provider_user_id")
+        .eq("empresa_id", empresaId)
+        .eq("provider", "instagram")
+        .eq("is_active", true)
+        .single();
+
+      if (igConn?.access_token && igConn.provider_user_id) {
+        const liveData = await fetchInstagramLive(igConn.access_token, igConn.provider_user_id, 30);
+
+        return NextResponse.json({
+          provider,
+          connected: true,
+          kpis: toProviderKPIs(liveData),
+          timeSeries: toProviderTimeSeries(liveData),
+          posts: toProviderPosts(liveData),
+          breakdown: toProviderBreakdown(liveData),
+          heatmap: toProviderHeatmap(liveData),
+          funnelStages: null,
+          topHashtags: toProviderHashtags(liveData),
+          trafficSources: null,
+          topPages: null,
+          campaigns: null,
+        });
+      }
+    } catch (err) {
+      console.error("[analytics/provider] Instagram live fetch failed:", err instanceof Error ? err.message : err);
+      // Fall through to DB-based logic below
+    }
   }
 
   // Previous period

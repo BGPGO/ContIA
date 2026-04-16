@@ -11,6 +11,11 @@ import type {
   TimeSeriesDataPoint,
   RecentPost,
 } from "@/types/analytics";
+import {
+  fetchInstagramLive,
+  toOverviewKPIs,
+  toRecentPosts,
+} from "@/lib/analytics/instagram-fetcher";
 
 /**
  * GET /api/analytics/overview?empresa_id=xxx&period_start=YYYY-MM-DD&period_end=YYYY-MM-DD
@@ -48,7 +53,7 @@ export async function GET(req: NextRequest) {
   const prevStartISO = prevStart.toISOString().split("T")[0];
   const prevEndISO = prevEnd.toISOString().split("T")[0];
 
-  const [connectionsRes, snapshotsCurrentRes, snapshotsPrevRes, contentRes] =
+  const [connectionsRes, snapshotsCurrentRes, snapshotsPrevRes, contentRes, empresaRes] =
     await Promise.all([
       supabase
         .from("social_connections")
@@ -77,12 +82,189 @@ export async function GET(req: NextRequest) {
         .lte("published_at", periodEnd)
         .order("published_at", { ascending: false })
         .limit(200),
+      supabase
+        .from("empresas")
+        .select("redes_sociais")
+        .eq("id", empresaId)
+        .single(),
     ]);
 
-  const connections = connectionsRes.data ?? [];
-  const currentSnapshots = snapshotsCurrentRes.data ?? [];
+  let connections = connectionsRes.data ?? [];
+  let currentSnapshots = snapshotsCurrentRes.data ?? [];
   const prevSnapshots = snapshotsPrevRes.data ?? [];
-  const contentItems = contentRes.data ?? [];
+  let contentItems = contentRes.data ?? [];
+  const empresa = empresaRes.data as { redes_sociais: Record<string, unknown> } | null;
+
+  // ── FALLBACK: se social_connections nao tem instagram mas legado tem ──
+  const hasIgConnection = connections.some((c) => c.provider === "instagram");
+  const legacyIg = empresa?.redes_sociais?.instagram as
+    | { conectado?: boolean; username?: string; access_token?: string; followers_count?: number; provider_user_id?: string }
+    | undefined;
+
+  if (!hasIgConnection && legacyIg?.conectado && legacyIg.access_token) {
+    // Inject a synthetic connection from legacy data
+    const syntheticId = `legacy-ig-${empresaId}`;
+    connections = [
+      ...connections,
+      {
+        id: syntheticId,
+        provider: "instagram" as const,
+        username: legacyIg.username ?? null,
+        display_name: legacyIg.username ?? null,
+      },
+    ];
+
+    // Fallback: build snapshot from legacy profile cache
+    const { data: legacyProfiles } = await supabase
+      .from("instagram_profile_cache")
+      .select("*")
+      .eq("empresa_id", empresaId)
+      .gte("snapshot_date", periodStart)
+      .lte("snapshot_date", periodEnd)
+      .order("snapshot_date", { ascending: true });
+
+    if (legacyProfiles && legacyProfiles.length > 0) {
+      const syntheticSnapshots = legacyProfiles.map((p) => ({
+        id: `legacy-snap-${p.id}`,
+        empresa_id: empresaId,
+        connection_id: syntheticId,
+        provider: "instagram",
+        snapshot_date: p.snapshot_date,
+        metrics: {
+          followers_count: p.followers_count ?? 0,
+          follows_count: p.follows_count ?? 0,
+          media_count: p.media_count ?? 0,
+        },
+        created_at: p.created_at,
+      }));
+      currentSnapshots = [...currentSnapshots, ...syntheticSnapshots];
+    } else if (legacyIg.followers_count) {
+      // No profile cache — use the static followers_count from empresa
+      currentSnapshots = [
+        ...currentSnapshots,
+        {
+          id: `legacy-snap-static`,
+          empresa_id: empresaId,
+          connection_id: syntheticId,
+          provider: "instagram",
+          snapshot_date: periodEnd,
+          metrics: { followers_count: legacyIg.followers_count },
+          created_at: new Date().toISOString(),
+        },
+      ];
+    }
+
+    // Fallback: content from legacy media cache
+    const { data: legacyMedia } = await supabase
+      .from("instagram_media_cache")
+      .select("*")
+      .eq("empresa_id", empresaId)
+      .gte("timestamp", periodStart)
+      .lte("timestamp", periodEnd)
+      .order("timestamp", { ascending: false })
+      .limit(200);
+
+    if (legacyMedia && legacyMedia.length > 0) {
+      const syntheticContent = legacyMedia.map((m) => ({
+        id: m.id,
+        empresa_id: empresaId,
+        connection_id: syntheticId,
+        provider: "instagram",
+        provider_content_id: m.ig_media_id,
+        content_type: m.media_type === "VIDEO" ? "reel" : "post",
+        title: null,
+        caption: m.caption,
+        url: m.permalink,
+        thumbnail_url: m.thumbnail_url ?? m.media_url,
+        published_at: m.timestamp,
+        metrics: {
+          likes: m.like_count ?? 0,
+          comments: m.comments_count ?? 0,
+          ...(m.insights ?? {}),
+        },
+        raw: { media_type: m.media_type, media_url: m.media_url },
+        synced_at: m.synced_at,
+      }));
+      contentItems = [...contentItems, ...syntheticContent];
+    }
+  }
+
+  // ── LIVE FETCH: se Instagram conectado mas snapshots/content vazios, buscar ao vivo ──
+  const igConnection = connections.find((c) => c.provider === "instagram");
+  const igHasSnapshots = currentSnapshots.some((s) => s.provider === "instagram");
+  const igHasContent = contentItems.some((c) => c.provider === "instagram");
+  let igLiveKPIs: { followers: number; reach: number; engRate: number; postsCount: number } | null = null;
+
+  if (igConnection && (!igHasSnapshots || !igHasContent)) {
+    try {
+      // Fetch access_token from social_connections (full record)
+      const { data: igConn } = await supabase
+        .from("social_connections")
+        .select("access_token, provider_user_id")
+        .eq("id", igConnection.id)
+        .single();
+
+      // Also check legacy
+      const accessToken = igConn?.access_token ?? legacyIg?.access_token;
+      const providerUserId = igConn?.provider_user_id ?? legacyIg?.provider_user_id;
+
+      if (accessToken && providerUserId) {
+        const liveData = await fetchInstagramLive(accessToken, providerUserId, 30);
+        igLiveKPIs = toOverviewKPIs(liveData);
+
+        // Inject live data as synthetic snapshots if missing
+        if (!igHasSnapshots) {
+          currentSnapshots = [
+            ...currentSnapshots,
+            {
+              id: `live-ig-snap-${Date.now()}`,
+              empresa_id: empresaId,
+              connection_id: igConnection.id,
+              provider: "instagram",
+              snapshot_date: periodEnd,
+              metrics: {
+                followers_count: liveData.kpis.followers,
+                reach: liveData.kpis.reach,
+                impressions: liveData.kpis.impressions,
+              },
+              created_at: new Date().toISOString(),
+            },
+          ];
+        }
+
+        // Inject live media as content items if missing
+        if (!igHasContent) {
+          const livePosts = toRecentPosts(liveData);
+          const syntheticContent = livePosts
+            .filter((p) => {
+              // Only include posts within the requested period
+              if (!p.published_at) return true;
+              return p.published_at >= periodStart && p.published_at <= periodEnd + "T23:59:59";
+            })
+            .map((p) => ({
+              id: p.id,
+              empresa_id: empresaId,
+              connection_id: igConnection.id,
+              provider: "instagram",
+              provider_content_id: p.id,
+              content_type: p.content_type,
+              title: p.title,
+              caption: p.caption,
+              url: p.url,
+              thumbnail_url: p.thumbnail_url,
+              published_at: p.published_at,
+              metrics: p.metrics,
+              raw: {},
+              synced_at: new Date().toISOString(),
+            }));
+          contentItems = [...contentItems, ...syntheticContent];
+        }
+      }
+    } catch (err) {
+      console.error("[overview] Instagram live fetch failed:", err instanceof Error ? err.message : err);
+      // Continue with whatever data we have — don't crash the endpoint
+    }
+  }
 
   const connectedSet = new Set(connections.map((c) => c.provider as ProviderKey));
 

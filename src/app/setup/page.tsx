@@ -189,7 +189,10 @@ export default function SetupPage() {
     setNotes,
     completedCount,
     totalCount,
-  } = useSetupProgress([...CARD_IDS]);
+  } = useSetupProgress([...CARD_IDS], {
+    "migration-009": true,
+    "paginas-legais": true,
+  });
 
   const [generatedApiKey, setGeneratedApiKey] = useState("");
 
@@ -233,8 +236,8 @@ export default function SetupPage() {
               Setup ContIA 2.0
             </h1>
             <p className="text-[13px] text-text-secondary">
-              Configuracao inicial necessaria para ativar todas as redes e
-              analises.
+              Migration Supabase e paginas legais ja configuradas pelo Claude em 15/04/2026.
+              Complete os passos restantes para ativar todas as redes e analises.
             </p>
           </div>
         </div>

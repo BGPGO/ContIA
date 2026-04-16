@@ -149,7 +149,7 @@ export async function POST(req: NextRequest) {
 
   try {
     // 6. Buscar conteudo do periodo
-    const { data: content } = await supabase
+    const { data: contentRaw } = await supabase
       .from("content_items")
       .select("*")
       .eq("empresa_id", empresa.id)
@@ -158,8 +158,46 @@ export async function POST(req: NextRequest) {
       .lte("published_at", pEnd.toISOString())
       .order("published_at", { ascending: false });
 
+    let content = contentRaw ?? [];
+
+    // ── FALLBACK: se content_items vazio para instagram, buscar legado ──
+    const hasIgContent = content.some((c) => c.provider === "instagram");
+    if (!hasIgContent && providers.includes("instagram" as ProviderKey)) {
+      const { data: legacyMedia } = await supabase
+        .from("instagram_media_cache")
+        .select("*")
+        .eq("empresa_id", empresa.id)
+        .gte("timestamp", pStart.toISOString())
+        .lte("timestamp", pEnd.toISOString())
+        .order("timestamp", { ascending: false });
+
+      if (legacyMedia && legacyMedia.length > 0) {
+        const syntheticContent = legacyMedia.map((m) => ({
+          id: m.id as string,
+          empresa_id: empresa.id,
+          connection_id: `legacy-ig-${empresa.id}`,
+          provider: "instagram" as string,
+          provider_content_id: m.ig_media_id as string,
+          content_type: (m.media_type === "VIDEO" ? "reel" : "post") as string,
+          title: null as string | null,
+          caption: m.caption as string | null,
+          url: m.permalink as string | null,
+          thumbnail_url: (m.thumbnail_url ?? m.media_url) as string | null,
+          published_at: m.timestamp as string | null,
+          metrics: {
+            likes: (m.like_count ?? 0) as number,
+            comments: (m.comments_count ?? 0) as number,
+            ...(m.insights as Record<string, unknown> ?? {}),
+          },
+          raw: { media_type: m.media_type, media_url: m.media_url },
+          synced_at: m.synced_at as string,
+        }));
+        content = [...content, ...syntheticContent];
+      }
+    }
+
     // 7. Buscar snapshots do periodo
-    const { data: snapshots } = await supabase
+    const { data: snapshotsRaw } = await supabase
       .from("provider_snapshots")
       .select("*")
       .eq("empresa_id", empresa.id)
@@ -167,6 +205,37 @@ export async function POST(req: NextRequest) {
       .gte("snapshot_date", pStart.toISOString().split("T")[0])
       .lte("snapshot_date", pEnd.toISOString().split("T")[0])
       .order("snapshot_date", { ascending: false });
+
+    let snapshots = snapshotsRaw ?? [];
+
+    // ── FALLBACK: se snapshots vazio para instagram, buscar legado ──
+    const hasIgSnaps = snapshots.some((s) => s.provider === "instagram");
+    if (!hasIgSnaps && providers.includes("instagram" as ProviderKey)) {
+      const { data: legacyProfiles } = await supabase
+        .from("instagram_profile_cache")
+        .select("*")
+        .eq("empresa_id", empresa.id)
+        .gte("snapshot_date", pStart.toISOString().split("T")[0])
+        .lte("snapshot_date", pEnd.toISOString().split("T")[0])
+        .order("snapshot_date", { ascending: false });
+
+      if (legacyProfiles && legacyProfiles.length > 0) {
+        const syntheticSnapshots = legacyProfiles.map((p) => ({
+          id: p.id as string,
+          empresa_id: empresa.id,
+          connection_id: `legacy-ig-${empresa.id}`,
+          provider: "instagram" as string,
+          snapshot_date: p.snapshot_date as string,
+          metrics: {
+            followers_count: (p.followers_count ?? 0) as number,
+            follows_count: (p.follows_count ?? 0) as number,
+            media_count: (p.media_count ?? 0) as number,
+          },
+          created_at: p.created_at as string,
+        }));
+        snapshots = [...snapshots, ...syntheticSnapshots];
+      }
+    }
 
     // 8. Periodo anterior
     const prev = getPreviousPeriod(pStart, pEnd, reportType);

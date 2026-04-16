@@ -13,10 +13,7 @@ import {
   Newspaper,
   Brain,
   Cable,
-  Zap,
-  Scissors,
   Palette,
-  Paintbrush,
   MessageSquareText,
   Settings,
   Wrench,
@@ -28,6 +25,9 @@ import {
   Menu,
   X,
   FileText,
+  Clock,
+  TrendingUp,
+  Lightbulb,
   type LucideIcon,
 } from "lucide-react";
 import { useEmpresa } from "@/hooks/useEmpresa";
@@ -36,73 +36,65 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { EmpresaWizard } from "@/components/empresas/EmpresaWizard";
 import type { Empresa } from "@/types";
 
+/* ── Types ── */
+
 interface NavLink {
   label: string;
   href: string;
   icon: LucideIcon;
+  badge?: string;
+  badgeColor?: "emerald" | "purple" | "amber";
 }
 
 interface NavSection {
   id: string;
   label: string;
-  icon: LucideIcon;
-  collapsible: boolean;
   links: NavLink[];
 }
 
+/* ── Navigation structure ── */
+
 const navSections: NavSection[] = [
-  {
-    id: "painel",
-    label: "Painel",
-    icon: LayoutDashboard,
-    collapsible: false,
-    links: [
-      { label: "Gestor de Redes", href: "/dashboard", icon: LayoutDashboard },
-    ],
-  },
   {
     id: "criar",
     label: "Criar",
-    icon: Sparkles,
-    collapsible: true,
     links: [
-      { label: "Copy Studio", href: "/studio", icon: MessageSquareText },
-      { label: "Editor Visual", href: "/studio/editor", icon: Paintbrush },
-      { label: "Criacao", href: "/criacao", icon: Sparkles },
-      { label: "Templates", href: "/templates", icon: Palette },
-      { label: "Cortes & Video", href: "/cortes", icon: Scissors },
+      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { label: "Criar Conteudo", href: "/criacao", icon: Sparkles },
       { label: "Calendario", href: "/calendario", icon: CalendarDays },
-    ],
-  },
-  {
-    id: "inteligencia",
-    label: "Inteligencia",
-    icon: Brain,
-    collapsible: true,
-    links: [
-      { label: "Inteligencia", href: "/insights", icon: Sparkles },
-      { label: "Comparativo", href: "/insights/comparar", icon: BarChart3 },
-      { label: "Relatorios", href: "/relatorios", icon: FileText },
-      { label: "DNA da Marca", href: "/marca", icon: Brain },
-      { label: "Materiais da Marca", href: "/marca/assets", icon: Palette },
+      { label: "Studio", href: "/studio", icon: MessageSquareText },
     ],
   },
   {
     id: "analisar",
     label: "Analisar",
-    icon: BarChart3,
-    collapsible: true,
     links: [
       { label: "Analytics", href: "/analytics", icon: BarChart3 },
+      { label: "Inteligencia", href: "/insights", icon: Lightbulb },
+      { label: "Comparativo", href: "/insights/comparar", icon: TrendingUp },
       { label: "Concorrentes", href: "/concorrentes", icon: Users },
       { label: "Noticias", href: "/noticias", icon: Newspaper },
     ],
   },
   {
+    id: "relatorios",
+    label: "Relatorios",
+    links: [
+      { label: "Relatorios", href: "/relatorios", icon: FileText },
+      { label: "Agendados", href: "/relatorios/agendados", icon: Clock },
+    ],
+  },
+  {
+    id: "marca",
+    label: "Marca",
+    links: [
+      { label: "DNA da Marca", href: "/marca", icon: Brain },
+      { label: "Materiais", href: "/marca/assets", icon: Palette },
+    ],
+  },
+  {
     id: "sistema",
     label: "Sistema",
-    icon: Settings,
-    collapsible: true,
     links: [
       { label: "Setup", href: "/setup", icon: Wrench },
       { label: "Conexoes", href: "/conexoes", icon: Cable },
@@ -111,7 +103,29 @@ const navSections: NavSection[] = [
   },
 ];
 
+/* ── Icon color map for contextual icons ── */
+const iconColorMap: Record<string, string> = {
+  "/dashboard": "text-[#4ecdc4]",
+  "/criacao": "text-[#a29bfe]",
+  "/calendario": "text-[#fbbf24]",
+  "/studio": "text-[#f093fb]",
+  "/analytics": "text-[#60a5fa]",
+  "/insights": "text-[#4ecdc4]",
+  "/insights/comparar": "text-[#34d399]",
+  "/concorrentes": "text-[#f87171]",
+  "/noticias": "text-[#fbbf24]",
+  "/relatorios": "text-[#a29bfe]",
+  "/relatorios/agendados": "text-[#60a5fa]",
+  "/marca": "text-[#f093fb]",
+  "/marca/assets": "text-[#fbbf24]",
+  "/setup": "text-[#4ecdc4]",
+  "/conexoes": "text-[#6c5ce7]",
+  "/configuracoes": "text-[#8b8fb0]",
+};
+
 const STORAGE_KEY = "contia_sidebar_sections";
+
+/* ── Sidebar Component ── */
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -137,30 +151,34 @@ export function Sidebar() {
   const toggleSection = useCallback((sectionId: string) => {
     setOpenSections((prev) => {
       const next = { ...prev, [sectionId]: !prev[sectionId] };
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        /* noop */
+      }
       return next;
     });
   }, []);
 
   // Check if section has active link
   const sectionHasActive = useCallback(
-    (section: NavSection) => section.links.some((l) => pathname === l.href || pathname.startsWith(l.href + "/")),
+    (section: NavSection) =>
+      section.links.some(
+        (l) => pathname === l.href || pathname.startsWith(l.href + "/")
+      ),
     [pathname]
   );
 
-  // Section is open if explicitly toggled open (or default open on first visit if active)
+  // Section is open if explicitly toggled or has active link
   const isSectionOpen = useCallback(
     (section: NavSection) => {
-      if (!section.collapsible) return true;
-      // If user has explicitly set a state, respect it
       if (section.id in openSections) return openSections[section.id];
-      // Default: open if has active link
       return sectionHasActive(section);
     },
     [openSections, sectionHasActive]
   );
 
-  const handleWizardCreated = (empresa: Empresa) => {
+  const handleWizardCreated = (_empresa: Empresa) => {
     setShowWizard(false);
   };
 
@@ -186,7 +204,10 @@ export function Sidebar() {
   // Close dropdown on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
         setDropdownOpen(false);
       }
     }
@@ -196,47 +217,63 @@ export function Sidebar() {
     }
   }, [dropdownOpen]);
 
-  /* ── Shared sidebar content (reused by desktop and mobile drawer) ── */
+  // Get user initials for avatar
+  const userInitials = user?.email
+    ? user.email.substring(0, 2).toUpperCase()
+    : "??";
+
+  /* ── Shared sidebar content ── */
   const sidebarContent = (
-    <>
-      {/* Brand */}
-      <div className="px-5 h-14 flex items-center gap-2.5 border-b border-border">
-        <div className="w-[26px] h-[26px] rounded-lg bg-gradient-to-br from-[#4ecdc4] to-[#2db6a0] flex items-center justify-center">
-          <Sparkles className="w-3.5 h-3.5 text-white" />
+    <div className="flex flex-col h-full">
+      {/* ── Brand Header ── */}
+      <div className="relative px-5 h-16 flex items-center gap-3 border-b border-[#1e2348]/80">
+        {/* Subtle gradient overlay on brand area */}
+        <div className="absolute inset-0 bg-gradient-to-r from-[#4ecdc4]/[0.03] to-[#6c5ce7]/[0.03] pointer-events-none" />
+        <div className="relative w-8 h-8 rounded-xl bg-gradient-to-br from-[#4ecdc4] to-[#6c5ce7] flex items-center justify-center shadow-lg shadow-[#4ecdc4]/20">
+          <Sparkles className="w-4 h-4 text-white" />
         </div>
-        <span className="text-[15px] font-semibold tracking-tight text-text-primary">
-          ContIA
-        </span>
-        <span className="ml-auto text-[10px] font-medium text-text-muted bg-bg-card px-1.5 py-0.5 rounded">
+        <div className="flex flex-col">
+          <span className="text-[15px] font-bold tracking-tight text-[#e8eaff]">
+            ContIA
+          </span>
+          <span className="text-[10px] font-medium text-[#5e6388] tracking-wide">
+            Content Intelligence
+          </span>
+        </div>
+        <span className="ml-auto text-[9px] font-semibold text-[#4ecdc4] bg-[#4ecdc4]/10 px-2 py-0.5 rounded-full border border-[#4ecdc4]/20 uppercase tracking-wider">
           AI
         </span>
-        {/* Close button visible only inside the mobile drawer */}
+        {/* Mobile close */}
         <button
           onClick={closeMobile}
-          className="md:hidden ml-2 p-1 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-card-hover transition-colors"
+          className="md:hidden ml-1 p-1.5 rounded-lg text-[#5e6388] hover:text-[#e8eaff] hover:bg-[#1a1e42] transition-all duration-200"
           aria-label="Fechar menu"
         >
           <X size={18} />
         </button>
       </div>
 
-      {/* Empresa Selector */}
-      <div className="px-3 py-3 border-b border-border relative" ref={dropdownRef}>
+      {/* ── Empresa Selector ── */}
+      <div className="px-3 py-3 border-b border-[#1e2348]/60 relative" ref={dropdownRef}>
         <button
           onClick={() => setDropdownOpen((o) => !o)}
-          className="w-full flex items-center gap-2.5 px-2.5 py-[7px] rounded-lg bg-[#141736]/60 border border-[#1e2348]/50 hover:border-[#4ecdc4]/30 transition-all duration-200 group"
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[#141736]/80 border border-[#1e2348]/60 hover:border-[#4ecdc4]/30 hover:bg-[#141736] transition-all duration-200 group"
+          aria-expanded={dropdownOpen}
+          aria-haspopup="listbox"
         >
-          {empresa && (
+          {empresa ? (
             <span
-              className="w-2 h-2 rounded-full shrink-0 ring-2 ring-transparent group-hover:ring-[#282d58] transition-all duration-200"
+              className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-[#141736] group-hover:ring-[#1a1e42] transition-all duration-200"
               style={{ backgroundColor: empresa.cor_primaria }}
             />
+          ) : (
+            <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-[#5e6388]/50" />
           )}
-          <span className="flex-1 text-left text-[13px] text-text-primary truncate font-medium">
+          <span className="flex-1 text-left text-[13px] text-[#e8eaff] truncate font-medium">
             {empresa?.nome ?? "Selecionar empresa"}
           </span>
           <ChevronDown
-            className={`w-3.5 h-3.5 text-text-muted transition-transform duration-200 ${
+            className={`w-3.5 h-3.5 text-[#5e6388] transition-transform duration-200 ${
               dropdownOpen ? "rotate-180" : ""
             }`}
           />
@@ -245,11 +282,12 @@ export function Sidebar() {
         <AnimatePresence>
           {dropdownOpen && (
             <motion.div
-              initial={{ opacity: 0, y: -8, scale: 0.96 }}
+              initial={{ opacity: 0, y: -6, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -8, scale: 0.96 }}
-              transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-              className="absolute left-3 right-3 top-full mt-1 z-50 bg-gradient-to-b from-[#141736] to-[#0f1230] border border-[#1e2348]/50 backdrop-blur-xl rounded-lg shadow-xl shadow-black/30 overflow-hidden py-1"
+              exit={{ opacity: 0, y: -6, scale: 0.97 }}
+              transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
+              className="absolute left-3 right-3 top-full mt-1 z-50 bg-gradient-to-b from-[#141736] to-[#0f1230] border border-[#1e2348]/60 backdrop-blur-xl rounded-xl shadow-xl shadow-black/40 overflow-hidden py-1"
+              role="listbox"
             >
               {empresas.map((e) => (
                 <button
@@ -258,7 +296,9 @@ export function Sidebar() {
                     setEmpresaId(e.id);
                     setDropdownOpen(false);
                   }}
-                  className="w-full flex items-center gap-2.5 px-2.5 py-[7px] text-[13px] text-text-secondary hover:text-text-primary hover:bg-[#1a1e42] transition-colors duration-150"
+                  role="option"
+                  aria-selected={empresa?.id === e.id}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-[#8b8fb0] hover:text-[#e8eaff] hover:bg-[#1a1e42] transition-colors duration-150"
                 >
                   <span
                     className="w-2 h-2 rounded-full shrink-0"
@@ -266,19 +306,19 @@ export function Sidebar() {
                   />
                   <span className="flex-1 text-left truncate">{e.nome}</span>
                   {empresa?.id === e.id && (
-                    <Check className="w-3 h-3 text-accent" />
+                    <Check className="w-3.5 h-3.5 text-[#4ecdc4]" />
                   )}
                 </button>
               ))}
-              <div className="my-1 mx-2 border-t border-border" />
+              <div className="my-1 mx-2.5 border-t border-[#1e2348]" />
               <button
                 onClick={() => {
                   setDropdownOpen(false);
                   setShowWizard(true);
                 }}
-                className="w-full flex items-center gap-2 px-2.5 py-[7px] text-[13px] text-accent hover:bg-[#6c5ce714] transition-colors duration-150"
+                className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-[#6c5ce7] hover:text-[#a29bfe] hover:bg-[#6c5ce7]/[0.06] transition-colors duration-150"
               >
-                <Plus className="w-3 h-3" />
+                <Plus className="w-3.5 h-3.5" />
                 Nova Empresa
               </button>
             </motion.div>
@@ -286,69 +326,120 @@ export function Sidebar() {
         </AnimatePresence>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-3 py-3 flex flex-col gap-1 overflow-y-auto">
-        {navSections.map((section) => {
+      {/* ── Navigation ── */}
+      <nav
+        className="flex-1 px-3 py-2 flex flex-col gap-0.5 overflow-y-auto"
+        aria-label="Menu principal"
+      >
+        {navSections.map((section, sectionIdx) => {
           const open = isSectionOpen(section);
           const hasActive = sectionHasActive(section);
 
           return (
             <div key={section.id}>
-              {/* Section header */}
-              {section.collapsible ? (
-                <button
-                  onClick={() => toggleSection(section.id)}
-                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-lg text-[13px] font-medium transition-colors duration-150 ${
+              {/* Section divider (not before the first) */}
+              {sectionIdx > 0 && (
+                <div className="mx-2 my-2 border-t border-[#1e2348]/50" />
+              )}
+
+              {/* Section label */}
+              <button
+                onClick={() => toggleSection(section.id)}
+                className="w-full flex items-center gap-2 px-2.5 h-7 mb-0.5 group"
+                aria-expanded={open}
+                aria-controls={`nav-section-${section.id}`}
+              >
+                <span
+                  className={`text-[10px] font-semibold uppercase tracking-[0.12em] transition-colors duration-200 ${
                     hasActive
-                      ? "text-accent"
-                      : "text-text-muted hover:text-text-secondary"
+                      ? "text-[#4ecdc4]/80"
+                      : "text-[#5e6388]/70 group-hover:text-[#5e6388]"
                   }`}
                 >
-                  <section.icon className="w-4 h-4 shrink-0" />
-                  <span className="flex-1 text-left">{section.label}</span>
-                  <ChevronRight
-                    className={`w-3 h-3 transition-transform duration-200 ${
-                      open ? "rotate-90" : ""
-                    }`}
-                  />
-                </button>
-              ) : null}
+                  {section.label}
+                </span>
+                <div className="flex-1" />
+                <ChevronRight
+                  className={`w-3 h-3 text-[#5e6388]/50 transition-transform duration-200 ${
+                    open ? "rotate-90" : ""
+                  }`}
+                />
+              </button>
 
               {/* Section links */}
               <AnimatePresence initial={false}>
                 {open && (
                   <motion.div
+                    id={`nav-section-${section.id}`}
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: "auto", opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+                    transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
                     className="overflow-hidden"
+                    role="group"
                   >
-                    <div className={`flex flex-col gap-0.5 ${section.collapsible ? "ml-1 pl-2 border-l border-border/50" : ""}`}>
+                    <div className="flex flex-col gap-[2px]">
                       {section.links.map((link) => {
-                        const active = pathname === link.href || pathname.startsWith(link.href + "/");
+                        const active =
+                          pathname === link.href ||
+                          pathname.startsWith(link.href + "/");
+                        const iconColor = active
+                          ? "text-white"
+                          : iconColorMap[link.href] || "text-[#5e6388]";
+
                         return (
                           <Link
                             key={link.href}
                             href={link.href}
                             onClick={closeMobile}
-                            className={`relative flex items-center gap-2.5 px-2.5 h-8 rounded-lg text-[13px] font-medium transition-all duration-200 ${
+                            aria-current={active ? "page" : undefined}
+                            className={`relative flex items-center gap-2.5 px-2.5 h-9 rounded-xl text-[13px] font-medium transition-all duration-200 group/link ${
                               active
-                                ? "text-text-primary bg-gradient-to-r from-[#4ecdc4]/15 to-transparent"
-                                : "text-text-secondary hover:text-text-primary hover:bg-[#4ecdc4]/5"
+                                ? "text-white bg-gradient-to-r from-[#4ecdc4]/20 via-[#6c5ce7]/10 to-transparent shadow-[inset_0_0_20px_rgba(78,205,196,0.06)]"
+                                : "text-[#8b8fb0] hover:text-[#e8eaff] hover:bg-[#1a1e42]/60"
                             }`}
                           >
+                            {/* Active indicator bar */}
                             {active && (
                               <motion.span
-                                layoutId="activeNav"
-                                className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full bg-gradient-to-b from-[#4ecdc4] to-[#6c5ce7] shadow-[0_0_8px_rgba(78,205,196,0.4)]"
-                                transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                                layoutId="sidebarActiveIndicator"
+                                className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-gradient-to-b from-[#4ecdc4] to-[#6c5ce7] shadow-[0_0_12px_rgba(78,205,196,0.5)]"
+                                transition={{
+                                  type: "spring",
+                                  stiffness: 380,
+                                  damping: 28,
+                                }}
                               />
                             )}
-                            <link.icon
-                              className={`w-4 h-4 shrink-0 ${active ? "text-accent-light" : ""}`}
-                            />
-                            {link.label}
+
+                            {/* Icon with contextual color */}
+                            <span
+                              className={`flex items-center justify-center w-5 h-5 shrink-0 transition-all duration-200 ${iconColor} ${
+                                !active
+                                  ? "group-hover/link:scale-110 group-hover/link:drop-shadow-[0_0_6px_rgba(78,205,196,0.3)]"
+                                  : "drop-shadow-[0_0_8px_rgba(78,205,196,0.4)]"
+                              }`}
+                            >
+                              <link.icon className="w-[18px] h-[18px]" />
+                            </span>
+
+                            {/* Label */}
+                            <span className="flex-1 truncate">{link.label}</span>
+
+                            {/* Badge */}
+                            {link.badge && (
+                              <span
+                                className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full ${
+                                  link.badgeColor === "purple"
+                                    ? "bg-[#6c5ce7]/15 text-[#a29bfe] border border-[#6c5ce7]/20"
+                                    : link.badgeColor === "amber"
+                                      ? "bg-[#fbbf24]/15 text-[#fbbf24] border border-[#fbbf24]/20"
+                                      : "bg-[#4ecdc4]/15 text-[#4ecdc4] border border-[#4ecdc4]/20"
+                                }`}
+                              >
+                                {link.badge}
+                              </span>
+                            )}
                           </Link>
                         );
                       })}
@@ -361,49 +452,75 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="px-5 py-3 border-t border-border space-y-2">
-        <div className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-          <p className="text-[11px] text-text-muted">Powered by AI</p>
-          <span className="ml-auto text-[10px] text-text-muted/60">v0.1</span>
+      {/* ── Footer ── */}
+      <div className="px-3 py-3 border-t border-[#1e2348]/80">
+        {/* Powered by AI indicator */}
+        <div className="flex items-center gap-1.5 px-2.5 mb-2">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#34d399] opacity-50" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-[#34d399]" />
+          </span>
+          <span className="text-[10px] text-[#5e6388] font-medium">
+            Powered by AI
+          </span>
+          <span className="ml-auto text-[10px] text-[#5e6388]/50 font-mono">
+            v0.1
+          </span>
         </div>
+
+        {/* User row */}
         {supabaseConfigured && (
-          <button
-            type="button"
-            onClick={signOut}
-            className="w-full flex items-center gap-2 px-2 h-7 rounded-lg text-[11px] text-text-muted hover:text-danger hover:bg-danger/10 transition-all duration-200 group"
-            title="Sair"
-          >
-            <LogOut className="w-3 h-3 shrink-0" />
-            <span className="flex-1 text-left truncate">
-              {user?.email ?? "Sair"}
-            </span>
-          </button>
+          <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-[#1a1e42]/60 transition-all duration-200 group/user">
+            {/* User avatar */}
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#6c5ce7]/30 to-[#4ecdc4]/30 border border-[#1e2348] flex items-center justify-center shrink-0">
+              <span className="text-[11px] font-bold text-[#a29bfe]">
+                {userInitials}
+              </span>
+            </div>
+            {/* Email */}
+            <div className="flex-1 min-w-0">
+              <p className="text-[12px] text-[#e8eaff] font-medium truncate">
+                {user?.email ?? "Usuario"}
+              </p>
+              <p className="text-[10px] text-[#5e6388] truncate">
+                {empresa?.nome ?? "Sem empresa"}
+              </p>
+            </div>
+            {/* Logout */}
+            <button
+              type="button"
+              onClick={signOut}
+              className="p-1.5 rounded-lg text-[#5e6388] hover:text-[#f87171] hover:bg-[#f87171]/10 transition-all duration-200 opacity-0 group-hover/user:opacity-100"
+              title="Sair"
+              aria-label="Sair da conta"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
+          </div>
         )}
       </div>
-    </>
+    </div>
   );
 
   return (
     <>
-      {/* ── Mobile Top Bar (only <md) ── */}
-      <div className="fixed top-0 left-0 right-0 z-40 md:hidden h-14 bg-[#0c0f24] border-b border-border flex items-center px-4 gap-3">
+      {/* ── Mobile Top Bar ── */}
+      <div className="fixed top-0 left-0 right-0 z-40 md:hidden h-14 bg-[#0c0f24]/95 backdrop-blur-xl border-b border-[#1e2348]/60 flex items-center px-4 gap-3">
         <button
           onClick={() => setMobileOpen(true)}
-          className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-card-hover transition-colors"
+          className="p-1.5 rounded-lg text-[#5e6388] hover:text-[#e8eaff] hover:bg-[#1a1e42] transition-all duration-200"
           aria-label="Abrir menu"
         >
           <Menu size={22} />
         </button>
-        <div className="w-[24px] h-[24px] rounded-lg bg-gradient-to-br from-[#4ecdc4] to-[#2db6a0] flex items-center justify-center">
-          <Sparkles className="w-3 h-3 text-white" />
+        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#4ecdc4] to-[#6c5ce7] flex items-center justify-center shadow-lg shadow-[#4ecdc4]/15">
+          <Sparkles className="w-3.5 h-3.5 text-white" />
         </div>
-        <span className="text-[14px] font-semibold tracking-tight text-text-primary">
+        <span className="text-[14px] font-bold tracking-tight text-[#e8eaff]">
           ContIA
         </span>
         {empresa && (
-          <span className="ml-auto text-[11px] text-text-secondary truncate max-w-[140px]">
+          <span className="ml-auto text-[11px] text-[#8b8fb0] truncate max-w-[140px] font-medium">
             {empresa.nome}
           </span>
         )}
@@ -418,8 +535,8 @@ export function Sidebar() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
+              transition={{ duration: 0.25 }}
+              className="fixed inset-0 z-40 bg-[#080b1e]/70 backdrop-blur-md md:hidden"
               onClick={closeMobile}
               aria-hidden="true"
             />
@@ -428,8 +545,11 @@ export function Sidebar() {
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
-              transition={{ type: "spring", stiffness: 350, damping: 35 }}
-              className="fixed top-0 left-0 bottom-0 z-50 w-[270px] flex flex-col bg-[#0c0f24] border-r border-border md:hidden"
+              transition={{ type: "spring", stiffness: 380, damping: 35 }}
+              className="fixed top-0 left-0 bottom-0 z-50 w-[280px] flex flex-col bg-[#0c0f24] border-r border-[#1e2348]/60 shadow-2xl shadow-black/50 md:hidden"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Menu de navegacao"
             >
               {sidebarContent}
             </motion.aside>
@@ -437,9 +557,13 @@ export function Sidebar() {
         )}
       </AnimatePresence>
 
-      {/* ── Desktop Sidebar (md+) ── */}
-      <aside className="hidden md:flex flex-col w-[240px] min-h-screen shrink-0 border-r border-border bg-[#0c0f24] relative z-30">
-        {sidebarContent}
+      {/* ── Desktop Sidebar ── */}
+      <aside className="hidden md:flex flex-col w-[260px] min-h-screen shrink-0 border-r border-[#1e2348]/60 bg-[#0c0f24] relative z-30">
+        {/* Subtle side gradient */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#4ecdc4]/[0.02] via-transparent to-[#6c5ce7]/[0.02] pointer-events-none" />
+        <div className="relative flex flex-col h-full">
+          {sidebarContent}
+        </div>
       </aside>
 
       {/* Empresa creation wizard */}
