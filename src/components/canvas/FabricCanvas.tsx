@@ -576,6 +576,57 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
       return () => ro.disconnect();
     }, [computeScale]);
 
+    // ── Prevent scroll when Fabric.js text editing (browser scrollIntoView on hidden textarea) ──
+    useEffect(() => {
+      const container = containerRef.current;
+      if (!container) return;
+
+      // Fabric.js creates a hidden textarea for text editing that triggers scrollIntoView
+      // We prevent any scroll on the editor page by capturing scroll events
+      const preventScroll = (e: Event) => {
+        const target = e.target as HTMLElement;
+        // Allow scroll inside designated scroll areas (property panel, layers, etc)
+        if (target.closest("[data-allow-scroll]")) return;
+        // Prevent the page from scrolling when editing text on canvas
+        if (container.contains(target)) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      };
+
+      // Also prevent the parent page from scrolling
+      const parentEl = container.closest("[data-editor-root]") || document.body;
+      parentEl.addEventListener("scroll", preventScroll, { passive: false, capture: true });
+
+      return () => {
+        parentEl.removeEventListener("scroll", preventScroll, true);
+      };
+    }, []);
+
+    // ── Ctrl+Scroll zoom on canvas ──
+    useEffect(() => {
+      const container = containerRef.current;
+      if (!container) return;
+
+      const handleWheel = (e: WheelEvent) => {
+        // Only zoom with Ctrl/Cmd held
+        if (!e.ctrlKey && !e.metaKey) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const delta = e.deltaY > 0 ? -0.05 : 0.05;
+        setScale((prev) => {
+          const next = prev + delta;
+          // Clamp between 0.1x and 3x
+          return Math.min(3, Math.max(0.1, next));
+        });
+      };
+
+      container.addEventListener("wheel", handleWheel, { passive: false });
+      return () => container.removeEventListener("wheel", handleWheel);
+    }, []);
+
     // ── Keyboard shortcuts ──
     useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {

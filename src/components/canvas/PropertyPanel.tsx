@@ -835,6 +835,12 @@ export function PropertyPanel({
                 {[
                   "Plus Jakarta Sans",
                   "Inter",
+                  "Poppins",
+                  "Montserrat",
+                  "Playfair Display",
+                  "Roboto",
+                  "Open Sans",
+                  "Lato",
                   "Formula1 Display",
                   "Formula1 Wide",
                   "Genius Techno",
