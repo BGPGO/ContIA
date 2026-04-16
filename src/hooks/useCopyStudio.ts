@@ -15,7 +15,6 @@ import type {
 import { QUICK_ACTIONS } from "@/types/copy-studio";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/client";
-import { submitPostForApproval } from "@/lib/posts";
 
 // ═══════════════════════════════════════════════════════════════════════
 // STATE
@@ -731,63 +730,6 @@ export function useCopyStudio() {
     }
   }, [sessionId, configured, format, tone, platforms, topic, currentCopy, messages, status]);
 
-  // ── Submit session for approval ──
-  // Converte a sessão atual em post (se necessário) e chama a API de aprovação.
-  // Retorna { success, postId?, error? }.
-  const submitSessionForApproval = useCallback(
-    async (comment?: string): Promise<{ success: boolean; postId?: string; error?: string }> => {
-      if (!empresaId || !currentCopy) {
-        return { success: false, error: "Nenhuma copy disponivel para enviar." };
-      }
-
-      if (!configured) {
-        return {
-          success: false,
-          error: "O fluxo de aprovacao requer conexao com Supabase. Configure o ambiente para usar este recurso.",
-        };
-      }
-
-      try {
-        // 1. Criar post a partir da sessão atual
-        const supabase = createClient();
-
-        const postData = {
-          empresa_id: empresaId,
-          titulo: topic || currentCopy.headline || "Sem titulo",
-          conteudo: currentCopy.caption || currentCopy.headline || "",
-          midia_url: null as string | null,
-          plataformas: platforms,
-          status: "rascunho" as const,
-          agendado_para: null as string | null,
-          publicado_em: null as string | null,
-          tematica: topic || "",
-        };
-
-        const { data: post, error: postErr } = await supabase
-          .from("posts")
-          .insert(postData)
-          .select()
-          .single();
-
-        if (postErr || !post) {
-          throw new Error(postErr?.message ?? "Falha ao criar post");
-        }
-
-        const postId = (post as { id: string }).id;
-
-        // 2. Enviar para aprovação
-        await submitPostForApproval(postId, comment);
-
-        return { success: true, postId };
-      } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : "Erro ao enviar para aprovação";
-        console.error("[useCopyStudio] submitSessionForApproval error:", errorMsg);
-        return { success: false, error: errorMsg };
-      }
-    },
-    [empresaId, currentCopy, topic, platforms, configured]
-  );
-
   // ── Reset ──
   const reset = useCallback(() => {
     if (abortControllerRef.current) {
@@ -842,7 +784,6 @@ export function useCopyStudio() {
     newSession,
     loadSession,
     saveSession,
-    submitSessionForApproval,
     reset,
   };
 }

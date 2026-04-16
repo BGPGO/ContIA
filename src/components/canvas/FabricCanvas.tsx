@@ -136,6 +136,33 @@ function extractSelectionInfo(obj: any): SelectionInfo {
   };
 }
 
+/**
+ * After any loadFromJSON, iterate over canvas objects and ensure every
+ * FabricImage has crossOrigin='anonymous'. This prevents canvas tainting
+ * when the same images are later used in toDataURL().
+ */
+function patchCanvasCrossOrigin(canvas: any) {
+  if (!canvas) return;
+  const objects: any[] = canvas.getObjects ? canvas.getObjects() : [];
+  for (const obj of objects) {
+    if (obj.type === "image" || obj.type === "Image") {
+      obj.crossOrigin = "anonymous";
+    }
+    // Recurse into groups
+    if (obj.type === "group" && typeof obj.getObjects === "function") {
+      for (const child of obj.getObjects()) {
+        if (child.type === "image" || child.type === "Image") {
+          child.crossOrigin = "anonymous";
+        }
+      }
+    }
+  }
+  // Also patch backgroundImage if present
+  if (canvas.backgroundImage) {
+    canvas.backgroundImage.crossOrigin = "anonymous";
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    FabricCanvas Component
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -601,6 +628,7 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
         // ── Load initial JSON if provided ──
         if (canvasJson) {
           canvasInstance.loadFromJSON(canvasJson).then(() => {
+            patchCanvasCrossOrigin(canvasInstance);
             canvasInstance.renderAll();
             saveHistory();
           });
@@ -863,6 +891,7 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
       historyIndexRef.current -= 1;
       const json = historyRef.current[historyIndexRef.current];
       canvas.loadFromJSON(JSON.parse(json)).then(() => {
+        patchCanvasCrossOrigin(canvas);
         canvas.renderAll();
         isUndoRedoRef.current = false;
         onCanvasChange?.();
@@ -880,6 +909,7 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
       historyIndexRef.current += 1;
       const json = historyRef.current[historyIndexRef.current];
       canvas.loadFromJSON(JSON.parse(json)).then(() => {
+        patchCanvasCrossOrigin(canvas);
         canvas.renderAll();
         isUndoRedoRef.current = false;
         onCanvasChange?.();
@@ -899,6 +929,7 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
           const canvas = fabricRef.current;
           if (!canvas) return;
           await canvas.loadFromJSON(json);
+          patchCanvasCrossOrigin(canvas);
           canvas.renderAll();
           saveHistory();
         },

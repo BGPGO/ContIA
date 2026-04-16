@@ -3,6 +3,7 @@
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState, useEffect, useCallback, Suspense, useRef } from "react";
 import { Loader2, ClipboardCopy, RefreshCw, Type, Sparkles } from "lucide-react";
+import { createPost, submitPostForApproval } from "@/lib/posts";
 import { FabricCanvas } from "@/components/canvas/FabricCanvas";
 import type { FabricCanvasRef, SelectionInfo, TextSelectionInfo } from "@/components/canvas/FabricCanvas";
 import { CanvasToolbar } from "@/components/canvas/CanvasToolbar";
@@ -432,6 +433,13 @@ function EditorContent() {
   const [isLoadingSession, setIsLoadingSession] = useState(!!sessionId);
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(!!templateId);
   const [canvasReady, setCanvasReady] = useState(false);
+  const [toastMsg, setToastMsg] = useState<{ text: string; type: "success" | "warning" | "error" } | null>(null);
+  const [isSubmittingApproval, setIsSubmittingApproval] = useState(false);
+
+  const showToast = useCallback((text: string, type: "success" | "warning" | "error" = "success") => {
+    setToastMsg({ text, type });
+    setTimeout(() => setToastMsg(null), 4000);
+  }, []);
 
   // ── Canvas dimensions based on aspect ratio ──
   const dims = CANVAS_DIMENSIONS[state.aspectRatio] || CANVAS_DIMENSIONS["1:1"];
@@ -671,9 +679,18 @@ function EditorContent() {
 
   // ── Build canvas payload for save/update ──
   const buildCanvasPayload = useCallback(
-    async (): Promise<{ canvasJsonToSave: unknown; thumbnail: string | null }> => {
+    async (): Promise<{ canvasJsonToSave: unknown; thumbnail: string | null; thumbnailFailed: boolean }> => {
       const json = getCanvasJson();
-      let thumbnail: string | null = exportImage({ format: "png", quality: 0.8, multiplier: 0.3 }) ?? null;
+      let thumbnail: string | null = null;
+      let thumbnailFailed = false;
+      try {
+        thumbnail = exportImage({ format: "png", quality: 0.8, multiplier: 0.3 }) ?? null;
+      } catch (err) {
+        // Canvas tainted by a cross-origin image — save continues without thumbnail
+        console.warn("[editor] toDataURL falhou (canvas tainted):", err);
+        thumbnailFailed = true;
+        thumbnail = null;
+      }
       let canvasJsonToSave: unknown = isCarousel ? { slides, currentSlideIndex } : json;
 
       if (isSupabaseConfigured()) {
@@ -691,7 +708,7 @@ function EditorContent() {
           }
         }
       }
-      return { canvasJsonToSave, thumbnail };
+      return { canvasJsonToSave, thumbnail, thumbnailFailed };
     },
     [getCanvasJson, exportImage, isCarousel, slides, currentSlideIndex, empresaId]
   );
@@ -706,28 +723,38 @@ function EditorContent() {
       }
       setIsSavingTemplate(true);
       try {
-        const { canvasJsonToSave, thumbnail } = await buildCanvasPayload();
+        const { canvasJsonToSave, thumbnail, thumbnailFailed } = await buildCanvasPayload();
 
-        await updateTemplate(originalTemplateId, {
+        // When thumbnail generation failed (canvas tainted), omit thumbnail_url from the
+        // update so the existing stored thumbnail is preserved.
+        const updatePayload: Record<string, unknown> = {
           canvas_json: canvasJsonToSave as object,
-          thumbnail_url: thumbnail,
           format: isCarousel ? "carousel" : "post",
           aspect_ratio: state.aspectRatio,
-        });
+        };
+        if (!thumbnailFailed) {
+          updatePayload.thumbnail_url = thumbnail;
+        }
+
+        await updateTemplate(originalTemplateId, updatePayload as Parameters<typeof updateTemplate>[1]);
 
         markClean();
         setShowSaveModal(false);
-        // Brief toast-like feedback via console (UI toast below)
+        if (thumbnailFailed) {
+          showToast("Template salvo, mas a miniatura não pôde ser atualizada (alguma imagem bloqueia a exportação).", "warning");
+        } else {
+          showToast("Template salvo com sucesso!", "success");
+        }
         console.info("[Editor] Template atualizado com sucesso:", originalTemplateId);
       } catch (err) {
         console.error("[Editor] Falha ao atualizar template:", err);
         const msg = err instanceof Error ? err.message : String(err);
-        alert(`Erro ao atualizar template: ${msg}`);
+        showToast(`Erro ao atualizar template: ${msg}`, "error");
       } finally {
         setIsSavingTemplate(false);
       }
     },
-    [originalTemplateId, buildCanvasPayload, updateTemplate, isCarousel, state.aspectRatio, markClean]
+    [originalTemplateId, buildCanvasPayload, updateTemplate, isCarousel, state.aspectRatio, markClean, showToast]
   );
 
   // ── Create new template (POST) — always inserts a new record ──
@@ -735,7 +762,7 @@ function EditorContent() {
     async (name: string) => {
       setIsSavingTemplate(true);
       try {
-        const { canvasJsonToSave, thumbnail } = await buildCanvasPayload();
+        const { canvasJsonToSave, thumbnail, thumbnailFailed } = await buildCanvasPayload();
 
         const newId = await saveTemplate({
           empresa_id: empresaId,
@@ -758,15 +785,20 @@ function EditorContent() {
 
         markClean();
         setShowSaveModal(false);
+        if (thumbnailFailed) {
+          showToast("Template criado, mas a miniatura não pôde ser gerada (alguma imagem bloqueia a exportação).", "warning");
+        } else {
+          showToast("Template criado com sucesso!", "success");
+        }
       } catch (err) {
         console.error("[Editor] Falha ao criar template:", err);
         const msg = err instanceof Error ? err.message : String(err);
-        alert(`Falha ao salvar template: ${msg}`);
+        showToast(`Falha ao salvar template: ${msg}`, "error");
       } finally {
         setIsSavingTemplate(false);
       }
     },
-    [buildCanvasPayload, saveTemplate, empresaId, isCarousel, state.aspectRatio, markClean]
+    [buildCanvasPayload, saveTemplate, empresaId, isCarousel, state.aspectRatio, markClean, showToast]
   );
 
   // ── Export / Download ──
@@ -777,7 +809,14 @@ function EditorContent() {
   // ── Copy to clipboard ──
   const handleCopyToClipboard = useCallback(async () => {
     try {
-      const dataUrl = exportImage({ format: "png", quality: 1, multiplier: 2 });
+      let dataUrl: string | undefined;
+      try {
+        dataUrl = exportImage({ format: "png", quality: 1, multiplier: 2 });
+      } catch (taintErr) {
+        console.warn("[Editor] Clipboard toDataURL falhou (canvas tainted):", taintErr);
+        showToast("Não foi possível copiar: alguma imagem bloqueia a exportação.", "warning");
+        return;
+      }
       if (!dataUrl) return;
 
       const response = await fetch(dataUrl);
@@ -788,7 +827,7 @@ function EditorContent() {
     } catch (err) {
       console.warn("[Editor] Clipboard copy failed:", err);
     }
-  }, [exportImage]);
+  }, [exportImage, showToast]);
 
   // ── Back navigation ──
   const handleBack = useCallback(() => {
@@ -798,6 +837,95 @@ function EditorContent() {
       router.push("/studio");
     }
   }, [router, sessionId]);
+
+  // ── Submit canvas art for approval ──
+  // Gera a imagem do canvas, cria um post no banco e chama o endpoint de aprovação.
+  // Se o usuário veio de uma copy session, vincula os dados da sessão ao post.
+  // Se veio direto (sem sessão), cria o post apenas com os dados do canvas.
+  // TODO: migrar midia_url para upload real no Supabase Storage quando o endpoint de upload de mídia for criado.
+  const handleSubmitForApproval = useCallback(async () => {
+    if (!isSupabaseConfigured()) {
+      showToast("O fluxo de aprovação requer conexão com Supabase.", "error");
+      return;
+    }
+    if (!empresaId) {
+      showToast("Nenhuma empresa selecionada.", "error");
+      return;
+    }
+
+    setIsSubmittingApproval(true);
+    try {
+      // 1. Exportar imagem do canvas como data URL
+      let midiaUrl: string | null = null;
+      try {
+        midiaUrl = exportImage({ format: "png", quality: 0.85, multiplier: 1 }) ?? null;
+      } catch (exportErr) {
+        console.warn("[Editor] Exportação de imagem falhou (canvas tainted):", exportErr);
+        // Continua sem imagem — midia_url ficará null
+      }
+
+      // 2. Coletar dados da sessão (copy), se houver
+      let titulo = originalTemplateName || "Post sem título";
+      let conteudo = "";
+      let tematica = "";
+      let plataformas: string[] = ["instagram"];
+
+      if (rawCopyContent) {
+        titulo = rawCopyContent.headline || titulo;
+        conteudo = rawCopyContent.caption || rawCopyContent.headline || "";
+        tematica = rawCopyContent.headline || "";
+      }
+
+      // Buscar plataformas e tematica da copy session, se existir
+      if (sessionId && isSupabaseConfigured()) {
+        try {
+          const supabase = createClient();
+          const { data: sessData } = await supabase
+            .from("copy_sessions")
+            .select("platforms, topic, current_copy")
+            .eq("id", sessionId)
+            .single();
+          if (sessData) {
+            if (sessData.platforms?.length) plataformas = sessData.platforms;
+            if (sessData.topic) tematica = sessData.topic;
+            if (sessData.current_copy && !rawCopyContent) {
+              const cc = sessData.current_copy as { headline?: string; caption?: string };
+              titulo = cc.headline || titulo;
+              conteudo = cc.caption || cc.headline || "";
+            }
+          }
+        } catch {
+          // Não bloqueia o fluxo
+        }
+      }
+
+      // 3. Criar o post no banco
+      const supabase = createClient();
+      const post = await createPost(supabase, {
+        empresa_id: empresaId,
+        titulo,
+        conteudo,
+        midia_url: midiaUrl,
+        plataformas,
+        status: "rascunho",
+        agendado_para: null,
+        publicado_em: null,
+        tematica,
+      });
+
+      // 4. Enviar para aprovação
+      await submitPostForApproval(post.id);
+
+      showToast("Post enviado para aprovação!", "success");
+      setTimeout(() => router.push("/aprovacao"), 1200);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro ao enviar para aprovação";
+      console.error("[Editor] handleSubmitForApproval:", msg);
+      showToast(`Erro: ${msg}`, "error");
+    } finally {
+      setIsSubmittingApproval(false);
+    }
+  }, [empresaId, exportImage, originalTemplateName, rawCopyContent, sessionId, router, showToast]);
 
   // ── Canvas ready callback ──
   const handleCanvasReady = useCallback(() => {
@@ -1006,8 +1134,10 @@ function EditorContent() {
         onCopyToClipboard={handleCopyToClipboard}
         onBack={handleBack}
         onCreateFromImage={() => setShowImageExtractor(true)}
+        onSubmitApproval={handleSubmitForApproval}
         hasUnsavedChanges={state.isDirty}
         isSaving={isSavingTemplate}
+        isSubmittingApproval={isSubmittingApproval}
         sessionId={sessionId}
       />
 
@@ -1053,6 +1183,20 @@ function EditorContent() {
         isSaving={isSavingTemplate}
         originalTemplateName={originalTemplateName}
       />
+
+      {/* Toast notifications */}
+      {toastMsg && (
+        <div
+          className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-xl text-sm font-medium shadow-2xl
+            transition-all pointer-events-none select-none
+            ${toastMsg.type === "success" ? "bg-[#4ecdc4]/20 border border-[#4ecdc4]/40 text-[#4ecdc4]" : ""}
+            ${toastMsg.type === "warning" ? "bg-yellow-500/15 border border-yellow-400/30 text-yellow-300" : ""}
+            ${toastMsg.type === "error" ? "bg-red-500/15 border border-red-400/30 text-red-300" : ""}
+          `}
+        >
+          {toastMsg.text}
+        </div>
+      )}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
   Check,
   Loader2,
   ImagePlus,
+  Send,
 } from "lucide-react";
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -23,8 +24,10 @@ interface EditorBottomBarProps {
   onCopyToClipboard: () => void;
   onBack: () => void;
   onCreateFromImage?: () => void;
+  onSubmitApproval?: () => Promise<void>;
   hasUnsavedChanges: boolean;
   isSaving?: boolean;
+  isSubmittingApproval?: boolean;
   sessionId?: string | null;
 }
 
@@ -39,8 +42,10 @@ export function EditorBottomBar({
   onCopyToClipboard,
   onBack,
   onCreateFromImage,
+  onSubmitApproval,
   hasUnsavedChanges,
   isSaving = false,
+  isSubmittingApproval = false,
   sessionId,
 }: EditorBottomBarProps) {
   const [copied, setCopied] = useState(false);
@@ -111,8 +116,30 @@ export function EditorBottomBar({
         </button>
       </div>
 
-      {/* Right: Export actions */}
+      {/* Right: Aprovação + Export actions */}
       <div className="flex items-center gap-2">
+        {onSubmitApproval && (
+          <button
+            type="button"
+            onClick={onSubmitApproval}
+            disabled={isSubmittingApproval}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold
+              text-[#a29bfe] bg-[#6c5ce7]/10 border border-[#6c5ce7]/25
+              hover:bg-[#6c5ce7]/20 hover:border-[#6c5ce7]/40
+              disabled:opacity-50 disabled:cursor-not-allowed
+              transition-all cursor-pointer"
+          >
+            {isSubmittingApproval ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Send size={16} />
+            )}
+            <span className="hidden sm:inline">
+              {isSubmittingApproval ? "Enviando..." : "Enviar para aprovação"}
+            </span>
+          </button>
+        )}
+
         <button
           type="button"
           onClick={handleCopy}
