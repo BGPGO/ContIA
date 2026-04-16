@@ -56,51 +56,112 @@ function copyToCopyPayload(copy: CopyContent, empresa?: { nome?: string } | null
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Save Template Modal
+   Supports two modes:
+   - "update": when editing an existing template (originalTemplateId set)
+   - "new": always creates a new template (asks for name)
    ═══════════════════════════════════════════════════════════════════════════ */
+
+type SaveModalMode = "update" | "new";
 
 function SaveTemplateModal({
   isOpen,
   onClose,
   onSave,
+  onSaveAsNew,
   isSaving,
+  originalTemplateName,
 }: {
   isOpen: boolean;
   onClose: () => void;
+  /** Called when saving over the existing template (update mode) or creating new without name conflict */
   onSave: (name: string) => void;
+  /** Called when "Salvar como novo" is chosen — always creates a fresh template */
+  onSaveAsNew: (name: string) => void;
   isSaving: boolean;
+  /** When set, the modal starts in "update" mode offering to overwrite this template */
+  originalTemplateName: string | null;
 }) {
+  const [mode, setMode] = useState<SaveModalMode>(
+    originalTemplateName ? "update" : "new"
+  );
   const [name, setName] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
-      setName("");
-      setTimeout(() => inputRef.current?.focus(), 100);
+      setMode(originalTemplateName ? "update" : "new");
+      setName(originalTemplateName ?? "");
+      setTimeout(() => {
+        if (!originalTemplateName) inputRef.current?.focus();
+      }, 100);
     }
-  }, [isOpen]);
+  }, [isOpen, originalTemplateName]);
 
   if (!isOpen) return null;
+
+  const isUpdate = mode === "update" && !!originalTemplateName;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-[#141736] border border-white/10 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
         <h3 className="text-lg font-semibold text-[#e8eaff] mb-4">
-          Salvar como Template
+          {isUpdate ? "Salvar Template" : "Salvar como Template"}
         </h3>
-        <input
-          ref={inputRef}
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && name.trim()) onSave(name.trim());
-            if (e.key === "Escape") onClose();
-          }}
-          placeholder="Nome do template..."
-          className="w-full bg-[#080b1e] border border-white/10 rounded-lg px-4 py-3 text-sm text-[#e8eaff]
-            placeholder:text-[#5e6388] focus:outline-none focus:border-[#4ecdc4]/40 transition-colors"
-        />
+
+        {/* Mode switcher — only visible when originalTemplate exists */}
+        {originalTemplateName && (
+          <div className="flex gap-2 mb-4">
+            <button
+              type="button"
+              onClick={() => setMode("update")}
+              className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
+                mode === "update"
+                  ? "border-[#4ecdc4] text-[#4ecdc4] bg-[#4ecdc4]/10"
+                  : "border-white/10 text-[#8b8fb0] hover:text-[#e8eaff] hover:bg-white/5"
+              }`}
+            >
+              Salvar (substituir)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode("new");
+                setName("");
+                setTimeout(() => inputRef.current?.focus(), 50);
+              }}
+              className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
+                mode === "new"
+                  ? "border-[#6c5ce7] text-[#6c5ce7] bg-[#6c5ce7]/10"
+                  : "border-white/10 text-[#8b8fb0] hover:text-[#e8eaff] hover:bg-white/5"
+              }`}
+            >
+              Salvar como novo
+            </button>
+          </div>
+        )}
+
+        {/* Update mode: shows current name (read-only) */}
+        {isUpdate ? (
+          <div className="w-full bg-[#080b1e] border border-white/10 rounded-lg px-4 py-3 text-sm text-[#8b8fb0]">
+            {originalTemplateName}
+          </div>
+        ) : (
+          <input
+            ref={inputRef}
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && name.trim()) onSaveAsNew(name.trim());
+              if (e.key === "Escape") onClose();
+            }}
+            placeholder="Nome do template..."
+            className="w-full bg-[#080b1e] border border-white/10 rounded-lg px-4 py-3 text-sm text-[#e8eaff]
+              placeholder:text-[#5e6388] focus:outline-none focus:border-[#4ecdc4]/40 transition-colors"
+          />
+        )}
+
         <div className="flex justify-end gap-3 mt-5">
           <button
             type="button"
@@ -112,20 +173,29 @@ function SaveTemplateModal({
           </button>
           <button
             type="button"
-            onClick={() => name.trim() && onSave(name.trim())}
-            disabled={!name.trim() || isSaving}
+            onClick={() => {
+              if (isUpdate) {
+                onSave(originalTemplateName!);
+              } else if (name.trim()) {
+                onSaveAsNew(name.trim());
+              }
+            }}
+            disabled={(!isUpdate && !name.trim()) || isSaving}
             className="px-4 py-2 rounded-lg text-sm font-semibold text-white
               disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
             style={{
-              background: name.trim()
-                ? "linear-gradient(135deg, #6c5ce7 0%, #4ecdc4 100%)"
-                : "rgba(255,255,255,0.06)",
+              background:
+                isUpdate || name.trim()
+                  ? "linear-gradient(135deg, #6c5ce7 0%, #4ecdc4 100%)"
+                  : "rgba(255,255,255,0.06)",
             }}
           >
             {isSaving ? (
               <Loader2 size={16} className="animate-spin mx-4" />
-            ) : (
+            ) : isUpdate ? (
               "Salvar"
+            ) : (
+              "Criar template"
             )}
           </button>
         </div>
@@ -341,6 +411,7 @@ function EditorContent() {
   const {
     templates,
     saveTemplate,
+    updateTemplate,
     deleteTemplate,
     duplicateTemplate,
   } = useVisualTemplates(empresaId || undefined);
@@ -352,6 +423,9 @@ function EditorContent() {
   const [showExporter, setShowExporter] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  // Track if we're editing an existing template — enables update (PATCH) flow
+  const [originalTemplateId, setOriginalTemplateId] = useState<string | null>(templateId);
+  const [originalTemplateName, setOriginalTemplateName] = useState<string | null>(null);
   const [copyData, setCopyData] = useState<CopyToTemplatePayload | null>(null);
   const [rawCopyContent, setRawCopyContent] = useState<CopyContent | null>(null);
   const [rightPanelTab, setRightPanelTab] = useState<"properties" | "assets" | "copy">("properties");
@@ -465,6 +539,11 @@ function EditorContent() {
           if (template.aspect_ratio) {
             setAspectRatio(template.aspect_ratio);
           }
+          // Store identity so save knows to UPDATE rather than INSERT
+          if (!cancelled) {
+            setOriginalTemplateId(template.id);
+            setOriginalTemplateName(template.name ?? null);
+          }
           // Use 300ms delay to ensure canvas has fully rendered all objects
           if (copyData) {
             console.log('[Editor] Applying copy after URL template load:', copyData);
@@ -493,6 +572,9 @@ function EditorContent() {
           setAspectRatio(template.aspect_ratio as "1:1" | "4:5" | "9:16");
         }
       }
+      // Track the loaded template so save behaves as UPDATE
+      setOriginalTemplateId(template.id);
+      setOriginalTemplateName(template.name ?? null);
       // Apply per-slide copy for carousels, single copy otherwise
       if (rawCopyContent && rawCopyContent.slides && rawCopyContent.slides.length > 0 && template.format === "carousel") {
         console.log('[Editor] Applying per-slide copy after template gallery select');
@@ -513,6 +595,9 @@ function EditorContent() {
   const handlePresetSelect = useCallback(
     async (presetId: string) => {
       await loadPreset(presetId, state.aspectRatio);
+      // Presets are NOT existing saved templates — reset tracking so save → INSERT
+      setOriginalTemplateId(null);
+      setOriginalTemplateName(null);
       // Apply per-slide copy for carousels if available
       if (rawCopyContent && rawCopyContent.slides && rawCopyContent.slides.length > 0) {
         console.log('[Editor] Applying per-slide copy after preset select:', presetId);
@@ -531,6 +616,9 @@ function EditorContent() {
   // ── Handle PSD template selection ──
   const handlePsdSelect = useCallback(
     async (template: PsdTemplate, slideIndex: number) => {
+      // PSD templates are presets — reset tracking so save → INSERT
+      setOriginalTemplateId(null);
+      setOriginalTemplateName(null);
       // Set aspect ratio based on slide dimensions
       const ratio = (template.slideHeight || template.height) / (template.slideWidth || template.width);
       if (ratio > 1.5) setAspectRatio("9:16");
@@ -581,40 +669,80 @@ function EditorContent() {
     [setAspectRatio]
   );
 
-  // ── Save as template ──
+  // ── Build canvas payload for save/update ──
+  const buildCanvasPayload = useCallback(
+    async (): Promise<{ canvasJsonToSave: unknown; thumbnail: string | null }> => {
+      const json = getCanvasJson();
+      let thumbnail: string | null = exportImage({ format: "png", quality: 0.8, multiplier: 0.3 }) ?? null;
+      let canvasJsonToSave: unknown = isCarousel ? { slides, currentSlideIndex } : json;
+
+      if (isSupabaseConfigured()) {
+        const supabase = createClient();
+        canvasJsonToSave = await externalizeCanvasImages(canvasJsonToSave, supabase, empresaId);
+        if (thumbnail && thumbnail.length > 800_000) {
+          const tmpJson = await externalizeCanvasImages(
+            { objects: [{ src: thumbnail }] },
+            supabase,
+            empresaId
+          );
+          const extracted = (tmpJson as { objects?: Array<{ src?: string }> })?.objects?.[0]?.src;
+          if (typeof extracted === "string" && extracted.startsWith("http")) {
+            thumbnail = extracted;
+          }
+        }
+      }
+      return { canvasJsonToSave, thumbnail };
+    },
+    [getCanvasJson, exportImage, isCarousel, slides, currentSlideIndex, empresaId]
+  );
+
+  // ── Update existing template (PATCH) ──
   const handleSaveTemplate = useCallback(
+    async (_name: string) => {
+      if (!originalTemplateId) {
+        // No ID tracked — should not happen via UI, but guard anyway
+        console.warn("[Editor] handleSaveTemplate called without originalTemplateId");
+        return;
+      }
+      setIsSavingTemplate(true);
+      try {
+        const { canvasJsonToSave, thumbnail } = await buildCanvasPayload();
+
+        await updateTemplate(originalTemplateId, {
+          canvas_json: canvasJsonToSave as object,
+          thumbnail_url: thumbnail,
+          format: isCarousel ? "carousel" : "post",
+          aspect_ratio: state.aspectRatio,
+        });
+
+        markClean();
+        setShowSaveModal(false);
+        // Brief toast-like feedback via console (UI toast below)
+        console.info("[Editor] Template atualizado com sucesso:", originalTemplateId);
+      } catch (err) {
+        console.error("[Editor] Falha ao atualizar template:", err);
+        const msg = err instanceof Error ? err.message : String(err);
+        alert(`Erro ao atualizar template: ${msg}`);
+      } finally {
+        setIsSavingTemplate(false);
+      }
+    },
+    [originalTemplateId, buildCanvasPayload, updateTemplate, isCarousel, state.aspectRatio, markClean]
+  );
+
+  // ── Create new template (POST) — always inserts a new record ──
+  const handleSaveAsNewTemplate = useCallback(
     async (name: string) => {
       setIsSavingTemplate(true);
       try {
-        const json = getCanvasJson();
-        let thumbnail = exportImage({ format: "png", quality: 0.8, multiplier: 0.3 });
+        const { canvasJsonToSave, thumbnail } = await buildCanvasPayload();
 
-        let canvasJsonToSave: unknown = isCarousel ? { slides, currentSlideIndex } : json;
-
-        if (isSupabaseConfigured()) {
-          const supabase = createClient();
-          // Externaliza imagens grandes do canvas_json
-          canvasJsonToSave = await externalizeCanvasImages(canvasJsonToSave, supabase, empresaId);
-          // Thumbnail: se grande (> 800KB base64), externaliza; senão deixa inline
-          if (thumbnail && thumbnail.length > 800_000) {
-            const tmpJson = await externalizeCanvasImages(
-              { objects: [{ src: thumbnail }] },
-              supabase,
-              empresaId
-            );
-            const extracted = (tmpJson as { objects?: Array<{ src?: string }> })?.objects?.[0]?.src;
-            if (typeof extracted === "string" && extracted.startsWith("http")) {
-              thumbnail = extracted;
-            }
-          }
-        }
-
-        await saveTemplate({
+        const newId = await saveTemplate({
           empresa_id: empresaId,
           name,
           description: "",
           canvas_json: canvasJsonToSave as object,
-          thumbnail_url: thumbnail || null,
+          thumbnail_url: thumbnail,
           format: isCarousel ? "carousel" : "post",
           aspect_ratio: state.aspectRatio,
           source: "manual",
@@ -624,17 +752,21 @@ function EditorContent() {
           ai_prompt: null,
         });
 
+        // Switch tracking to the newly created template
+        setOriginalTemplateId(newId);
+        setOriginalTemplateName(name);
+
         markClean();
         setShowSaveModal(false);
       } catch (err) {
-        console.error("[Editor] Failed to save template:", err);
+        console.error("[Editor] Falha ao criar template:", err);
         const msg = err instanceof Error ? err.message : String(err);
         alert(`Falha ao salvar template: ${msg}`);
       } finally {
         setIsSavingTemplate(false);
       }
     },
-    [getCanvasJson, exportImage, saveTemplate, empresaId, state.aspectRatio, markClean, isCarousel, slides, currentSlideIndex]
+    [buildCanvasPayload, saveTemplate, empresaId, isCarousel, state.aspectRatio, markClean]
   );
 
   // ── Export / Download ──
@@ -774,7 +906,7 @@ function EditorContent() {
                   canvasRef={canvasRef}
                   isVisible={showExporter}
                   postTitle="post"
-                  onSaveAsTemplate={(name) => handleSaveTemplate(name)}
+                  onSaveAsTemplate={(name) => handleSaveAsNewTemplate(name)}
                   isCarousel={isCarousel}
                   slides={slides}
                   currentSlideIndex={currentSlideIndex}
@@ -917,7 +1049,9 @@ function EditorContent() {
         isOpen={showSaveModal}
         onClose={() => setShowSaveModal(false)}
         onSave={handleSaveTemplate}
+        onSaveAsNew={handleSaveAsNewTemplate}
         isSaving={isSavingTemplate}
+        originalTemplateName={originalTemplateName}
       />
     </div>
   );

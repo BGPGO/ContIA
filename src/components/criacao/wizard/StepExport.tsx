@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Save,
@@ -17,11 +18,14 @@ import {
   Download,
   Image as ImageIcon,
   Loader2,
+  Send,
+  XCircle,
 } from "lucide-react";
 import type { WizardState } from "@/hooks/useCreationWizard";
 import type { CreationTemplate, ContentFormat } from "@/types/ai";
 import type { Post } from "@/types";
 import { getPlataformaLabel } from "@/lib/utils";
+import { submitPostForApproval } from "@/lib/posts";
 import { PostCanvas } from "@/components/post-design/PostCanvas";
 import type { PostDesignData, PostDesignTemplate } from "@/components/post-design/PostCanvas";
 
@@ -58,6 +62,7 @@ export function StepExport({
   empresaId,
   onReset,
 }: StepExportProps) {
+  const router = useRouter();
   const [copied, setCopied] = useState(false);
   const [savedPost, setSavedPost] = useState(false);
   const [savedTemplate, setSavedTemplate] = useState(false);
@@ -65,8 +70,15 @@ export function StepExport({
   const [scheduleDate, setScheduleDate] = useState("");
   const [templateName, setTemplateName] = useState(state.templateName || "");
   const [exporting, setExporting] = useState(false);
+  const [submittingApproval, setSubmittingApproval] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const canvasRef = useRef<HTMLDivElement>(null);
+
+  function showToast(message: string, type: "success" | "error") {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
+  }
 
   const { result, visualMode, visualLegenda, visualCta } = state;
 
@@ -135,6 +147,45 @@ export function StepExport({
     if (post) {
       setSavedPost(true);
       setField("saved", true);
+    }
+  };
+
+  const handleSubmitApproval = async () => {
+    setSubmittingApproval(true);
+    try {
+      // 1. Salvar o post como rascunho primeiro para obter o postId
+      const post = await createPost({
+        empresa_id: empresaId,
+        titulo: getTitle(),
+        conteudo: getContent(),
+        midia_url: state.generatedImageUrl || null,
+        plataformas: state.platforms,
+        status: "rascunho",
+        agendado_para: null,
+        publicado_em: null,
+        tematica: state.topic,
+      });
+
+      if (!post) {
+        throw new Error(
+          "Falha ao salvar o post. O fluxo de aprovacao requer conexao com Supabase."
+        );
+      }
+
+      // 2. Enviar para aprovação
+      await submitPostForApproval(post.id);
+
+      showToast("Post enviado para aprovação!", "success");
+
+      // 3. Redirecionar para /aprovacao após breve delay para o toast ser visto
+      setTimeout(() => {
+        router.push("/aprovacao");
+      }, 1200);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro ao enviar para aprovação";
+      showToast(msg, "error");
+    } finally {
+      setSubmittingApproval(false);
     }
   };
 
@@ -306,6 +357,32 @@ export function StepExport({
           </div>
         </motion.button>
 
+        {/* Send for approval */}
+        <motion.button
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.13 }}
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.99 }}
+          onClick={handleSubmitApproval}
+          disabled={state.saving || submittingApproval}
+          className="w-full flex items-center gap-4 bg-bg-card border border-border rounded-xl p-4 hover:border-secondary/40 hover:bg-bg-card-hover transition-all text-left group"
+        >
+          <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center group-hover:bg-secondary/20 transition-colors">
+            {submittingApproval ? (
+              <Loader2 size={18} className="text-secondary animate-spin" />
+            ) : (
+              <Send size={18} className="text-secondary" />
+            )}
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-text-primary">
+              {submittingApproval ? "Enviando..." : "Enviar para Aprovação"}
+            </p>
+            <p className="text-xs text-text-muted mt-0.5">Solicitar revisão antes de publicar</p>
+          </div>
+        </motion.button>
+
         {/* Schedule */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
@@ -447,6 +524,29 @@ export function StepExport({
           </div>
         )}
       </motion.div>
+
+      {/* Toast notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className={`fixed bottom-6 right-6 z-[60] flex items-center gap-3 px-5 py-3 rounded-xl border shadow-xl backdrop-blur-xl ${
+              toast.type === "success"
+                ? "bg-[#0c0f24]/95 border-[#34d399]/30 text-[#34d399]"
+                : "bg-[#0c0f24]/95 border-[#f87171]/30 text-[#f87171]"
+            }`}
+          >
+            {toast.type === "success" ? (
+              <Check size={16} className="shrink-0" />
+            ) : (
+              <XCircle size={16} className="shrink-0" />
+            )}
+            <span className="text-sm font-medium text-[#e8eaff]">{toast.message}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

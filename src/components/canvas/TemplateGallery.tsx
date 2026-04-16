@@ -151,6 +151,7 @@ export function TemplateGallery({
     aspectRatio || "1:1"
   );
   const [hoveredBrand, setHoveredBrand] = useState<string | null>(null);
+  const [loadingBrandId, setLoadingBrandId] = useState<string | null>(null);
   const [psdTemplates, setPsdTemplates] = useState<PsdTemplate[]>([]);
   const [hoveredPsd, setHoveredPsd] = useState<string | null>(null);
   const [psdSlideSelection, setPsdSlideSelection] = useState<Record<string, number>>({});
@@ -610,41 +611,40 @@ export function TemplateGallery({
                           >
                             {/* Thumbnail */}
                             <button
-                              onClick={() =>
-                                onSelect({
-                                  id: tpl.id,
-                                  name: tpl.name,
-                                  thumbnail_url: tpl.thumbnail_url,
-                                  format: tpl.format as VisualTemplate["format"],
-                                  aspect_ratio: tpl.aspect_ratio as VisualTemplate["aspect_ratio"],
-                                  source: tpl.source as VisualTemplate["source"],
-                                  tags: tpl.tags,
-                                  updated_at: tpl.updated_at,
-                                  // These will be loaded on demand
-                                  empresa_id: empresaId,
-                                  user_id: "",
-                                  description: "",
-                                  canvas_json: {},
-                                  source_image_url: null,
-                                  ai_prompt: null,
-                                  is_public: false,
-                                  created_at: tpl.updated_at,
-                                } as VisualTemplate)
-                              }
-                              className="w-full"
+                              onClick={async () => {
+                                if (loadingBrandId) return;
+                                setLoadingBrandId(tpl.id);
+                                try {
+                                  const res = await fetch(`/api/visual-templates/${tpl.id}`);
+                                  if (!res.ok) throw new Error("Resposta inválida do servidor");
+                                  const fullTemplate: VisualTemplate = await res.json();
+                                  onSelect(fullTemplate);
+                                } catch {
+                                  alert("Erro ao carregar template. Tente novamente.");
+                                } finally {
+                                  setLoadingBrandId(null);
+                                }
+                              }}
+                              disabled={loadingBrandId === tpl.id}
+                              className="w-full relative"
                             >
                               <div className="aspect-square bg-[#080b1e] flex items-center justify-center">
                                 {tpl.thumbnail_url ? (
                                   <img
                                     src={tpl.thumbnail_url}
                                     alt={tpl.name}
-                                    className="w-full h-full object-cover"
+                                    className={`w-full h-full object-cover transition-opacity duration-200 ${loadingBrandId === tpl.id ? "opacity-40" : "opacity-100"}`}
                                   />
                                 ) : (
                                   <Layout
                                     size={24}
                                     className="text-[#5e6388] opacity-40"
                                   />
+                                )}
+                                {loadingBrandId === tpl.id && (
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="w-6 h-6 border-2 border-[#4ecdc4] border-t-transparent rounded-full animate-spin" />
+                                  </div>
                                 )}
                               </div>
                             </button>

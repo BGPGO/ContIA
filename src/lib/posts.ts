@@ -1,5 +1,35 @@
 import { SupabaseClient } from "@supabase/supabase-js";
-import { Post } from "@/types";
+import { Post, PostApproval } from "@/types";
+
+// ── Resultado de submit-approval ──
+export interface PostApprovalResult {
+  post: Post;
+  approval: PostApproval;
+}
+
+/**
+ * Envia um post para o fluxo de aprovação.
+ * Encapsula o fetch para POST /api/posts/[postId]/submit-approval.
+ */
+export async function submitPostForApproval(
+  postId: string,
+  comment?: string
+): Promise<PostApprovalResult> {
+  const res = await fetch(`/api/posts/${postId}/submit-approval`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ comment }),
+  });
+
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(
+      (json as { error?: string }).error ?? `Erro ${res.status} ao enviar para aprovação`
+    );
+  }
+
+  return res.json() as Promise<PostApprovalResult>;
+}
 
 type PostInsert = Omit<Post, "id" | "created_at" | "metricas">;
 type PostUpdate = Partial<Omit<Post, "id" | "created_at">>;

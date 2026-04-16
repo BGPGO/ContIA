@@ -62,6 +62,16 @@ const STATUS_CONFIG: Record<
     dot: "bg-text-muted",
     color: "var(--color-text-muted)",
   },
+  pendente_aprovacao: {
+    label: "Aguardando aprovação",
+    dot: "bg-warning",
+    color: "var(--color-warning)",
+  },
+  rejeitado: {
+    label: "Rejeitado",
+    dot: "bg-danger",
+    color: "var(--color-danger)",
+  },
   erro: {
     label: "Erro",
     dot: "bg-danger",

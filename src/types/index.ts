@@ -63,12 +63,36 @@ export interface Post {
   conteudo: string;
   midia_url: string | null;
   plataformas: string[];
-  status: "rascunho" | "agendado" | "publicado" | "erro";
+  status:
+    | "rascunho"
+    | "pendente_aprovacao"
+    | "agendado"
+    | "publicado"
+    | "erro"
+    | "rejeitado";
   agendado_para: string | null;
   publicado_em: string | null;
   tematica: string;
   metricas: PostMetricas | null;
   created_at: string;
+  approval_required?: boolean;
+  rejection_reason?: string | null;
+}
+
+// ── Fluxo de aprovação de posts ──
+
+export type PostApprovalStatus = "pending" | "approved" | "rejected";
+
+export interface PostApproval {
+  id: string;
+  postId: string;
+  empresaId: string;
+  requestedBy: string | null;
+  reviewedBy: string | null;
+  status: PostApprovalStatus;
+  comment: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PostMetricas {

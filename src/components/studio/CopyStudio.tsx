@@ -294,6 +294,7 @@ export function CopyStudio() {
     updateConfig,
     newSession,
     loadSession,
+    submitSessionForApproval,
     reset,
   } = useCopyStudio();
 
@@ -681,6 +682,13 @@ export function CopyStudio() {
                       : "/studio/editor";
                     router.push(url);
                   }}
+                  onSubmitApproval={async () => {
+                    const result = await submitSessionForApproval();
+                    if (!result.success) {
+                      throw new Error(result.error ?? "Erro ao enviar para aprovação");
+                    }
+                    setTimeout(() => router.push("/aprovacao"), 1200);
+                  }}
                 />
               </div>
             </motion.div>
@@ -716,6 +724,14 @@ export function CopyStudio() {
               ? `/studio/editor?session=${studio.sessionId}`
               : "/studio/editor";
             router.push(url);
+          }}
+          onSubmitApproval={async () => {
+            const result = await submitSessionForApproval();
+            if (!result.success) {
+              throw new Error(result.error ?? "Erro ao enviar para aprovação");
+            }
+            setMobilePreviewOpen(false);
+            setTimeout(() => router.push("/aprovacao"), 1200);
           }}
         />
       </MobilePreviewSheet>

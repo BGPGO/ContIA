@@ -16,6 +16,9 @@ import {
   Music,
   Clock,
   AlertCircle,
+  Send,
+  Loader2,
+  XCircle,
 } from "lucide-react";
 import type { CopyContent, CopySlide, RichSlide, SlideSection } from "@/types/copy-studio";
 import {
@@ -44,6 +47,7 @@ interface CopyPreviewProps {
   onApprove: () => void;
   onEdit: (field: keyof CopyContent, value: unknown) => void;
   onCreateVisual: () => void;
+  onSubmitApproval?: () => Promise<void>;
 }
 
 /* ── Inline editable field ── */
@@ -750,7 +754,30 @@ export function CopyPreview({
   onApprove,
   onEdit,
   onCreateVisual,
+  onSubmitApproval,
 }: CopyPreviewProps) {
+  const [submittingApproval, setSubmittingApproval] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+  function showToast(message: string, type: "success" | "error") {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
+  }
+
+  async function handleSubmitApproval() {
+    if (!onSubmitApproval) return;
+    setSubmittingApproval(true);
+    try {
+      await onSubmitApproval();
+      showToast("Post enviado para aprovação!", "success");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro ao enviar para aprovação";
+      showToast(msg, "error");
+    } finally {
+      setSubmittingApproval(false);
+    }
+  }
+
   if (!copy) return <EmptyState />;
 
   const renderContent = () => {
@@ -815,6 +842,27 @@ export function CopyPreview({
           </div>
         )}
 
+        {/* Enviar para aprovação — fluxo alternativo ao Criar Visual */}
+        {onSubmitApproval && (
+          <button
+            type="button"
+            onClick={handleSubmitApproval}
+            disabled={submittingApproval}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold
+              bg-[#6c5ce7]/10 text-[#a29bfe] border border-[#6c5ce7]/20
+              hover:bg-[#6c5ce7]/20 hover:border-[#6c5ce7]/40
+              disabled:opacity-50 disabled:cursor-not-allowed
+              transition-all cursor-pointer"
+          >
+            {submittingApproval ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Send size={16} />
+            )}
+            {submittingApproval ? "Enviando..." : "Enviar para Aprovação"}
+          </button>
+        )}
+
         <button
           type="button"
           onClick={onCreateVisual}
@@ -832,6 +880,29 @@ export function CopyPreview({
           Criar Visual
         </button>
       </div>
+
+      {/* Toast notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className={`fixed bottom-6 right-6 z-[60] flex items-center gap-3 px-5 py-3 rounded-xl border shadow-xl backdrop-blur-xl ${
+              toast.type === "success"
+                ? "bg-[#0c0f24]/95 border-[#34d399]/30 text-[#34d399]"
+                : "bg-[#0c0f24]/95 border-[#f87171]/30 text-[#f87171]"
+            }`}
+          >
+            {toast.type === "success" ? (
+              <Check size={16} className="shrink-0" />
+            ) : (
+              <XCircle size={16} className="shrink-0" />
+            )}
+            <span className="text-sm font-medium text-[#e8eaff]">{toast.message}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

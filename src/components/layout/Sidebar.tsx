@@ -29,6 +29,7 @@ import {
   Lightbulb,
   LayoutTemplate,
   Scissors,
+  CheckCircle,
   type LucideIcon,
 } from "lucide-react";
 import { useEmpresa } from "@/hooks/useEmpresa";
@@ -64,6 +65,7 @@ const navSections: NavSection[] = [
       { label: "Studio", href: "/studio", icon: Sparkles },
       { label: "Templates", href: "/templates", icon: LayoutTemplate },
       { label: "Calendario", href: "/calendario", icon: CalendarDays },
+      { label: "Aprovacoes", href: "/aprovacao", icon: CheckCircle },
       { label: "Cortes de Video", href: "/cortes", icon: Scissors },
     ],
   },
@@ -112,6 +114,7 @@ const iconColorMap: Record<string, string> = {
   "/studio": "text-[#a29bfe]",
   "/templates": "text-[#f093fb]",
   "/calendario": "text-[#fbbf24]",
+  "/aprovacao": "text-[#34d399]",
   "/cortes": "text-[#34d399]",
   "/analytics": "text-[#60a5fa]",
   "/insights": "text-[#4ecdc4]",
