@@ -410,6 +410,62 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 10b. Pre-calcular dados enriquecidos para salvar no report.data
+    const { buildEnrichedAnalysis, findTopContent } = await import("@/lib/ai/report-aggregator");
+
+    const enrichedData = buildEnrichedAnalysis(
+      content ?? [],
+      snapshots ?? [],
+      previousContent ?? [],
+      previousSnapshots ?? [],
+    );
+
+    const topContentItems = findTopContent(content ?? [], 5);
+
+    // Montar report.data com metricas visuais
+    const reportDataPayload: Record<string, unknown> = {
+      contentCount: (content ?? []).length,
+      previousContentCount: (previousContent ?? []).length,
+      snapshotCount: (snapshots ?? []).length,
+      providers,
+      generatedAt: new Date().toISOString(),
+      // KPIs principais (do snapshot mais recente)
+      kpis: {
+        followers: enrichedData.aggregated[providers[0]]?.followers ?? null,
+        engagementRate: enrichedData.engagementBreakdown.engagementRate,
+        totalPosts: (content ?? []).length,
+        totalReach: enrichedData.aggregated[providers[0]]?.topMetrics?.reach ?? null,
+      },
+      // Engagement breakdown
+      engagementBreakdown: enrichedData.engagementBreakdown,
+      // Performance por tipo de conteudo
+      contentPerformance: enrichedData.contentPerformance,
+      // Analise de captions/CTAs
+      captionAnalysis: enrichedData.captionAnalysis,
+      // Frequencia de postagem
+      postingFrequency: enrichedData.postingFrequency,
+      // Growth metrics
+      growthMetrics: enrichedData.growthMetrics,
+      // Top 5 posts com metricas
+      topPosts: topContentItems.map((c) => ({
+        id: c.id,
+        provider: c.provider,
+        contentType: c.content_type,
+        caption: c.caption?.slice(0, 120) ?? null,
+        thumbnailUrl: c.thumbnail_url ?? null,
+        url: c.url ?? null,
+        publishedAt: c.published_at,
+        metrics: c.metrics,
+        engagement:
+          (c.metrics.likes ?? c.metrics.like_count ?? 0) +
+          (c.metrics.comments ?? c.metrics.comments_count ?? 0) +
+          (c.metrics.shares ?? c.metrics.share_count ?? 0) +
+          (c.metrics.saves ?? c.metrics.saved ?? 0),
+      })),
+      // Agregados por provider
+      aggregatedByProvider: enrichedData.aggregated,
+    };
+
     // 11. Gerar analise IA
     const reportInput: ReportInput = {
       empresaId: empresa.id,
@@ -429,18 +485,12 @@ export async function POST(req: NextRequest) {
 
     const analysis = await generateReportAnalysis(reportInput);
 
-    // 12. Atualizar relatorio com analise
+    // 12. Atualizar relatorio com analise + dados enriquecidos
     await admin
       .from("reports")
       .update({
         ai_analysis: analysis,
-        data: {
-          contentCount: (content ?? []).length,
-          previousContentCount: (previousContent ?? []).length,
-          snapshotCount: (snapshots ?? []).length,
-          providers,
-          generatedAt: new Date().toISOString(),
-        },
+        data: reportDataPayload,
         status: "ready",
       })
       .eq("id", report.id);

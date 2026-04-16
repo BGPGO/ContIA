@@ -1,17 +1,19 @@
 /**
- * Envia email de relatório pronto via Resend API.
- * Usa fetch direto (Resend SDK não está no package.json).
- * Domínio verificado: bertuzzipatrimonial.app.br
+ * Envia email de relatorio pronto via Resend API.
+ * Usa fetch direto (Resend SDK nao esta no package.json).
+ * Dominio verificado: bertuzzipatrimonial.app.br
  */
 
 import { buildReportReadyEmail } from "./templates/report-ready";
 import type { Report } from "@/types/reports";
 
 const FROM_ADDRESS = "ContIA <relatorios@bertuzzipatrimonial.app.br>";
+const REPLY_TO = "vitor@bertuzzipatrimonial.com.br";
 const RESEND_API_URL = "https://api.resend.com/emails";
 
 interface ResendEmailPayload {
   from: string;
+  reply_to: string;
   to: string[];
   subject: string;
   html: string;
@@ -22,12 +24,15 @@ interface ResendResponse {
   id?: string;
   statusCode?: number;
   message?: string;
+  name?: string;
 }
 
 async function sendViaResend(payload: ResendEmailPayload): Promise<{ ok: boolean; id?: string; error?: string }> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    throw new Error("RESEND_API_KEY não configurada");
+    throw new Error(
+      "RESEND_API_KEY nao configurada. Configure esta variavel de ambiente no Coolify para habilitar o envio de emails."
+    );
   }
 
   const res = await fetch(RESEND_API_URL, {
@@ -39,10 +44,17 @@ async function sendViaResend(payload: ResendEmailPayload): Promise<{ ok: boolean
     body: JSON.stringify(payload),
   });
 
-  const data = (await res.json()) as ResendResponse;
+  let data: ResendResponse;
+  try {
+    data = (await res.json()) as ResendResponse;
+  } catch {
+    return { ok: false, error: `Resend HTTP ${res.status} — resposta nao-JSON` };
+  }
 
   if (!res.ok) {
-    return { ok: false, error: data.message ?? `Resend HTTP ${res.status}` };
+    const detail = data.message ?? data.name ?? `HTTP ${res.status}`;
+    console.error("[send-report] Resend error:", { status: res.status, body: data });
+    return { ok: false, error: `Resend: ${detail}` };
   }
 
   return { ok: true, id: data.id };
@@ -85,6 +97,7 @@ export async function sendReportEmail(
     try {
       const result = await sendViaResend({
         from: FROM_ADDRESS,
+        reply_to: REPLY_TO,
         to: [recipient],
         subject: emailData.subject,
         html: emailData.html,

@@ -23,6 +23,9 @@ import type {
   HeatmapData,
   HashtagStat,
   RecentPost,
+  InstagramAdvancedAnalytics,
+  InstagramFormatPerformance,
+  InstagramTopPost,
 } from "@/types/analytics";
 
 /* ── Types ── */
@@ -197,7 +200,20 @@ export function toRecentPosts(data: InstagramLiveData): RecentPost[] {
 /* ── Converters for [provider] endpoint ── */
 
 export function toProviderKPIs(data: InstagramLiveData): AnalyticsKPI[] {
-  const { kpis } = data;
+  const { kpis, media, mediaInsightsMap } = data;
+  const followers = data.profile.followers_count || 1;
+
+  // Engagement rate with all metrics (likes+comments+saves+shares)
+  const totalEng = kpis.totalLikes + kpis.totalComments + kpis.totalSaves + kpis.totalShares;
+  const fullEngRate = media.length > 0
+    ? Math.round(((totalEng / media.length / followers) * 100) * 100) / 100
+    : 0;
+
+  // Average reach per post
+  const postsWithReach = media.filter((m) => mediaInsightsMap.has(m.id));
+  const totalReach = postsWithReach.reduce((s, m) => s + (mediaInsightsMap.get(m.id)?.reach ?? 0), 0);
+  const avgReach = postsWithReach.length > 0 ? Math.round(totalReach / postsWithReach.length) : 0;
+
   return [
     {
       key: "followers",
@@ -210,9 +226,20 @@ export function toProviderKPIs(data: InstagramLiveData): AnalyticsKPI[] {
       icon: "users",
     },
     {
+      key: "engagement",
+      label: "Engagement Rate",
+      value: fullEngRate,
+      previousValue: 0,
+      delta: 0,
+      deltaPercent: 0,
+      trend: "flat",
+      icon: "heart",
+      suffix: "%",
+    },
+    {
       key: "reach",
-      label: "Alcance",
-      value: kpis.reach,
+      label: "Alcance Medio/Post",
+      value: avgReach,
       previousValue: 0,
       delta: 0,
       deltaPercent: 0,
@@ -220,25 +247,14 @@ export function toProviderKPIs(data: InstagramLiveData): AnalyticsKPI[] {
       icon: "eye",
     },
     {
-      key: "impressions",
-      label: "Impressoes",
-      value: kpis.impressions,
+      key: "posts",
+      label: "Posts no Periodo",
+      value: kpis.posts,
       previousValue: 0,
       delta: 0,
       deltaPercent: 0,
       trend: "flat",
-      icon: "trending",
-    },
-    {
-      key: "engagement",
-      label: "Engajamento",
-      value: kpis.engagementRate,
-      previousValue: 0,
-      delta: 0,
-      deltaPercent: 0,
-      trend: "flat",
-      icon: "heart",
-      suffix: "%",
+      icon: "file",
     },
   ];
 }
@@ -350,6 +366,192 @@ export function toProviderTimeSeries(data: InstagramLiveData): TimeSeriesDataPoi
       clicks: 0,
       leads: 0,
     }));
+}
+
+/* ── Instagram Advanced Analytics ── */
+
+const FORMAT_LABELS: Record<string, string> = {
+  IMAGE: "Post",
+  VIDEO: "Reel",
+  CAROUSEL_ALBUM: "Carrossel",
+};
+
+const CTA_REGEX = /link\s*na\s*bio|acesse|clique|saiba\s*mais|confira|arrast[ae]|coment[ea]|salv[ea]|compartilh[ea]|https?:\/\/|[\u{1F446}\u{1F447}\u{1F517}]/giu;
+
+function extractHashtags(caption: string): string[] {
+  return (caption.match(/#[\w\u00C0-\u017F]+/g) ?? []).map((t) => t.toLowerCase());
+}
+
+export function toInstagramAdvanced(data: InstagramLiveData): InstagramAdvancedAnalytics {
+  const { media, mediaInsightsMap, kpis } = data;
+  const totalPosts = media.length || 1;
+  const followers = data.profile.followers_count || 1;
+
+  // ── Engagement Breakdown ──
+  const engagementBreakdown = {
+    avgLikes: Math.round((kpis.totalLikes / totalPosts) * 10) / 10,
+    avgComments: Math.round((kpis.totalComments / totalPosts) * 10) / 10,
+    avgSaves: Math.round((kpis.totalSaves / totalPosts) * 10) / 10,
+    avgShares: Math.round((kpis.totalShares / totalPosts) * 10) / 10,
+  };
+
+  // ── Format Performance ──
+  const formatGroups = new Map<string, { posts: typeof media; totalEng: number; totalReach: number }>();
+  for (const m of media) {
+    const fmt = m.media_type;
+    const group = formatGroups.get(fmt) ?? { posts: [], totalEng: 0, totalReach: 0 };
+    const mi = mediaInsightsMap.get(m.id);
+    const likes = m.like_count ?? 0;
+    const comments = m.comments_count ?? 0;
+    const saves = mi?.saved ?? 0;
+    const shares = mi?.shares ?? 0;
+    const reach = mi?.reach ?? 0;
+    const eng = likes + comments + saves + shares;
+
+    group.posts.push(m);
+    group.totalEng += eng;
+    group.totalReach += reach;
+    formatGroups.set(fmt, group);
+  }
+
+  const formatPerformance: InstagramFormatPerformance[] = Array.from(formatGroups.entries()).map(([fmt, group]) => {
+    const count = group.posts.length;
+    const avgEngagement = count > 0 ? Math.round((group.totalEng / count / followers) * 10000) / 100 : 0;
+    const avgReach = count > 0 ? Math.round(group.totalReach / count) : 0;
+
+    // Find best post by engagement
+    let bestPost: InstagramFormatPerformance["bestPost"] = null;
+    let bestEng = 0;
+    for (const m of group.posts) {
+      const mi = mediaInsightsMap.get(m.id);
+      const eng = (m.like_count ?? 0) + (m.comments_count ?? 0) + (mi?.saved ?? 0) + (mi?.shares ?? 0);
+      if (eng > bestEng) {
+        bestEng = eng;
+        bestPost = {
+          thumbnail: m.thumbnail_url ?? m.media_url ?? "",
+          engagement: eng,
+          permalink: m.permalink ?? "",
+        };
+      }
+    }
+
+    return {
+      format: fmt,
+      label: FORMAT_LABELS[fmt] ?? fmt,
+      count,
+      avgEngagement,
+      avgReach,
+      bestPost,
+    };
+  }).sort((a, b) => b.avgEngagement - a.avgEngagement);
+
+  // ── Top Posts (by engagement) ──
+  const postsWithMetrics = media.map((m) => {
+    const mi = mediaInsightsMap.get(m.id);
+    const likes = m.like_count ?? 0;
+    const comments = m.comments_count ?? 0;
+    const saves = mi?.saved ?? 0;
+    const shares = mi?.shares ?? 0;
+    const reach = mi?.reach ?? 0;
+    const totalEng = likes + comments + saves + shares;
+    const engagementRate = followers > 0 ? Math.round((totalEng / followers) * 10000) / 100 : 0;
+
+    return {
+      id: m.id,
+      thumbnail: m.thumbnail_url ?? m.media_url ?? "",
+      caption: m.caption ?? "",
+      format: m.media_type,
+      label: FORMAT_LABELS[m.media_type] ?? m.media_type,
+      likes,
+      comments,
+      saves,
+      shares,
+      reach,
+      engagementRate,
+      date: m.timestamp,
+      permalink: m.permalink ?? "",
+    } satisfies InstagramTopPost;
+  });
+
+  const topPosts = [...postsWithMetrics]
+    .sort((a, b) => (b.likes + b.comments + b.saves + b.shares) - (a.likes + a.comments + a.saves + a.shares))
+    .slice(0, 6);
+
+  // ── Save Rate Analysis ──
+  const postsWithReach = postsWithMetrics.filter((p) => p.reach > 0);
+  const avgSaveRate = postsWithReach.length > 0
+    ? Math.round((postsWithReach.reduce((s, p) => s + (p.saves / p.reach), 0) / postsWithReach.length) * 10000) / 100
+    : 0;
+
+  const bestSaveRatePosts = [...postsWithReach]
+    .map((p) => ({
+      thumbnail: p.thumbnail,
+      saveRate: Math.round((p.saves / p.reach) * 10000) / 100,
+      caption: p.caption.slice(0, 100),
+      permalink: p.permalink,
+    }))
+    .sort((a, b) => b.saveRate - a.saveRate)
+    .slice(0, 5);
+
+  // ── Caption & CTA Analysis ──
+  let withCTA = 0;
+  let withoutCTA = 0;
+  let ctaEngTotal = 0;
+  let noCtaEngTotal = 0;
+  let totalCaptionLength = 0;
+  const hashtagEngMap = new Map<string, { count: number; totalEng: number }>();
+
+  for (const p of postsWithMetrics) {
+    const caption = p.caption;
+    totalCaptionLength += caption.length;
+    const eng = p.likes + p.comments + p.saves + p.shares;
+    const hasCTA = CTA_REGEX.test(caption);
+    // Reset lastIndex since we use global flag
+    CTA_REGEX.lastIndex = 0;
+
+    if (hasCTA) {
+      withCTA++;
+      ctaEngTotal += eng;
+    } else {
+      withoutCTA++;
+      noCtaEngTotal += eng;
+    }
+
+    // Hashtag analysis
+    const tags = extractHashtags(caption);
+    for (const tag of tags) {
+      const entry = hashtagEngMap.get(tag) ?? { count: 0, totalEng: 0 };
+      entry.count++;
+      entry.totalEng += eng;
+      hashtagEngMap.set(tag, entry);
+    }
+  }
+
+  const topHashtags = Array.from(hashtagEngMap.entries())
+    .map(([tag, { count, totalEng }]) => ({
+      tag,
+      count,
+      avgEngagement: count > 0 ? Math.round(totalEng / count) : 0,
+    }))
+    .sort((a, b) => b.avgEngagement - a.avgEngagement)
+    .slice(0, 10);
+
+  const captionAnalysis = {
+    avgLength: Math.round(totalCaptionLength / totalPosts),
+    withCTA,
+    withoutCTA,
+    ctaEngagement: withCTA > 0 ? Math.round(ctaEngTotal / withCTA) : 0,
+    noCtaEngagement: withoutCTA > 0 ? Math.round(noCtaEngTotal / withoutCTA) : 0,
+    topHashtags,
+  };
+
+  return {
+    engagementBreakdown,
+    formatPerformance,
+    topPosts,
+    saveRateAnalysis: { avgSaveRate, bestSaveRatePosts },
+    captionAnalysis,
+  };
 }
 
 /* ── Persist snapshot to DB (background, non-blocking) ── */

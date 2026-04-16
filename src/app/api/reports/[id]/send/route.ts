@@ -74,8 +74,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     );
   }
 
+  // Check RESEND_API_KEY before attempting send
+  if (!process.env.RESEND_API_KEY) {
+    return NextResponse.json(
+      { error: "RESEND_API_KEY nao configurada. Configure esta variavel de ambiente no Coolify para habilitar o envio de emails." },
+      { status: 503 }
+    );
+  }
+
   try {
     const result = await sendReportEmail(report as Report, recipients, { customMessage });
+
+    if (result.sent === 0 && result.failed.length > 0) {
+      return NextResponse.json(
+        { error: `Falha ao enviar para todos os destinatarios`, sent: 0, failed: result.failed },
+        { status: 502 }
+      );
+    }
 
     return NextResponse.json({
       sent: result.sent,

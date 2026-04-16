@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Rss,
@@ -541,21 +541,30 @@ export default function NoticiasPage() {
     persistFeeds(updatedFeeds);
   }, [feeds, persistFeeds]);
 
-  const handleEditFeed = useCallback((index: number, updated: ConfigRSS) => {
+  // Ref para permitir chamadas de fetchNoticias antes da declaracao
+  const fetchNoticiasRef = useRef<(() => void) | undefined>(undefined);
+
+  const handleEditFeed = useCallback(async (index: number, updated: ConfigRSS) => {
     const updatedFeeds = feeds.map((f, i) => i === index ? updated : f);
-    persistFeeds(updatedFeeds);
+    await persistFeeds(updatedFeeds);
+    // Recarregar noticias com os novos dados (tag/topico alterado invalida cache no backend)
+    fetchNoticiasRef.current?.();
   }, [feeds, persistFeeds]);
 
-  const handleToggleFeed = useCallback((index: number) => {
+  const handleToggleFeed = useCallback(async (index: number) => {
     const updatedFeeds = feeds.map((f, i) =>
       i === index ? { ...f, ativo: !f.ativo } : f
     );
-    persistFeeds(updatedFeeds);
+    await persistFeeds(updatedFeeds);
+    // Recarregar noticias pois ativar/desativar muda o conteudo visivel
+    fetchNoticiasRef.current?.();
   }, [feeds, persistFeeds]);
 
-  const handleDeleteFeed = useCallback((index: number) => {
+  const handleDeleteFeed = useCallback(async (index: number) => {
     const updatedFeeds = feeds.filter((_, i) => i !== index);
-    persistFeeds(updatedFeeds);
+    await persistFeeds(updatedFeeds);
+    // Recarregar noticias apos remover feed
+    fetchNoticiasRef.current?.();
   }, [feeds, persistFeeds]);
 
   const fetchNoticias = useCallback(async () => {
@@ -621,6 +630,9 @@ export default function NoticiasPage() {
       setLoading(false);
     }
   }, [empresa]);
+
+  // Manter ref sincronizado com fetchNoticias para handlers acima
+  fetchNoticiasRef.current = fetchNoticias;
 
   // Fetch on mount and when empresa changes
   useEffect(() => {

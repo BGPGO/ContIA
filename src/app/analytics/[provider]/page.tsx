@@ -21,6 +21,11 @@ import { PostsTable } from "@/components/analytics/PostsTable";
 import { HeatmapChart } from "@/components/analytics/HeatmapChart";
 import { BreakdownPie } from "@/components/analytics/BreakdownPie";
 import { FunnelChart } from "@/components/analytics/FunnelChart";
+import { EngagementBreakdown } from "@/components/analytics/EngagementBreakdown";
+import { FormatPerformanceCards } from "@/components/analytics/FormatPerformanceCards";
+import { TopPostsGrid } from "@/components/analytics/TopPostsGrid";
+import { SaveRateCard } from "@/components/analytics/SaveRateCard";
+import { CaptionAnalysisCard } from "@/components/analytics/CaptionAnalysisCard";
 import type { ProviderKey } from "@/types/providers";
 
 /* ── Metric config per provider category ───────────────────────── */
@@ -100,6 +105,8 @@ function ProviderAnalyticsContent() {
   const chartConfigs = getChartConfigs(provider, meta.color);
   const isSocial = meta.category === "social";
   const isAds = meta.category === "ads";
+  const isInstagram = provider === "instagram";
+  const igAdvanced = data?.instagramAdvanced;
 
   return (
     <div className="space-y-5 sm:space-y-6 p-2 sm:p-4 md:p-6 max-w-7xl mx-auto">
@@ -268,6 +275,30 @@ function ProviderAnalyticsContent() {
                 </motion.div>
               )}
             </div>
+          )}
+
+          {/* ── Instagram Advanced Analytics ── */}
+          {isInstagram && igAdvanced && (
+            <>
+              {/* Engagement Breakdown + Save Rate side by side */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <EngagementBreakdown data={igAdvanced.engagementBreakdown} />
+                <SaveRateCard data={igAdvanced.saveRateAnalysis} />
+              </div>
+
+              {/* Format Performance Cards */}
+              {igAdvanced.formatPerformance.length > 0 && (
+                <FormatPerformanceCards data={igAdvanced.formatPerformance} />
+              )}
+
+              {/* Top Posts Grid */}
+              {igAdvanced.topPosts.length > 0 && (
+                <TopPostsGrid posts={igAdvanced.topPosts} />
+              )}
+
+              {/* Caption & CTA Analysis */}
+              <CaptionAnalysisCard data={igAdvanced.captionAnalysis} />
+            </>
           )}
 
           {/* Funnel (CRM) */}

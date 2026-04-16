@@ -121,3 +121,68 @@ export interface CampaignRow {
   cpc: number;
   conversions: number;
 }
+
+/* ── Instagram Advanced Analytics ─────────────────────────────── */
+
+export interface InstagramEngagementBreakdown {
+  avgLikes: number;
+  avgComments: number;
+  avgSaves: number;
+  avgShares: number;
+}
+
+export interface InstagramFormatPerformance {
+  format: string;
+  label: string;
+  count: number;
+  avgEngagement: number;
+  avgReach: number;
+  bestPost: { thumbnail: string; engagement: number; permalink: string } | null;
+}
+
+export interface InstagramTopPost {
+  id: string;
+  thumbnail: string;
+  caption: string;
+  format: string;
+  label: string;
+  likes: number;
+  comments: number;
+  saves: number;
+  shares: number;
+  reach: number;
+  engagementRate: number;
+  date: string;
+  permalink: string;
+}
+
+export interface InstagramSaveRateAnalysis {
+  avgSaveRate: number;
+  bestSaveRatePosts: Array<{
+    thumbnail: string;
+    saveRate: number;
+    caption: string;
+    permalink: string;
+  }>;
+}
+
+export interface InstagramCaptionAnalysis {
+  avgLength: number;
+  withCTA: number;
+  withoutCTA: number;
+  ctaEngagement: number;
+  noCtaEngagement: number;
+  topHashtags: Array<{ tag: string; count: number; avgEngagement: number }>;
+}
+
+export interface InstagramAdvancedAnalytics {
+  engagementBreakdown: InstagramEngagementBreakdown;
+  formatPerformance: InstagramFormatPerformance[];
+  topPosts: InstagramTopPost[];
+  saveRateAnalysis: InstagramSaveRateAnalysis;
+  captionAnalysis: InstagramCaptionAnalysis;
+}
+
+export interface ProviderAnalyticsDataWithInstagram extends ProviderAnalyticsData {
+  instagramAdvanced?: InstagramAdvancedAnalytics;
+}

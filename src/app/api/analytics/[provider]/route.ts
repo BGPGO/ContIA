@@ -20,6 +20,7 @@ import {
   toProviderHeatmap,
   toProviderHashtags,
   toProviderTimeSeries,
+  toInstagramAdvanced,
 } from "@/lib/analytics/instagram-fetcher";
 
 const DAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
@@ -236,6 +237,7 @@ export async function GET(
         trafficSources: null,
         topPages: null,
         campaigns: null,
+        instagramAdvanced: toInstagramAdvanced(liveData),
       });
     } catch (err) {
       console.error("[analytics/provider] Instagram live fetch falhou:", err instanceof Error ? err.message : err);

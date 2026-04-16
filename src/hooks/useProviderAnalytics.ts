@@ -3,7 +3,9 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useEmpresa } from "./useEmpresa";
 import type { ProviderKey } from "@/types/providers";
-import type { ProviderAnalyticsData } from "@/types/analytics";
+import type { ProviderAnalyticsDataWithInstagram } from "@/types/analytics";
+
+type ProviderAnalyticsData = ProviderAnalyticsDataWithInstagram;
 
 interface UseProviderAnalyticsReturn {
   data: ProviderAnalyticsData | null;

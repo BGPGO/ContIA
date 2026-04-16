@@ -3,6 +3,7 @@ import { getDefaultFeeds } from "@/lib/rss";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminSupabase } from "@/lib/supabase/admin";
 import { ConfigRSS } from "@/types";
+import { invalidateNoticiasCache } from "../route";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -126,6 +127,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Invalidar cache de noticias para que proximo fetch use os novos feeds
+    invalidateNoticiasCache(empresaId);
+
     return NextResponse.json({
       feed: newFeed,
       feeds: updatedFeeds,
@@ -212,6 +216,9 @@ export async function DELETE(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Invalidar cache de noticias para que proximo fetch use os feeds atualizados
+    invalidateNoticiasCache(empresaId);
 
     return NextResponse.json({
       removed,
