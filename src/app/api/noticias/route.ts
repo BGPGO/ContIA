@@ -13,7 +13,11 @@ export async function GET(request: NextRequest) {
 
   try {
     // Tentar buscar feeds customizados da empresa
+    // undefined  = empresa sem custom feeds → usar defaults por nicho
+    // []         = empresa TEM feeds custom mas todos desativados → retornar vazio
+    // [...items] = feeds ativos da empresa → usar apenas eles
     let customFeeds: Array<{ nome: string; url: string; topico: string }> | undefined;
+    let allFeedsDisabled = false;
 
     if (empresaId) {
       const key = cacheKey("noticias", empresaId, nicho);
@@ -30,7 +34,8 @@ export async function GET(request: NextRequest) {
           .eq("id", empresaId)
           .single();
 
-        if (empresa?.config_rss && Array.isArray(empresa.config_rss)) {
+        if (empresa?.config_rss && Array.isArray(empresa.config_rss) && empresa.config_rss.length > 0) {
+          // Empresa tem feeds customizados — NUNCA usar defaults, mesmo que todos estejam desativados
           const activeFeeds = empresa.config_rss
             .filter((f: { ativo?: boolean }) => f.ativo !== false)
             .map((f: { nome: string; url: string; topico: string }) => ({
@@ -39,8 +44,10 @@ export async function GET(request: NextRequest) {
               topico: f.topico,
             }));
 
-          if (activeFeeds.length > 0) {
-            customFeeds = activeFeeds;
+          // Passa array vazio se nenhum ativo — getNoticiasForNicho retornara []
+          customFeeds = activeFeeds;
+          if (activeFeeds.length === 0) {
+            allFeedsDisabled = true;
           }
         }
       } catch {
@@ -50,13 +57,13 @@ export async function GET(request: NextRequest) {
 
     const noticias = await getNoticiasForNicho(nicho, customFeeds);
 
-    // Salvar no cache
-    if (empresaId) {
+    // Salvar no cache somente quando ha resultados ou feeds ativos configurados
+    if (empresaId && !allFeedsDisabled) {
       const key = cacheKey("noticias", empresaId, nicho);
       noticiasCache.set(key, noticias);
     }
 
-    return NextResponse.json({ noticias, source: "fresh" });
+    return NextResponse.json({ noticias, source: "fresh", allFeedsDisabled });
   } catch (error) {
     console.error("Erro ao buscar noticias:", error);
     return NextResponse.json(

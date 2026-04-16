@@ -471,6 +471,7 @@ export default function NoticiasPage() {
   const [loading, setLoading] = useState(true);
   const [savingFeeds, setSavingFeeds] = useState(false);
   const [usingMock, setUsingMock] = useState(false);
+  const [allFeedsDisabled, setAllFeedsDisabled] = useState(false);
 
   // keep feeds in sync when empresa changes (mas nao durante salvamento local)
   useEffect(() => {
@@ -515,6 +516,7 @@ export default function NoticiasPage() {
 
     setLoading(true);
     setUsingMock(false);
+    setAllFeedsDisabled(false);
 
     try {
       const params = new URLSearchParams({
@@ -528,6 +530,13 @@ export default function NoticiasPage() {
       }
 
       const data = await res.json();
+
+      // Empresa tem feeds custom mas todos desativados — nao usar mock
+      if (data.allFeedsDisabled) {
+        setAllFeedsDisabled(true);
+        setNoticias([]);
+        return;
+      }
 
       if (data.noticias && data.noticias.length > 0) {
         // Mapear resposta da API para o tipo Noticia da pagina
@@ -628,6 +637,14 @@ export default function NoticiasPage() {
         <div className="bg-bg-card border border-border rounded-lg px-3 py-2 text-xs text-text-muted flex items-center gap-2">
           <Tag size={12} />
           Exibindo dados de exemplo. Os feeds RSS reais nao retornaram resultados.
+        </div>
+      )}
+
+      {/* ── all feeds disabled notice ─────────────────────────────────── */}
+      {allFeedsDisabled && !loading && (
+        <div className="bg-bg-card border border-warning/30 rounded-lg px-3 py-2 text-xs text-warning flex items-center gap-2">
+          <ToggleLeft size={13} />
+          Ative pelo menos um feed para ver noticias.
         </div>
       )}
 

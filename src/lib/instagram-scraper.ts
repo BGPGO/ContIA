@@ -1,9 +1,10 @@
 // ── Instagram Public Profile Scraper ─────────────────────────────────────────
 // Scrapes public Instagram profiles to get posts with engagement metrics.
 // Uses multiple strategies with graceful degradation.
-// Reutiliza abordagem de src/app/api/ai/analyze-instagram/route.ts
+// Strategy priority: Business Discovery API > Public API > HTML Scraping
 
 import { AnalysisCache, cacheKey } from "@/lib/cache";
+import { createClient } from "@supabase/supabase-js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -60,7 +61,97 @@ const BROWSER_HEADERS = {
   "Accept-Language": "en-US,en;q=0.9",
 };
 
-// ── Strategy 1: Instagram public API endpoint ───────────────────────────────
+// ── Strategy 1: Business Discovery API (official, preferred) ────────────────
+// Uses our own IG Business token to query any public profile via
+// the Business Discovery endpoint. No scraping needed.
+
+async function tryBusinessDiscovery(
+  username: string
+): Promise<IGScrapedProfile | null> {
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key =
+      process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) return null;
+
+    const admin = createClient(url, key, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    const { data: conn } = await admin
+      .from("social_connections")
+      .select("access_token, provider_user_id")
+      .eq("provider", "instagram")
+      .eq("is_active", true)
+      .limit(1)
+      .single();
+
+    if (!conn?.access_token || !conn.provider_user_id) return null;
+
+    const fields = [
+      "username",
+      "name",
+      "biography",
+      "profile_picture_url",
+      "followers_count",
+      "follows_count",
+      "media_count",
+      "media.limit(12){id,caption,timestamp,media_type,media_url,thumbnail_url,permalink,like_count,comments_count}",
+    ].join(",");
+
+    const apiUrl =
+      `https://graph.instagram.com/v23.0/${conn.provider_user_id}` +
+      `?fields=business_discovery.fields(${fields}).username(${username})` +
+      `&access_token=${conn.access_token}`;
+
+    const res = await fetch(apiUrl, { signal: AbortSignal.timeout(15000) });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error(
+        "[business-discovery] Erro:",
+        err?.error?.message || res.status
+      );
+      return null;
+    }
+
+    const json = await res.json();
+    const bd = json.business_discovery;
+    if (!bd) return null;
+
+    const posts: IGScrapedPost[] = (bd.media?.data || []).map((m: any) => ({
+      id: m.id,
+      shortcode:
+        m.permalink?.split("/p/")?.[1]?.replace("/", "") || m.id,
+      imageUrl: m.media_url || m.thumbnail_url || "",
+      caption: m.caption || "",
+      likes: m.like_count || 0,
+      comments: m.comments_count || 0,
+      timestamp: m.timestamp || "",
+      isVideo: m.media_type === "VIDEO",
+      permalink: m.permalink || "",
+    }));
+
+    return {
+      username: bd.username,
+      fullName: bd.name || "",
+      biography: bd.biography || "",
+      followers: bd.followers_count || 0,
+      following: bd.follows_count || 0,
+      postCount: bd.media_count || 0,
+      profilePicUrl: bd.profile_picture_url || "",
+      posts,
+      scrapedAt: new Date().toISOString(),
+      partial: false,
+    };
+  } catch (e) {
+    console.error("[business-discovery] Exception:", (e as Error).message);
+    return null;
+  }
+}
+
+// ── Strategy 2: Instagram public API endpoint (fallback) ────────────────────
 
 async function tryPublicAPI(username: string): Promise<IGScrapedProfile | null> {
   try {
@@ -118,7 +209,7 @@ async function tryPublicAPI(username: string): Promise<IGScrapedProfile | null> 
   }
 }
 
-// ── Strategy 2: HTML scraping with embedded JSON ────────────────────────────
+// ── Strategy 3: HTML scraping with embedded JSON (last resort) ──────────────
 
 async function tryHTMLScraping(username: string): Promise<IGScrapedProfile | null> {
   try {
@@ -247,8 +338,14 @@ export async function scrapeInstagramPublicProfile(
 
   recordScrape(clean);
 
-  // Try strategies in order
-  let result = await tryPublicAPI(clean);
+  // Try strategies in order of reliability
+  // 1. Business Discovery API (official IG API, most reliable on servers)
+  let result = await tryBusinessDiscovery(clean);
+  // 2. Public API (works locally, blocked on most servers)
+  if (!result) {
+    result = await tryPublicAPI(clean);
+  }
+  // 3. HTML scraping (last resort, often blocked)
   if (!result) {
     result = await tryHTMLScraping(clean);
   }

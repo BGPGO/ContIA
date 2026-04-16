@@ -67,7 +67,14 @@ export async function getNoticiasForNicho(
   nicho: string,
   customFeeds?: Array<{ nome: string; url: string; topico: string }>
 ): Promise<NoticiaItem[]> {
-  const feeds = customFeeds?.length
+  // undefined  → empresa sem feeds custom, usar defaults por nicho
+  // []         → empresa TEM feeds custom mas todos desativados, retornar vazio
+  // [...items] → usar apenas os feeds ativos da empresa
+  if (customFeeds !== undefined && customFeeds.length === 0) {
+    return [];
+  }
+
+  const feeds = customFeeds !== undefined
     ? customFeeds
     : (DEFAULT_FEEDS[nicho.toLowerCase()] || DEFAULT_FEEDS.geral);
 
