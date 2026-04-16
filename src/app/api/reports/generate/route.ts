@@ -16,6 +16,7 @@ import { generateReportPDF } from "@/lib/reports/pdf-generator";
 import { uploadReportPdf, buildPdfPath } from "@/lib/reports/storage";
 import type { ProviderKey } from "@/types/providers";
 import type { ReportType } from "@/types/reports";
+import { fetchInstagramLive } from "@/lib/analytics/instagram-fetcher";
 
 /* ── Input validation ────────────────────────────────────────────────────── */
 
@@ -43,6 +44,7 @@ const RequestSchema = z.object({
     .min(1, "Selecione pelo menos 1 plataforma"),
   reportType: z.enum(["weekly", "monthly", "quarterly", "custom"]),
   name: z.string().max(200).optional(),
+  empresaId: z.string().uuid().optional(),
 });
 
 /* ── Rate limit por empresa (in-memory) ──────────────────────────────────── */
@@ -110,7 +112,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: messages }, { status: 400 });
   }
 
-  const { periodStart, periodEnd, providers, reportType, name } = validation.data;
+  const { periodStart, periodEnd, providers, reportType, name, empresaId: requestEmpresaId } = validation.data;
 
   // 3. Auth
   const supabase = await createClient();
@@ -121,13 +123,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
   }
 
-  // 4. Resolve empresa
-  const { data: empresa } = await supabase
+  // 4. Resolve empresa — usar empresaId do request se disponivel, senao primeira do user
+  let empresaQuery = supabase
     .from("empresas")
     .select("id, nome")
-    .eq("user_id", user.id)
-    .limit(1)
-    .single();
+    .eq("user_id", user.id);
+
+  if (requestEmpresaId) {
+    empresaQuery = empresaQuery.eq("id", requestEmpresaId);
+  }
+
+  const { data: empresa } = await empresaQuery.limit(1).single();
 
   if (!empresa) {
     return NextResponse.json(
@@ -234,6 +240,109 @@ export async function POST(req: NextRequest) {
           created_at: p.created_at as string,
         }));
         snapshots = [...snapshots, ...syntheticSnapshots];
+      }
+    }
+
+    // ── FALLBACK LIVE: se Instagram sem dados em content NEM snapshots, buscar API live ──
+    const hasAnyIgContent = content.some((c) => c.provider === "instagram");
+    const hasAnyIgSnaps = snapshots.some((s) => s.provider === "instagram");
+
+    if (providers.includes("instagram" as ProviderKey) && (!hasAnyIgContent || !hasAnyIgSnaps)) {
+      let igAccessToken: string | null = null;
+      let igProviderUserId: string | null = null;
+
+      // Tentar social_connections
+      const { data: igConn, error: igConnError } = await supabase
+        .from("social_connections")
+        .select("access_token, provider_user_id")
+        .eq("empresa_id", empresa.id)
+        .eq("provider", "instagram")
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+
+      if (igConnError) {
+        console.error("[reports/generate] Erro ao buscar conexao IG:", igConnError.message);
+      }
+
+      if (igConn?.access_token && igConn.provider_user_id) {
+        igAccessToken = igConn.access_token;
+        igProviderUserId = igConn.provider_user_id;
+      } else {
+        // Fallback legado empresa.redes_sociais
+        const { data: empresaRedes } = await supabase
+          .from("empresas")
+          .select("redes_sociais")
+          .eq("id", empresa.id)
+          .single();
+
+        const legacyIg = (empresaRedes?.redes_sociais as Record<string, Record<string, string | boolean>> | null)?.instagram;
+        if (legacyIg?.access_token && legacyIg.provider_user_id) {
+          igAccessToken = legacyIg.access_token as string;
+          igProviderUserId = legacyIg.provider_user_id as string;
+        }
+      }
+
+      if (igAccessToken && igProviderUserId) {
+        try {
+          const liveData = await fetchInstagramLive(igAccessToken, igProviderUserId, 30);
+
+          // Injetar content sintetico se nao tem
+          if (!hasAnyIgContent && liveData.media.length > 0) {
+            const liveContent = liveData.media.map((m) => {
+              const mi = liveData.mediaInsightsMap.get(m.id);
+              return {
+                id: m.id,
+                empresa_id: empresa.id,
+                connection_id: `live-ig-${empresa.id}`,
+                provider: "instagram" as string,
+                provider_content_id: m.id,
+                content_type: (m.media_type === "VIDEO" ? "reel" : "post") as string,
+                title: null as string | null,
+                caption: m.caption ?? null,
+                url: m.permalink ?? null,
+                thumbnail_url: (m.thumbnail_url ?? m.media_url) as string | null,
+                published_at: m.timestamp ?? null,
+                metrics: {
+                  likes: (m.like_count ?? 0) as number,
+                  comments: (m.comments_count ?? 0) as number,
+                  saves: (mi?.saved ?? 0) as number,
+                  shares: (mi?.shares ?? 0) as number,
+                  reach: (mi?.reach ?? 0) as number,
+                },
+                raw: { media_type: m.media_type },
+                synced_at: new Date().toISOString(),
+              };
+            });
+            content = [...content, ...liveContent];
+          }
+
+          // Injetar snapshot sintetico se nao tem
+          if (!hasAnyIgSnaps) {
+            const today = new Date().toISOString().split("T")[0];
+            snapshots = [
+              ...snapshots,
+              {
+                id: `live-ig-snap-${empresa.id}`,
+                empresa_id: empresa.id,
+                connection_id: `live-ig-${empresa.id}`,
+                provider: "instagram" as string,
+                snapshot_date: today,
+                metrics: {
+                  followers_count: liveData.kpis.followers,
+                  reach: liveData.kpis.reach,
+                  impressions: liveData.kpis.impressions,
+                  engagement_rate: liveData.kpis.engagementRate,
+                },
+                created_at: new Date().toISOString(),
+              },
+            ];
+          }
+
+          console.log("[reports/generate] Dados live Instagram injetados para relatorio");
+        } catch (err) {
+          console.error("[reports/generate] Falha ao buscar Instagram live:", err instanceof Error ? err.message : err);
+        }
       }
     }
 

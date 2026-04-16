@@ -217,6 +217,7 @@ export default function NovoRelatorioPage() {
           providers: selectedProviders,
           reportType,
           name: reportName,
+          empresaId: empresa.id,
         }),
       });
 

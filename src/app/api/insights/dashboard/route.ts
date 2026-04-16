@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { PROVIDER_DISPLAY_ORDER } from "@/lib/drivers/metadata";
 import type { ProviderKey } from "@/types/providers";
+import {
+  fetchInstagramLive,
+  type InstagramLiveData,
+} from "@/lib/analytics/instagram-fetcher";
 
 /**
  * GET /api/insights/dashboard?empresa_id=xxx&period_start=YYYY-MM-DD&period_end=YYYY-MM-DD
@@ -94,14 +98,135 @@ export async function GET(req: NextRequest) {
       .maybeSingle(),
   ]);
 
-  const connections = connectionsRes.data ?? [];
-  const currentSnapshots = snapshotsCurrentRes.data ?? [];
+  let connections = connectionsRes.data ?? [];
+  let currentSnapshots = snapshotsCurrentRes.data ?? [];
   const prevSnapshots = snapshotsPrevRes.data ?? [];
-  const contentItems = contentRes.data ?? [];
+  let contentItems = contentRes.data ?? [];
 
-  // Connected providers count
-  const connectedProviders = new Set(connections.map((c) => c.provider));
+  if (connectionsRes.error) {
+    console.error("[insights/dashboard] Erro ao buscar social_connections:", connectionsRes.error.message);
+  }
+
+  // ── FALLBACK: se social_connections retornou vazio, tentar empresa.redes_sociais ──
+  const connectedProviders = new Set(connections.map((c) => c.provider as string));
+
+  if (!connectedProviders.has("instagram")) {
+    const { data: empresa } = await supabase
+      .from("empresas")
+      .select("redes_sociais")
+      .eq("id", empresaId)
+      .single();
+
+    const legacyIg = (empresa?.redes_sociais as Record<string, Record<string, string | boolean>> | null)?.instagram;
+    if (legacyIg?.conectado && legacyIg.access_token) {
+      connectedProviders.add("instagram");
+      connections = [
+        ...connections,
+        { id: `legacy-${empresaId}`, provider: "instagram" } as typeof connections[number],
+      ];
+      console.log("[insights/dashboard] Instagram detectado via empresa.redes_sociais (legado)");
+    }
+  }
+
   const connectedCount = connectedProviders.size;
+
+  // ── LIVE FETCH: se Instagram conectado mas sem dados em content_items/snapshots ──
+  const hasIgContent = contentItems.some((c) => c.provider === "instagram");
+  const hasIgSnapshots = currentSnapshots.some((s) => s.provider === "instagram");
+
+  let igLiveData: InstagramLiveData | null = null;
+
+  if (connectedProviders.has("instagram") && (!hasIgContent || !hasIgSnapshots)) {
+    // Buscar access_token: primeiro social_connections, depois legado
+    let igAccessToken: string | null = null;
+    let igProviderUserId: string | null = null;
+
+    const { data: igConn, error: igConnError } = await supabase
+      .from("social_connections")
+      .select("access_token, provider_user_id")
+      .eq("empresa_id", empresaId)
+      .eq("provider", "instagram")
+      .eq("is_active", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (igConnError) {
+      console.error("[insights/dashboard] Erro ao buscar conexao IG:", igConnError.message);
+    }
+
+    if (igConn?.access_token && igConn.provider_user_id) {
+      igAccessToken = igConn.access_token;
+      igProviderUserId = igConn.provider_user_id;
+    } else {
+      // Fallback legado
+      const { data: empresa } = await supabase
+        .from("empresas")
+        .select("redes_sociais")
+        .eq("id", empresaId)
+        .single();
+
+      const legacyIg = (empresa?.redes_sociais as Record<string, Record<string, string | boolean>> | null)?.instagram;
+      if (legacyIg?.access_token && legacyIg.provider_user_id) {
+        igAccessToken = legacyIg.access_token as string;
+        igProviderUserId = legacyIg.provider_user_id as string;
+      }
+    }
+
+    if (igAccessToken && igProviderUserId) {
+      try {
+        igLiveData = await fetchInstagramLive(igAccessToken, igProviderUserId, 30);
+
+        // Injetar dados live como synthetic content_items se nao tem conteudo IG
+        if (!hasIgContent && igLiveData.media.length > 0) {
+          const syntheticContent = igLiveData.media.map((m) => {
+            const mi = igLiveData!.mediaInsightsMap.get(m.id);
+            return {
+              id: m.id,
+              empresa_id: empresaId,
+              provider: "instagram",
+              content_type: m.media_type === "VIDEO" ? "reel" : "post",
+              title: null,
+              caption: m.caption ?? null,
+              url: m.permalink ?? null,
+              thumbnail_url: m.thumbnail_url ?? m.media_url ?? null,
+              published_at: m.timestamp ?? null,
+              metrics: {
+                likes: m.like_count ?? 0,
+                comments: m.comments_count ?? 0,
+                saves: mi?.saved ?? 0,
+                shares: mi?.shares ?? 0,
+                reach: mi?.reach ?? 0,
+              },
+            };
+          });
+          contentItems = [...contentItems, ...syntheticContent];
+        }
+
+        // Injetar snapshot sintetico se nao tem snapshots IG
+        if (!hasIgSnapshots) {
+          const today = new Date().toISOString().split("T")[0];
+          const syntheticSnapshot = {
+            id: `live-ig-${empresaId}`,
+            empresa_id: empresaId,
+            provider: "instagram",
+            snapshot_date: today,
+            metrics: {
+              followers_count: igLiveData.kpis.followers,
+              reach: igLiveData.kpis.reach,
+              impressions: igLiveData.kpis.impressions,
+              engagement_rate: igLiveData.kpis.engagementRate,
+            },
+            created_at: new Date().toISOString(),
+          };
+          currentSnapshots = [...currentSnapshots, syntheticSnapshot];
+        }
+
+        console.log("[insights/dashboard] Dados live Instagram injetados com sucesso");
+      } catch (err) {
+        console.error("[insights/dashboard] Falha ao buscar Instagram live:", err instanceof Error ? err.message : err);
+      }
+    }
+  }
 
   // --- KPIs ---
   function sumMetric(

@@ -71,18 +71,48 @@ export async function GET(
     return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
   }
 
-  // Check if connected
-  const { data: connData } = await supabase
+  // ── Passo 1: Tentar social_connections ──
+  const { data: connData, error: connError } = await supabase
     .from("social_connections")
-    .select("id")
+    .select("id, access_token, provider_user_id, username")
     .eq("empresa_id", empresaId)
     .eq("provider", provider)
     .eq("is_active", true)
     .limit(1);
 
-  const connected = (connData ?? []).length > 0;
+  if (connError) {
+    console.error("[analytics/provider] Erro ao buscar social_connections:", connError.message);
+  }
 
-  if (!connected) {
+  let connection: {
+    id: string;
+    access_token: string | null;
+    provider_user_id: string | null;
+    username: string | null;
+  } | null = connData?.[0] ?? null;
+
+  // ── Passo 2: FALLBACK — buscar em empresa.redes_sociais (legado) ──
+  if (!connection && provider === "instagram") {
+    const { data: empresa } = await supabase
+      .from("empresas")
+      .select("redes_sociais")
+      .eq("id", empresaId)
+      .single();
+
+    const legacyIg = (empresa?.redes_sociais as Record<string, Record<string, string | boolean>> | null)?.instagram;
+    if (legacyIg?.conectado && legacyIg.access_token) {
+      connection = {
+        id: `legacy-${empresaId}`,
+        access_token: legacyIg.access_token as string,
+        provider_user_id: (legacyIg.provider_user_id as string) ?? null,
+        username: (legacyIg.username as string) ?? null,
+      };
+      console.log("[analytics/provider] Usando conexao legada (empresa.redes_sociais) para Instagram");
+    }
+  }
+
+  // ── Passo 3: Se realmente nao tem conexao, retorna ──
+  if (!connection) {
     return NextResponse.json({
       provider,
       connected: false,
@@ -99,38 +129,28 @@ export async function GET(
     });
   }
 
-  // ── INSTAGRAM LIVE: buscar dados ao vivo da API ──
-  if (provider === "instagram") {
+  // ── Passo 4: INSTAGRAM LIVE — buscar dados ao vivo da API ──
+  if (provider === "instagram" && connection.access_token && connection.provider_user_id) {
     try {
-      const { data: igConn } = await supabase
-        .from("social_connections")
-        .select("access_token, provider_user_id")
-        .eq("empresa_id", empresaId)
-        .eq("provider", "instagram")
-        .eq("is_active", true)
-        .single();
+      const liveData = await fetchInstagramLive(connection.access_token, connection.provider_user_id, 30);
 
-      if (igConn?.access_token && igConn.provider_user_id) {
-        const liveData = await fetchInstagramLive(igConn.access_token, igConn.provider_user_id, 30);
-
-        return NextResponse.json({
-          provider,
-          connected: true,
-          kpis: toProviderKPIs(liveData),
-          timeSeries: toProviderTimeSeries(liveData),
-          posts: toProviderPosts(liveData),
-          breakdown: toProviderBreakdown(liveData),
-          heatmap: toProviderHeatmap(liveData),
-          funnelStages: null,
-          topHashtags: toProviderHashtags(liveData),
-          trafficSources: null,
-          topPages: null,
-          campaigns: null,
-        });
-      }
+      return NextResponse.json({
+        provider,
+        connected: true,
+        kpis: toProviderKPIs(liveData),
+        timeSeries: toProviderTimeSeries(liveData),
+        posts: toProviderPosts(liveData),
+        breakdown: toProviderBreakdown(liveData),
+        heatmap: toProviderHeatmap(liveData),
+        funnelStages: null,
+        topHashtags: toProviderHashtags(liveData),
+        trafficSources: null,
+        topPages: null,
+        campaigns: null,
+      });
     } catch (err) {
-      console.error("[analytics/provider] Instagram live fetch failed:", err instanceof Error ? err.message : err);
-      // Fall through to DB-based logic below
+      console.error("[analytics/provider] Instagram live fetch falhou:", err instanceof Error ? err.message : err);
+      // Continua para fallback DB-based abaixo
     }
   }
 
