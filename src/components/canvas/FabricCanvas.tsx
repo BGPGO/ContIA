@@ -77,8 +77,10 @@ export interface FabricCanvasRef {
   applyStyleToSelection: (style: Record<string, any>) => void;
   getSelectionStyle: () => Record<string, any> | null;
   isEditingText: () => boolean;
-  addImageFrame: (options?: { width?: number; height?: number; rx?: number; ry?: number }) => void;
+  addImageFrame: (options?: { width?: number; height?: number; rx?: number; ry?: number; shape?: 'rect' | 'rounded' | 'circle' | 'hexagon' }) => void;
   fillImageFrame: (frameId: string, imageUrl: string) => Promise<void>;
+  setFrameShape: (frameId: string, shape: 'rect' | 'rounded' | 'circle' | 'hexagon') => void;
+  setFrameRadius: (frameId: string, radius: number) => void;
 }
 
 export interface FabricCanvasProps {
@@ -126,8 +128,8 @@ function extractSelectionInfo(obj: any): SelectionInfo {
       textAlign: obj.textAlign,
       opacity: obj.opacity != null ? Math.round(obj.opacity * 100) : 100,
       text: obj.text,
-      rx: (obj as any).rx || 0,
-      ry: (obj as any).ry || 0,
+      rx: (obj as any).data?.frameRx ?? (obj as any).rx ?? 0,
+      ry: (obj as any).data?.frameRy ?? (obj as any).ry ?? 0,
       stroke: typeof obj.stroke === "string" ? obj.stroke : undefined,
       strokeWidth: obj.strokeWidth || 0,
     },
@@ -694,9 +696,11 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
       const canvasW = dims.w * currentScale;
       const canvasH = dims.h * currentScale;
 
-      // Allow canvas to go at most 50% off screen in any direction
-      const maxPanX = Math.max(cw * 0.5, canvasW * 0.5);
-      const maxPanY = Math.max(ch * 0.5, canvasH * 0.5);
+      // Keep canvas always visible — limit pan to the padding around it
+      const paddingX = Math.max(16, (cw - canvasW) / 2);
+      const paddingY = Math.max(16, (ch - canvasH) / 2);
+      const maxPanX = paddingX;
+      const maxPanY = paddingY;
 
       return {
         x: Math.max(-maxPanX, Math.min(maxPanX, offset.x)),
@@ -1333,15 +1337,16 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
         },
 
         // ── Add image frame (clip mask / mockup frame) ──
-        addImageFrame: (options?: { width?: number; height?: number; rx?: number; ry?: number }) => {
+        addImageFrame: (options?: { width?: number; height?: number; rx?: number; ry?: number; shape?: 'rect' | 'rounded' | 'circle' | 'hexagon' }) => {
           import("fabric").then(({ Rect, IText, Group }) => {
             const canvas = fabricRef.current;
             if (!canvas) return;
 
             const w = options?.width || 400;
             const h = options?.height || 400;
-            const rx = options?.rx || 20;
-            const ry = options?.ry || 20;
+            const shape = options?.shape || 'rounded';
+            let rx = options?.rx ?? (shape === 'rect' ? 0 : shape === 'circle' ? Math.min(w, h) / 2 : 20);
+            let ry = options?.ry ?? rx;
 
             const frame = new Rect({
               width: w,
@@ -1378,6 +1383,7 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
               frameHeight: h,
               frameRx: rx,
               frameRy: ry,
+              frameShape: shape,
             };
 
             canvas.add(group);
@@ -1401,31 +1407,38 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
           const fh = (frame as any).data?.frameHeight || (frame as any).height || 400;
           const rx = (frame as any).data?.frameRx || 20;
           const ry = (frame as any).data?.frameRy || 20;
+          const frameLeft = frame.left || 0;
+          const frameTop = frame.top || 0;
 
           const { FabricImage, Rect } = await import("fabric");
 
           const img = await FabricImage.fromURL(imageUrl, { crossOrigin: 'anonymous' });
+          if (!img.width || !img.height) return;
 
-          // Scale image to cover the frame
-          const scaleX = fw / (img.width || 1);
-          const scaleY = fh / (img.height || 1);
-          const coverScale = Math.max(scaleX, scaleY);
+          // Scale to COVER the frame
+          const coverScale = Math.max(fw / img.width, fh / img.height);
 
-          // clipPath in Fabric.js is relative to the object's own coordinate space
+          // Center the image within the frame
+          const imgW = img.width * coverScale;
+          const imgH = img.height * coverScale;
+          const offsetX = (imgW - fw) / 2;
+          const offsetY = (imgH - fh) / 2;
+
           img.set({
             scaleX: coverScale,
             scaleY: coverScale,
-            left: frame.left || 0,
-            top: frame.top || 0,
+            left: frameLeft - offsetX,
+            top: frameTop - offsetY,
+            // ClipPath is in the object's local coordinate space (before scaling)
             clipPath: new Rect({
               width: fw / coverScale,
               height: fh / coverScale,
               rx: rx / coverScale,
               ry: ry / coverScale,
-              originX: 'center',
-              originY: 'center',
+              left: offsetX / coverScale,
+              top: offsetY / coverScale,
             }),
-            data: { id: crypto.randomUUID(), role: 'framed-image' },
+            data: { id: crypto.randomUUID(), role: 'framed-image', sourceFrameId: frameId },
           });
 
           canvas.remove(frame);
@@ -1433,6 +1446,68 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
           canvas.setActiveObject(img);
           canvas.renderAll();
           saveHistory();
+        },
+
+        // ── Set frame shape ──
+        setFrameShape: (frameId: string, shape: 'rect' | 'rounded' | 'circle' | 'hexagon') => {
+          const canvas = fabricRef.current;
+          if (!canvas) return;
+
+          const frame = canvas.getObjects().find(
+            (obj: any) => obj.data?.id === frameId && obj.data?.role === 'image-frame'
+          );
+          if (!frame) return;
+
+          const fw = (frame as any).data?.frameWidth || (frame as any).width || 400;
+          const fh = (frame as any).data?.frameHeight || (frame as any).height || 400;
+
+          let rx = 0;
+          let ry = 0;
+          switch (shape) {
+            case 'rect': rx = 0; ry = 0; break;
+            case 'rounded': rx = 20; ry = 20; break;
+            case 'circle': rx = Math.min(fw, fh) / 2; ry = Math.min(fw, fh) / 2; break;
+            case 'hexagon': rx = 0; ry = 0; break;
+          }
+
+          (frame as any).data.frameRx = rx;
+          (frame as any).data.frameRy = ry;
+          (frame as any).data.frameShape = shape;
+
+          // If it's a Group, update the first child (the Rect)
+          if (typeof (frame as any).getObjects === 'function') {
+            const rect = (frame as any).getObjects()[0];
+            if (rect) {
+              rect.set({ rx, ry });
+            }
+          }
+
+          canvas.renderAll();
+          saveHistory();
+          emitSelection(frame);
+        },
+
+        // ── Set frame border radius ──
+        setFrameRadius: (frameId: string, radius: number) => {
+          const canvas = fabricRef.current;
+          if (!canvas) return;
+
+          const frame = canvas.getObjects().find(
+            (obj: any) => obj.data?.id === frameId && obj.data?.role === 'image-frame'
+          );
+          if (!frame) return;
+
+          (frame as any).data.frameRx = radius;
+          (frame as any).data.frameRy = radius;
+
+          if (typeof (frame as any).getObjects === 'function') {
+            const rect = (frame as any).getObjects()[0];
+            if (rect) rect.set({ rx: radius, ry: radius });
+          }
+
+          canvas.renderAll();
+          saveHistory();
+          emitSelection(frame);
         },
       }),
       [dims.w, dims.h, undoAction, redoAction, saveHistory, emitSelection, computeScale, onCanvasChange, addImageFromDataUrl, onTextSelectionChange]

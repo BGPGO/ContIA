@@ -20,6 +20,8 @@ import {
   Crosshair,
   CornerUpLeft,
   Paintbrush,
+  ImagePlus,
+  Hexagon,
 } from "lucide-react";
 import type { SelectionInfo, FabricCanvasRef, TextSelectionInfo } from "./FabricCanvas";
 
@@ -537,6 +539,91 @@ export function PropertyPanel({
             </button>
           </div>
         </div>
+
+        {/* ── Image Frame controls ── */}
+        {selection.role === 'image-frame' && (
+          <div>
+            <SectionHeader icon={ImagePlus} label="Frame de Imagem" />
+
+            {/* Upload image into frame */}
+            <div className="mb-3">
+              <label className="block text-[10px] text-[#8b8fb0] uppercase tracking-wide mb-1.5">
+                Imagem
+              </label>
+              <label className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border-2 border-dashed border-white/10 hover:border-[#4ecdc4]/40 cursor-pointer transition-colors group">
+                <ImagePlus size={16} className="text-[#5e6388] group-hover:text-[#4ecdc4]" />
+                <span className="text-xs text-[#8b8fb0] group-hover:text-[#e8eaff]">Subir imagem</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file || !selection) return;
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                      const dataUrl = ev.target?.result as string;
+                      canvasRef.current?.fillImageFrame(selection.id, dataUrl);
+                    };
+                    reader.readAsDataURL(file);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+            </div>
+
+            {/* Frame shape selector */}
+            <div className="mb-3">
+              <label className="block text-[10px] text-[#8b8fb0] uppercase tracking-wide mb-1.5">
+                Forma
+              </label>
+              <div className="grid grid-cols-4 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => canvasRef.current?.setFrameShape(selection.id, 'rect')}
+                  className="p-2 rounded-lg bg-[#141736] hover:bg-white/10 flex items-center justify-center cursor-pointer border border-white/10"
+                  title="Retangulo"
+                >
+                  <div className="w-6 h-6 border-2 border-[#8b8fb0] rounded-sm" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => canvasRef.current?.setFrameShape(selection.id, 'rounded')}
+                  className="p-2 rounded-lg bg-[#141736] hover:bg-white/10 flex items-center justify-center cursor-pointer border border-white/10"
+                  title="Arredondado"
+                >
+                  <div className="w-6 h-6 border-2 border-[#8b8fb0] rounded-lg" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => canvasRef.current?.setFrameShape(selection.id, 'circle')}
+                  className="p-2 rounded-lg bg-[#141736] hover:bg-white/10 flex items-center justify-center cursor-pointer border border-white/10"
+                  title="Circulo"
+                >
+                  <div className="w-6 h-6 border-2 border-[#8b8fb0] rounded-full" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => canvasRef.current?.setFrameShape(selection.id, 'hexagon')}
+                  className="p-2 rounded-lg bg-[#141736] hover:bg-white/10 flex items-center justify-center cursor-pointer border border-white/10"
+                  title="Hexagono"
+                >
+                  <Hexagon size={18} className="text-[#8b8fb0]" />
+                </button>
+              </div>
+            </div>
+
+            {/* Border radius */}
+            <PropInput
+              label="Arredondamento"
+              value={selection.props.rx || 0}
+              onChange={(v) => canvasRef.current?.setFrameRadius(selection.id, Number(v))}
+              min={0}
+              max={200}
+              suffix="px"
+            />
+          </div>
+        )}
 
         {/* ── Position & Size ── */}
         <div>

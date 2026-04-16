@@ -714,7 +714,7 @@ function EditorContent() {
   const isLoading = isLoadingSession || isLoadingTemplate;
 
   return (
-    <div className="h-screen flex flex-col bg-[#080b1e] overflow-hidden" data-editor-root>
+    <div className="fixed inset-0 z-50 flex flex-col bg-[#080b1e] overflow-hidden" data-editor-root>
       {/* Loading overlay */}
       {isLoading && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#080b1e]/80 backdrop-blur-sm">
