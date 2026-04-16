@@ -373,6 +373,160 @@ async function tryHTMLScraping(username: string): Promise<IGScrapedProfile | nul
   }
 }
 
+// ── Strategy 5: Puppeteer headless (renders JS, extracts posts) ─────────────
+
+async function tryPuppeteerScrape(username: string): Promise<IGScrapedProfile | null> {
+  try {
+    const puppeteer = await import("puppeteer");
+    const browser = await puppeteer.default.launch({
+      headless: true,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--no-first-run",
+        "--no-zygote",
+        "--single-process",
+      ],
+    });
+
+    try {
+      const page = await browser.newPage();
+      await page.setUserAgent(
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      );
+
+      // Bloquear imagens/CSS pra acelerar
+      await page.setRequestInterception(true);
+      page.on("request", (req) => {
+        const rt = req.resourceType();
+        if (rt === "image" || rt === "stylesheet" || rt === "font") {
+          req.abort();
+        } else {
+          req.continue();
+        }
+      });
+
+      await page.goto(`https://www.instagram.com/${username}/`, {
+        waitUntil: "networkidle2",
+        timeout: 25000,
+      });
+
+      // Esperar um pouco pra JS hidratar
+      await new Promise((r) => setTimeout(r, 3000));
+
+      // Extrair dados do DOM renderizado
+      const data = await page.evaluate(() => {
+        const getMeta = (prop: string) =>
+          document.querySelector(`meta[property="${prop}"]`)?.getAttribute("content") || "";
+
+        // Buscar posts do DOM renderizado
+        const postElements = document.querySelectorAll("article a[href*='/p/']");
+        const posts: Array<{
+          shortcode: string;
+          imageUrl: string;
+          likes: number;
+          comments: number;
+        }> = [];
+
+        postElements.forEach((el) => {
+          const href = el.getAttribute("href") || "";
+          const match = href.match(/\/p\/([^/]+)/);
+          if (!match) return;
+
+          const img = el.querySelector("img");
+          posts.push({
+            shortcode: match[1],
+            imageUrl: img?.src || "",
+            likes: 0,
+            comments: 0,
+          });
+        });
+
+        // Fallback: buscar todas imagens em articles
+        if (posts.length === 0) {
+          const imgs = document.querySelectorAll("article img[src*='cdninstagram']");
+          const links = document.querySelectorAll("a[href*='/p/']");
+          const shortcodes = Array.from(links)
+            .map((l) => l.getAttribute("href")?.match(/\/p\/([^/]+)/)?.[1])
+            .filter(Boolean);
+
+          imgs.forEach((img, i) => {
+            posts.push({
+              shortcode: shortcodes[i] || `post-${i}`,
+              imageUrl: (img as HTMLImageElement).src || "",
+              likes: 0,
+              comments: 0,
+            });
+          });
+        }
+
+        const desc = getMeta("og:description");
+        const followersMatch = desc.match(/([\d,.]+[KkMm]?)\s*Followers/i);
+        let followers = 0;
+        if (followersMatch) {
+          const raw = followersMatch[1].replace(/,/g, "");
+          if (/[Kk]$/.test(raw)) followers = Math.round(parseFloat(raw) * 1000);
+          else if (/[Mm]$/.test(raw)) followers = Math.round(parseFloat(raw) * 1_000_000);
+          else followers = parseInt(raw, 10) || 0;
+        }
+
+        const followingMatch = desc.match(/([\d,.]+)\s*Following/i);
+        const postCountMatch = desc.match(/([\d,.]+)\s*Posts/i);
+
+        return {
+          username: document.querySelector("header h2, header span")?.textContent?.replace("@", "") || "",
+          fullName: document.querySelector('header span[dir="auto"]')?.textContent || "",
+          biography: document.querySelector("header section > div > span")?.textContent || "",
+          followers,
+          following: parseInt(followingMatch?.[1]?.replace(/,/g, "") || "0", 10),
+          postCount: parseInt(postCountMatch?.[1]?.replace(/,/g, "") || "0", 10),
+          profilePicUrl: (document.querySelector('header img[alt*="profile"]') as HTMLImageElement)?.src || "",
+          posts: posts.slice(0, 12),
+          ogImage: getMeta("og:image"),
+        };
+      });
+
+      await browser.close();
+
+      if (!data || (!data.username && data.followers === 0 && data.posts.length === 0)) {
+        return null;
+      }
+
+      return {
+        username: data.username || username,
+        fullName: data.fullName,
+        biography: data.biography,
+        followers: data.followers,
+        following: data.following,
+        postCount: data.postCount,
+        profilePicUrl: data.profilePicUrl || data.ogImage,
+        posts: data.posts.map((p) => ({
+          id: p.shortcode,
+          shortcode: p.shortcode,
+          imageUrl: p.imageUrl,
+          caption: "",
+          likes: p.likes,
+          comments: p.comments,
+          timestamp: "",
+          isVideo: false,
+          permalink: `https://www.instagram.com/p/${p.shortcode}/`,
+        })),
+        scrapedAt: new Date().toISOString(),
+        partial: data.posts.length === 0,
+      };
+    } catch (err) {
+      await browser.close();
+      throw err;
+    }
+  } catch (err) {
+    console.error("[scraper/puppeteer]", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
 // ── Main scraper function ───────────────────────────────────────────────────
 
 export async function scrapeInstagramPublicProfile(
@@ -391,7 +545,6 @@ export async function scrapeInstagramPublicProfile(
 
   // Rate limit check
   if (isRateLimited(clean)) {
-    // Return cached even if expired, or null
     const stale = scrapeCache.get<IGScrapedProfile>(ck);
     return stale || null;
   }
@@ -409,9 +562,16 @@ export async function scrapeInstagramPublicProfile(
   if (!result) {
     result = await tryBusinessDiscovery(clean);
   }
-  // 4. HTML scraping (last resort, often blocked)
+  // 4. HTML scraping (gets followers from meta but no posts)
   if (!result) {
     result = await tryHTMLScraping(clean);
+  }
+  // 5. Puppeteer headless (if we got no posts from HTML, render JS to get them)
+  if (!result || (result.partial && result.posts.length === 0)) {
+    const puppeteerResult = await tryPuppeteerScrape(clean);
+    if (puppeteerResult && (puppeteerResult.posts.length > 0 || !result)) {
+      result = puppeteerResult;
+    }
   }
 
   // Cache the result if we got anything
