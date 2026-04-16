@@ -93,7 +93,7 @@ const navSections: NavSection[] = [
     icon: BarChart3,
     collapsible: true,
     links: [
-      { label: "Analytics (Legacy)", href: "/analytics", icon: BarChart3 },
+      { label: "Analytics", href: "/analytics", icon: BarChart3 },
       { label: "Concorrentes", href: "/concorrentes", icon: Users },
       { label: "Noticias", href: "/noticias", icon: Newspaper },
     ],

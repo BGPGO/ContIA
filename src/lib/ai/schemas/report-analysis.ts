@@ -53,10 +53,10 @@ export const ComparisonSchema = z.object({
 /* ── Schema completo ─────────────────────────────────────────────────────── */
 
 export const ReportAnalysisSchema = z.object({
-  summary: z.string().min(100).max(3000),
-  highlights: z.array(HighlightSchema).min(1).max(10),
-  insights: z.array(InsightSchema).min(1).max(10),
-  recommendations: z.array(RecommendationSchema).min(1).max(10),
+  summary: z.string().min(20).max(5000),
+  highlights: z.array(HighlightSchema).max(10),
+  insights: z.array(InsightSchema).max(10),
+  recommendations: z.array(RecommendationSchema).max(10),
   warnings: z.array(WarningSchema).max(10),
   comparisons: z.array(ComparisonSchema).max(30),
 });
@@ -64,18 +64,18 @@ export const ReportAnalysisSchema = z.object({
 /* ── Schemas parciais para cada chamada IA ──────────────────────────────── */
 
 export const SummaryHighlightsRecommendationsSchema = z.object({
-  summary: z.string().min(100).max(3000),
-  highlights: z.array(HighlightSchema).min(1).max(10),
-  recommendations: z.array(RecommendationSchema).min(1).max(10),
+  summary: z.string().min(20).max(5000),
+  highlights: z.array(HighlightSchema).max(10),
+  recommendations: z.array(RecommendationSchema).max(10),
 });
 
 export const InsightsWarningsSchema = z.object({
-  insights: z.array(InsightSchema).min(1).max(10),
+  insights: z.array(InsightSchema).max(10),
   warnings: z.array(WarningSchema).max(10),
 });
 
 export const ComparisonsNarrativeSchema = z.object({
-  comparisons: z.array(ComparisonSchema).min(1).max(30),
+  comparisons: z.array(ComparisonSchema).max(30),
 });
 
 /* ── Inferred types ──────────────────────────────────────────────────────── */
