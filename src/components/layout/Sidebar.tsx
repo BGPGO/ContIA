@@ -14,7 +14,6 @@ import {
   Brain,
   Cable,
   Palette,
-  MessageSquareText,
   Settings,
   Wrench,
   ChevronDown,
@@ -28,6 +27,8 @@ import {
   Clock,
   TrendingUp,
   Lightbulb,
+  LayoutTemplate,
+  Scissors,
   type LucideIcon,
 } from "lucide-react";
 import { useEmpresa } from "@/hooks/useEmpresa";
@@ -60,9 +61,10 @@ const navSections: NavSection[] = [
     label: "Criar",
     links: [
       { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-      { label: "Criar Conteudo", href: "/criacao", icon: Sparkles },
+      { label: "Studio", href: "/studio", icon: Sparkles },
+      { label: "Templates", href: "/templates", icon: LayoutTemplate },
       { label: "Calendario", href: "/calendario", icon: CalendarDays },
-      { label: "Studio", href: "/studio", icon: MessageSquareText },
+      { label: "Cortes de Video", href: "/cortes", icon: Scissors },
     ],
   },
   {
@@ -107,8 +109,10 @@ const navSections: NavSection[] = [
 const iconColorMap: Record<string, string> = {
   "/dashboard": "text-[#4ecdc4]",
   "/criacao": "text-[#a29bfe]",
+  "/studio": "text-[#a29bfe]",
+  "/templates": "text-[#f093fb]",
   "/calendario": "text-[#fbbf24]",
-  "/studio": "text-[#f093fb]",
+  "/cortes": "text-[#34d399]",
   "/analytics": "text-[#60a5fa]",
   "/insights": "text-[#4ecdc4]",
   "/insights/comparar": "text-[#34d399]",

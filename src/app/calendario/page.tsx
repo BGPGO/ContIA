@@ -7,6 +7,7 @@ import {
   ChevronRight,
   X,
   Calendar,
+  Smartphone,
 } from "lucide-react";
 import {
   startOfMonth,
@@ -26,6 +27,8 @@ import { useEmpresa } from "@/hooks/useEmpresa";
 import { usePosts } from "@/hooks/usePosts";
 import { cn, getPlataformaCor, getPlataformaLabel } from "@/lib/utils";
 import { Post } from "@/types";
+import { PhoneMockup } from "@/components/calendario/PhoneMockup";
+import { useInstagramFeedPreview } from "@/hooks/useInstagramFeedPreview";
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -450,6 +453,9 @@ export default function CalendarioPage() {
 
   const [direction, setDirection] = useState(0);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [showPhoneMock, setShowPhoneMock] = useState(true);
+
+  const feedPreview = useInstagramFeedPreview(empresa?.id);
 
   const allTematicas = useMemo(
     () => Array.from(new Set(allPosts.map((p) => p.tematica))).sort(),
@@ -548,6 +554,21 @@ export default function CalendarioPage() {
           <motion.button
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
+            onClick={() => setShowPhoneMock((v) => !v)}
+            className={cn(
+              "hidden md:flex p-1.5 rounded-lg transition-all duration-200 mr-2",
+              showPhoneMock
+                ? "text-[#4ecdc4] bg-[#4ecdc4]/10"
+                : "text-text-muted hover:text-[#4ecdc4] hover:bg-[#4ecdc4]/10"
+            )}
+            aria-label="Toggle feed preview"
+            title="Preview do feed Instagram"
+          >
+            <Smartphone size={16} />
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
             onClick={() => { setDirection(-1); setCurrentMonth((m) => subMonths(m, 1)); }}
             className="p-1 rounded-lg text-text-muted hover:text-[#4ecdc4] hover:bg-[#4ecdc4]/10 transition-all duration-200"
             aria-label="Mes anterior"
@@ -619,50 +640,78 @@ export default function CalendarioPage() {
         </div>
       </div>
 
-      {/* ── Desktop: calendar grid (hidden on <md) ─────────────────────── */}
-      <div className="hidden md:block bg-bg-card backdrop-blur-xl border border-border rounded-xl p-3">
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={format(currentMonth, "yyyy-MM")}
-            initial={{ opacity: 0, x: direction * 80 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: direction * -80 }}
-            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-          >
-            {/* weekday header */}
-            <div className="grid grid-cols-7">
-              {WEEKDAY_LABELS.map((label) => (
-                <div
-                  key={label}
-                  className="text-center text-[11px] uppercase tracking-wider text-text-muted py-2 font-medium"
-                >
-                  {label}
-                </div>
-              ))}
-            </div>
-
-            {/* days grid */}
-            {loading ? (
-              <CalendarSkeleton />
-            ) : (
-              <div className="grid grid-cols-7 border-t border-l border-border-subtle">
-                {calendarDays.map((day) => {
-                  const key = format(day, "yyyy-MM-dd");
-                  const dayPosts = postsByDay.get(key) ?? [];
-                  return (
-                    <DayCell
-                      key={key}
-                      day={day}
-                      currentMonth={currentMonth}
-                      posts={dayPosts}
-                      selectedPostId={selectedPostId}
-                      onSelectPost={setSelectedPostId}
-                    />
-                  );
-                })}
+      {/* ── Desktop: calendar grid + phone mockup (hidden on <md) ─────── */}
+      <div className="hidden md:flex gap-4">
+        {/* Calendar (expands to fill) */}
+        <div className={cn(
+          "bg-bg-card backdrop-blur-xl border border-border rounded-xl p-3 transition-all duration-300",
+          showPhoneMock ? "flex-1 min-w-0" : "w-full"
+        )}>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={format(currentMonth, "yyyy-MM")}
+              initial={{ opacity: 0, x: direction * 80 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: direction * -80 }}
+              transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+            >
+              {/* weekday header */}
+              <div className="grid grid-cols-7">
+                {WEEKDAY_LABELS.map((label) => (
+                  <div
+                    key={label}
+                    className="text-center text-[11px] uppercase tracking-wider text-text-muted py-2 font-medium"
+                  >
+                    {label}
+                  </div>
+                ))}
               </div>
-            )}
-          </motion.div>
+
+              {/* days grid */}
+              {loading ? (
+                <CalendarSkeleton />
+              ) : (
+                <div className="grid grid-cols-7 border-t border-l border-border-subtle">
+                  {calendarDays.map((day) => {
+                    const key = format(day, "yyyy-MM-dd");
+                    const dayPosts = postsByDay.get(key) ?? [];
+                    return (
+                      <DayCell
+                        key={key}
+                        day={day}
+                        currentMonth={currentMonth}
+                        posts={dayPosts}
+                        selectedPostId={selectedPostId}
+                        onSelectPost={setSelectedPostId}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* Phone mockup sidebar */}
+        <AnimatePresence>
+          {showPhoneMock && (
+            <motion.div
+              initial={{ opacity: 0, x: 40, width: 0 }}
+              animate={{ opacity: 1, x: 0, width: "auto" }}
+              exit={{ opacity: 0, x: 40, width: 0 }}
+              transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+              className="shrink-0 flex items-start justify-center pt-4 overflow-hidden"
+            >
+              <PhoneMockup
+                feedPosts={feedPreview.feedPosts}
+                profilePic={feedPreview.profilePic}
+                username={feedPreview.username}
+                followersCount={feedPreview.followersCount}
+                postsCount={feedPreview.postsCount}
+                loading={feedPreview.loading}
+              />
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
 
@@ -703,6 +752,37 @@ export default function CalendarioPage() {
             )}
           </>
         )}
+      </div>
+
+      {/* ── Mobile: phone mockup (collapsible) ──────────────────────────── */}
+      <div className="md:hidden">
+        <button
+          onClick={() => setShowPhoneMock((v) => !v)}
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-bg-card border border-border text-text-secondary text-xs font-medium hover:border-[#4ecdc4]/30 transition-colors"
+        >
+          <Smartphone size={14} />
+          {showPhoneMock ? "Ocultar preview do feed" : "Ver preview do feed"}
+        </button>
+        <AnimatePresence>
+          {showPhoneMock && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3 }}
+              className="overflow-hidden flex justify-center pt-4"
+            >
+              <PhoneMockup
+                feedPosts={feedPreview.feedPosts}
+                profilePic={feedPreview.profilePic}
+                username={feedPreview.username}
+                followersCount={feedPreview.followersCount}
+                postsCount={feedPreview.postsCount}
+                loading={feedPreview.loading}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* ── summary stats ───────────────────────────────────────────────── */}
