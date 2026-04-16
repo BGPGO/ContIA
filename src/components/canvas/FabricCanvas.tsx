@@ -77,6 +77,8 @@ export interface FabricCanvasRef {
   applyStyleToSelection: (style: Record<string, any>) => void;
   getSelectionStyle: () => Record<string, any> | null;
   isEditingText: () => boolean;
+  addImageFrame: (options?: { width?: number; height?: number; rx?: number; ry?: number }) => void;
+  fillImageFrame: (frameId: string, imageUrl: string) => Promise<void>;
 }
 
 export interface FabricCanvasProps {
@@ -161,6 +163,7 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
     const guidelinesRef = useRef<any[]>([]);
     const clipboardRef = useRef<any>(null);
     const [scale, setScale] = useState(1);
+    const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
     const [ready, setReady] = useState(false);
     const [isDragOver, setIsDragOver] = useState(false);
 
@@ -416,11 +419,67 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
         const reader = new FileReader();
         reader.onload = (ev) => {
           const dataUrl = ev.target?.result as string;
+
+          // Check if drop target overlaps with an image-frame
+          const canvas = fabricRef.current;
+          if (canvas && containerRef.current) {
+            const containerRect = containerRef.current.getBoundingClientRect();
+            // Convert mouse coords to canvas coords
+            const mouseX = (e.clientX - containerRect.left) / scale;
+            const mouseY = (e.clientY - containerRect.top) / scale;
+
+            const frameObj = canvas.getObjects().find((obj: any) => {
+              if (obj.data?.role !== 'image-frame') return false;
+              const left = obj.left || 0;
+              const top = obj.top || 0;
+              const w = obj.getScaledWidth?.() || obj.width || 0;
+              const h = obj.getScaledHeight?.() || obj.height || 0;
+              return mouseX >= left && mouseX <= left + w && mouseY >= top && mouseY <= top + h;
+            });
+
+            if (frameObj && frameObj.data?.id) {
+              // Auto-fill the image frame
+              import("fabric").then(async ({ FabricImage, Rect }) => {
+                const fw = frameObj.data?.frameWidth || frameObj.width || 400;
+                const fh = frameObj.data?.frameHeight || frameObj.height || 400;
+                const rx = frameObj.data?.frameRx || 20;
+                const ry = frameObj.data?.frameRy || 20;
+
+                const img = await FabricImage.fromURL(dataUrl, { crossOrigin: 'anonymous' });
+                const scX = fw / (img.width || 1);
+                const scY = fh / (img.height || 1);
+                const coverScale = Math.max(scX, scY);
+
+                img.set({
+                  scaleX: coverScale,
+                  scaleY: coverScale,
+                  left: frameObj.left,
+                  top: frameObj.top,
+                  clipPath: new Rect({
+                    width: fw,
+                    height: fh,
+                    rx,
+                    ry,
+                    absolutePositioned: false,
+                  }),
+                  data: { id: crypto.randomUUID(), role: 'framed-image' },
+                });
+
+                canvas.remove(frameObj);
+                canvas.add(img);
+                canvas.setActiveObject(img);
+                canvas.renderAll();
+                saveHistory();
+              });
+              return;
+            }
+          }
+
           addImageFromDataUrl(dataUrl);
         };
         reader.readAsDataURL(imageFile);
       }
-    }, [addImageFromDataUrl]);
+    }, [addImageFromDataUrl, scale, saveHistory]);
 
     const handleDragOver = useCallback((e: React.DragEvent) => {
       e.preventDefault();
@@ -503,6 +562,26 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
         // ── Events: text editing ──
         canvasInstance.on("text:editing:entered", () => {
           onTextEditingChange?.(true);
+
+          // Prevent browser from scrolling to Fabric's hidden textarea
+          // Fabric.js creates a <textarea> for text editing that triggers scrollIntoView
+          requestAnimationFrame(() => {
+            const hiddenTextarea = document.querySelector('.upper-canvas')
+              ?.parentElement
+              ?.querySelector('textarea');
+            if (hiddenTextarea) {
+              hiddenTextarea.scrollIntoView = () => {};
+              hiddenTextarea.style.position = 'fixed';
+              hiddenTextarea.style.top = '0';
+              hiddenTextarea.style.left = '0';
+            }
+            const editorRoot = document.querySelector('[data-editor-root]');
+            if (editorRoot) {
+              editorRoot.scrollTop = 0;
+              editorRoot.scrollLeft = 0;
+            }
+            window.scrollTo(0, 0);
+          });
         });
         canvasInstance.on("text:editing:exited", () => {
           onTextEditingChange?.(false);
@@ -538,6 +617,25 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
           saveHistory();
         }
 
+        // ── Observe for hidden textareas and neutralize scrollIntoView ──
+        if (canvasElRef.current?.parentElement) {
+          const textareaObserver = new MutationObserver((mutations) => {
+            for (const m of mutations) {
+              for (const node of Array.from(m.addedNodes)) {
+                if (node instanceof HTMLTextAreaElement) {
+                  node.scrollIntoView = () => {};
+                  node.style.position = 'fixed';
+                  node.style.top = '0';
+                  node.style.left = '0';
+                }
+              }
+            }
+          });
+          textareaObserver.observe(canvasElRef.current.parentElement, { childList: true, subtree: true });
+          // Store for cleanup
+          (canvasInstance as any).__textareaObserver = textareaObserver;
+        }
+
         // ── Compute initial scale ──
         const s = computeScale();
         setScale(s);
@@ -548,6 +646,7 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
       return () => {
         cancelled = true;
         if (canvasInstance) {
+          (canvasInstance as any).__textareaObserver?.disconnect();
           canvasInstance.dispose();
           fabricRef.current = null;
         }
@@ -603,29 +702,48 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
       };
     }, []);
 
-    // ── Ctrl+Scroll zoom on canvas ──
+    // ── Wheel handler: Ctrl+scroll = zoom to mouse, plain scroll = pan ──
     useEffect(() => {
       const container = containerRef.current;
       if (!container) return;
 
       const handleWheel = (e: WheelEvent) => {
-        // Only zoom with Ctrl/Cmd held
-        if (!e.ctrlKey && !e.metaKey) return;
-
         e.preventDefault();
         e.stopPropagation();
 
-        const delta = e.deltaY > 0 ? -0.05 : 0.05;
-        setScale((prev) => {
-          const next = prev + delta;
-          // Clamp between 0.1x and 3x
-          return Math.min(3, Math.max(0.1, next));
-        });
+        if (e.ctrlKey || e.metaKey) {
+          // ZOOM toward mouse position
+          const rect = container.getBoundingClientRect();
+          const mouseX = e.clientX - rect.left;
+          const mouseY = e.clientY - rect.top;
+
+          // Mouse position as fraction of container
+          const fx = mouseX / rect.width;
+          const fy = mouseY / rect.height;
+
+          const delta = e.deltaY > 0 ? -0.05 : 0.05;
+
+          setScale((prev) => {
+            const next = Math.min(3, Math.max(0.1, prev + delta));
+            const scaleDiff = next - prev;
+            setPanOffset((p) => ({
+              x: p.x - (fx - 0.5) * dims.w * scaleDiff,
+              y: p.y - (fy - 0.5) * dims.h * scaleDiff,
+            }));
+            return next;
+          });
+        } else {
+          // PAN (scroll when zoomed)
+          setPanOffset((prev) => ({
+            x: prev.x - e.deltaX,
+            y: prev.y - e.deltaY,
+          }));
+        }
       };
 
       container.addEventListener("wheel", handleWheel, { passive: false });
       return () => container.removeEventListener("wheel", handleWheel);
-    }, []);
+    }, [dims.w, dims.h]);
 
     // ── Keyboard shortcuts ──
     useEffect(() => {
@@ -1008,6 +1126,7 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
 
         zoomToFit: () => {
           setScale(computeScale());
+          setPanOffset({ x: 0, y: 0 });
         },
 
         getCanvas: () => fabricRef.current,
@@ -1205,6 +1324,107 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
           if (!obj || typeof (obj as any).setSelectionStyles !== 'function') return false;
           return !!(obj as any).isEditing;
         },
+
+        // ── Add image frame (clip mask / mockup frame) ──
+        addImageFrame: (options?: { width?: number; height?: number; rx?: number; ry?: number }) => {
+          import("fabric").then(({ Rect, IText, Group }) => {
+            const canvas = fabricRef.current;
+            if (!canvas) return;
+
+            const w = options?.width || 400;
+            const h = options?.height || 400;
+            const rx = options?.rx || 20;
+            const ry = options?.ry || 20;
+
+            const frame = new Rect({
+              width: w,
+              height: h,
+              rx,
+              ry,
+              fill: '#1a1e42',
+              stroke: '#4ecdc4',
+              strokeWidth: 2,
+              strokeDashArray: [8, 4],
+            });
+
+            const label = new IText('Arraste uma imagem aqui', {
+              fontSize: 16,
+              fill: '#5e6388',
+              fontFamily: 'Plus Jakarta Sans',
+              textAlign: 'center',
+              originX: 'center',
+              originY: 'center',
+              left: w / 2,
+              top: h / 2,
+              selectable: false,
+              evented: false,
+            });
+
+            const group = new Group([frame, label], {
+              left: (canvas.width! - w) / 2,
+              top: (canvas.height! - h) / 2,
+            } as any);
+            (group as any).data = {
+              id: crypto.randomUUID(),
+              role: 'image-frame',
+              frameWidth: w,
+              frameHeight: h,
+              frameRx: rx,
+              frameRy: ry,
+            };
+
+            canvas.add(group);
+            canvas.setActiveObject(group);
+            canvas.renderAll();
+            saveHistory();
+          });
+        },
+
+        // ── Fill image frame with image (clip mask) ──
+        fillImageFrame: async (frameId: string, imageUrl: string) => {
+          const canvas = fabricRef.current;
+          if (!canvas) return;
+
+          const frame = canvas.getObjects().find(
+            (obj: any) => obj.data?.id === frameId && obj.data?.role === 'image-frame'
+          );
+          if (!frame) return;
+
+          const fw = (frame as any).data?.frameWidth || (frame as any).width || 400;
+          const fh = (frame as any).data?.frameHeight || (frame as any).height || 400;
+          const rx = (frame as any).data?.frameRx || 20;
+          const ry = (frame as any).data?.frameRy || 20;
+
+          const { FabricImage, Rect } = await import("fabric");
+
+          const img = await FabricImage.fromURL(imageUrl, { crossOrigin: 'anonymous' });
+
+          // Scale image to cover the frame
+          const scaleX = fw / (img.width || 1);
+          const scaleY = fh / (img.height || 1);
+          const coverScale = Math.max(scaleX, scaleY);
+
+          img.set({
+            scaleX: coverScale,
+            scaleY: coverScale,
+            left: frame.left,
+            top: frame.top,
+            clipPath: new Rect({
+              width: fw,
+              height: fh,
+              rx,
+              ry,
+              absolutePositioned: false,
+            }),
+            data: { id: crypto.randomUUID(), role: 'framed-image' },
+          });
+
+          canvas.remove(frame);
+          canvas.add(img);
+          canvas.setActiveObject(img);
+          canvas.renderAll();
+          saveHistory();
+        },
       }),
       [dims.w, dims.h, undoAction, redoAction, saveHistory, emitSelection, computeScale, onCanvasChange, addImageFromDataUrl, onTextSelectionChange]
     );
@@ -1250,6 +1470,7 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
           style={{
             width: dims.w * scale,
             height: dims.h * scale,
+            transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
           }}
         >
           {/* Canvas wrapper with CSS scale */}

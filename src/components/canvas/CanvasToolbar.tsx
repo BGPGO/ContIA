@@ -788,6 +788,16 @@ export function CanvasToolbar({
           <span>Imagem</span>
         </button>
 
+        <button
+          type="button"
+          onClick={() => canvasRef.current?.addImageFrame()}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#141736] border border-white/10 text-xs text-[#e8eaff] hover:bg-white/10 hover:border-[#4ecdc4]/30 transition-all cursor-pointer"
+          title="Adicionar frame de imagem"
+        >
+          <ImagePlus size={13} className="text-[#f59e0b]" />
+          <span>Frame</span>
+        </button>
+
         <ToolbarSeparator />
 
         {/* Aspect ratio toggle */}
