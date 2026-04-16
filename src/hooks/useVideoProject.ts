@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import { createClient } from "@/lib/supabase/client";
 import type {
   VideoProject,
   VideoProjectStatus,
@@ -9,6 +10,59 @@ import type {
   VideoAnalysis,
   TranscriptionSegment,
 } from "@/types/video";
+
+/* ── DB persistence helpers ── */
+
+async function persistProject(proj: VideoProject): Promise<void> {
+  try {
+    const supabase = createClient();
+    const { error } = await supabase.from("video_projects").upsert({
+      id: proj.id,
+      empresa_id: proj.empresaId,
+      title: proj.title,
+      status: proj.status,
+      transcription: proj.transcription,
+      cut_suggestions: proj.cuts,
+      edits: proj.edits,
+      gemini_analysis: proj.analysis ?? {},
+      duration_seconds: proj.duration,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) console.warn("[useVideoProject] upsert error:", error.message);
+  } catch (err) {
+    console.warn("[useVideoProject] persist failed:", err);
+  }
+}
+
+async function updateProjectEdits(
+  id: string,
+  edits: VideoEdit[]
+): Promise<void> {
+  try {
+    const supabase = createClient();
+    await supabase
+      .from("video_projects")
+      .update({ edits, updated_at: new Date().toISOString() })
+      .eq("id", id);
+  } catch (err) {
+    console.warn("[useVideoProject] updateEdits failed:", err);
+  }
+}
+
+async function updateProjectCuts(
+  id: string,
+  cuts: VideoCut[]
+): Promise<void> {
+  try {
+    const supabase = createClient();
+    await supabase
+      .from("video_projects")
+      .update({ cut_suggestions: cuts, updated_at: new Date().toISOString() })
+      .eq("id", id);
+  } catch (err) {
+    console.warn("[useVideoProject] updateCuts failed:", err);
+  }
+}
 
 function generateId() {
   return Math.random().toString(36).substring(2, 15);
@@ -216,6 +270,9 @@ export function useVideoProject() {
 
         setProject(updated);
         setStatus("analyzed");
+
+        // Persist to DB (fire-and-forget)
+        void persistProject(updated);
       } catch (err) {
         console.error("Processing error:", err);
         setError(err instanceof Error ? err.message : "Erro ao processar vídeo");
@@ -268,13 +325,15 @@ export function useVideoProject() {
   const acceptCut = useCallback(
     (cut: VideoCut) => {
       if (!project) return;
+      const updatedCuts = project.cuts.map((c) =>
+        c.id === cut.id ? { ...c, accepted: true } : c
+      );
       setProject({
         ...project,
-        cuts: project.cuts.map((c) =>
-          c.id === cut.id ? { ...c, accepted: true } : c
-        ),
+        cuts: updatedCuts,
         updatedAt: new Date().toISOString(),
       });
+      void updateProjectCuts(project.id, updatedCuts);
     },
     [project]
   );
@@ -331,6 +390,54 @@ export function useVideoProject() {
     processingRef.current = false;
   }, [project]);
 
+  /**
+   * Load a project from DB history (no re-processing needed).
+   * videoUrl will be empty — the video file is not kept locally.
+   */
+  const loadFromHistory = useCallback(
+    (item: {
+      id: string;
+      title: string;
+      status: string;
+      duration_seconds: number | null;
+      cut_suggestions: unknown;
+      transcription: unknown;
+      edits: unknown;
+      gemini_analysis: unknown;
+      created_at: string;
+      updated_at: string;
+    }) => {
+      const restored: VideoProject = {
+        id: item.id,
+        empresaId: "",
+        title: item.title,
+        videoUrl: "",
+        originalFileName: item.title,
+        duration: item.duration_seconds ?? 0,
+        transcription: Array.isArray(item.transcription)
+          ? (item.transcription as TranscriptionSegment[])
+          : [],
+        aiSummary: "",
+        cuts: Array.isArray(item.cut_suggestions)
+          ? (item.cut_suggestions as VideoCut[])
+          : [],
+        edits: Array.isArray(item.edits)
+          ? (item.edits as VideoEdit[])
+          : [
+              { type: "subtitle", enabled: true, config: {} },
+              { type: "logo", enabled: false, config: { position: "bottom-right" } },
+            ],
+        analysis: item.gemini_analysis as VideoAnalysis | null,
+        status: "analyzed",
+        createdAt: item.created_at,
+        updatedAt: item.updated_at,
+      };
+      setProject(restored);
+      setStatus("analyzed");
+    },
+    []
+  );
+
   return {
     project,
     status,
@@ -348,6 +455,7 @@ export function useVideoProject() {
     adjustCut,
     toggleEdit,
     reset,
+    loadFromHistory,
   };
 }
 

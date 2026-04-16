@@ -1,169 +1,621 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Layers, Image, Type, Loader2 } from "lucide-react";
-import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Plus,
+  Loader2,
+  Layout,
+  Trash2,
+  Pencil,
+  Copy,
+  Search,
+  Upload,
+  Image as ImageIcon,
+  Layers,
+  X,
+  Check,
+} from "lucide-react";
+import { useEmpresa } from "@/hooks/useEmpresa";
+import { useVisualTemplates } from "@/hooks/useVisualTemplates";
+import type { VisualTemplateSummary } from "@/types/canvas";
 
-interface Template {
+/* ═══════════════════════════════════════════════════════════════════════════
+   Brand Asset type (mirrors API response)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+interface BrandAsset {
   id: string;
+  empresa_id: string;
   name: string;
-  format: "feed" | "story" | "carousel";
-  slides: number;
-  thumbnail: string;
-  fonts: string[];
-  colors: string[];
+  type: "logo" | "font" | "element" | "texture" | "photo";
+  file_url: string;
+  file_name: string | null;
+  file_size: number | null;
+  mime_type: string | null;
+  tags: string[];
+  created_at: string;
 }
 
-const formatLabel: Record<Template["format"], string> = {
-  carousel: "Carrossel",
-  story: "Story",
-  feed: "Feed",
+const ASSET_TYPE_LABELS: Record<BrandAsset["type"], string> = {
+  logo: "Logo",
+  font: "Fonte",
+  element: "Elemento",
+  texture: "Textura",
+  photo: "Foto",
 };
 
-function FormatIcon({ format }: { format: Template["format"] }) {
-  switch (format) {
-    case "carousel":
-      return <Layers className="w-3.5 h-3.5" />;
-    case "story":
-      return <Image className="w-3.5 h-3.5" />;
-    case "feed":
-      return <Image className="w-3.5 h-3.5" />;
-  }
+const ASSET_TYPE_OPTIONS: BrandAsset["type"][] = [
+  "logo",
+  "photo",
+  "texture",
+  "element",
+  "font",
+];
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Source badge (same style as TemplateGallery)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function SourceBadge({ source }: { source: string }) {
+  const config: Record<string, { label: string; color: string }> = {
+    manual: { label: "Manual", color: "#4ecdc4" },
+    ai_chat: { label: "IA", color: "#6c5ce7" },
+    image_extraction: { label: "Imagem", color: "#f59e0b" },
+    psd: { label: "PSD", color: "#ec4899" },
+    import: { label: "Importado", color: "#3b82f6" },
+    preset: { label: "Preset", color: "#10b981" },
+  };
+  const c = config[source] || config.manual;
+
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium"
+      style={{ backgroundColor: `${c.color}15`, color: c.color }}
+    >
+      {c.label}
+    </span>
+  );
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   Delete confirmation modal
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function ConfirmDeleteModal({
+  name,
+  onConfirm,
+  onCancel,
+}: {
+  name: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onCancel}
+      />
+      <div className="relative bg-[#0c0f24] border border-white/[0.08] rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+        <h3 className="text-base font-semibold text-[#e8eaff] mb-2">
+          Excluir template?
+        </h3>
+        <p className="text-sm text-[#5e6388] mb-5">
+          O template <strong className="text-[#e8eaff]">{name}</strong> sera
+          excluido permanentemente.
+        </p>
+        <div className="flex items-center gap-3 justify-end">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 rounded-lg text-sm font-medium text-[#5e6388] hover:bg-white/5 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors"
+          >
+            Excluir
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Page
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 export default function TemplatesPage() {
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const { empresa } = useEmpresa();
+  const empresaId = empresa?.id;
+
+  const {
+    templates,
+    isLoading: templatesLoading,
+    error: templatesError,
+    deleteTemplate,
+    duplicateTemplate,
+  } = useVisualTemplates(empresaId);
+
+  // ── Brand assets state ──
+  const [assets, setAssets] = useState<BrandAsset[]>([]);
+  const [assetsLoading, setAssetsLoading] = useState(true);
+  const [assetsError, setAssetsError] = useState<string | null>(null);
+
+  // ── Search ──
+  const [search, setSearch] = useState("");
+
+  // ── Delete confirmation ──
+  const [deleteTarget, setDeleteTarget] = useState<VisualTemplateSummary | null>(null);
+
+  // ── Upload state ──
+  const [uploading, setUploading] = useState(false);
+  const [uploadType, setUploadType] = useState<BrandAsset["type"]>("photo");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Fetch brand assets ──
+  const fetchAssets = useCallback(async () => {
+    if (!empresaId) {
+      setAssets([]);
+      setAssetsLoading(false);
+      return;
+    }
+    setAssetsLoading(true);
+    setAssetsError(null);
+    try {
+      const res = await fetch(
+        `/api/brand-assets?empresa_id=${encodeURIComponent(empresaId)}`
+      );
+      if (!res.ok) throw new Error("Erro ao carregar assets");
+      const data: BrandAsset[] = await res.json();
+      setAssets(data);
+    } catch (err) {
+      setAssetsError((err as Error).message);
+    } finally {
+      setAssetsLoading(false);
+    }
+  }, [empresaId]);
 
   useEffect(() => {
-    async function fetchTemplates() {
-      try {
-        const res = await fetch("/api/psd-templates");
-        if (!res.ok) throw new Error("Erro ao carregar templates");
-        const data = await res.json();
-        setTemplates(data);
-      } catch (err: any) {
-        setError(err.message || "Erro desconhecido");
-      } finally {
-        setLoading(false);
+    fetchAssets();
+  }, [fetchAssets]);
+
+  // ── Filtered templates ──
+  const filteredTemplates = search
+    ? templates.filter((t) =>
+        t.name.toLowerCase().includes(search.toLowerCase())
+      )
+    : templates;
+
+  // ── Filtered assets ──
+  const filteredAssets = search
+    ? assets.filter(
+        (a) =>
+          a.name.toLowerCase().includes(search.toLowerCase()) ||
+          a.type.toLowerCase().includes(search.toLowerCase())
+      )
+    : assets;
+
+  // ── Handlers ──
+  function handleNewTemplate() {
+    router.push("/studio/editor");
+  }
+
+  function handleEditTemplate(id: string) {
+    router.push(`/studio/editor?template=${id}`);
+  }
+
+  async function handleDeleteTemplate() {
+    if (!deleteTarget) return;
+    try {
+      await deleteTemplate(deleteTarget.id);
+    } catch {
+      // error handled by hook
+    }
+    setDeleteTarget(null);
+  }
+
+  async function handleDuplicate(id: string) {
+    try {
+      await duplicateTemplate(id);
+    } catch {
+      // error handled by hook
+    }
+  }
+
+  async function handleUploadFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !empresaId) return;
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("empresa_id", empresaId);
+      formData.append("type", uploadType);
+      formData.append("name", file.name.replace(/\.[^/.]+$/, ""));
+
+      const res = await fetch("/api/brand-assets", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: "Erro no upload" }));
+        throw new Error(body.error || "Erro no upload");
+      }
+
+      // Refresh assets list
+      await fetchAssets();
+    } catch (err) {
+      setAssetsError((err as Error).message);
+    } finally {
+      setUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
       }
     }
-    fetchTemplates();
-  }, []);
+  }
+
+  // ── No empresa selected ──
+  if (!empresaId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Layout size={40} className="mx-auto text-[#5e6388] opacity-40 mb-3" />
+          <p className="text-[#5e6388]">
+            Selecione uma empresa para ver os templates.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen p-6 md:p-8 lg:p-10">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl md:text-3xl font-bold text-text-primary mb-2">
-          Templates da Marca
-        </h1>
-        <p className="text-text-secondary text-sm md:text-base max-w-2xl">
-          Templates extraídos dos PSDs da marca. Edite os textos e gere posts
-          novos mantendo a identidade visual.
-        </p>
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-[#e8eaff] mb-1">
+            Templates & Assets
+          </h1>
+          <p className="text-sm text-[#5e6388]">
+            Gerencie seus templates visuais e assets da marca
+          </p>
+        </div>
+
+        <button
+          onClick={handleNewTemplate}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-[#6c5ce7] to-[#4ecdc4] text-white hover:opacity-90 transition-opacity shadow-lg shadow-[#6c5ce7]/20"
+        >
+          <Plus size={18} />
+          Novo Template
+        </button>
       </div>
 
-      {/* Loading */}
-      {loading && (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-6 h-6 text-accent animate-spin" />
-          <span className="ml-3 text-text-secondary">
-            Carregando templates...
-          </span>
-        </div>
-      )}
+      {/* ── Search bar ── */}
+      <div className="relative mb-8 max-w-md">
+        <Search
+          size={16}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5e6388]"
+        />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar templates e assets..."
+          className="w-full pl-9 pr-4 py-2.5 bg-[#141736] border border-white/[0.06] rounded-xl text-sm text-[#e8eaff] placeholder:text-[#5e6388] focus:outline-none focus:border-[#4ecdc4]/40 transition-colors"
+        />
+        {search && (
+          <button
+            onClick={() => setSearch("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#5e6388] hover:text-[#e8eaff]"
+          >
+            <X size={14} />
+          </button>
+        )}
+      </div>
 
-      {/* Error */}
-      {error && !loading && (
-        <div className="rounded-xl border border-danger/30 bg-danger/10 p-6 text-center">
-          <p className="text-danger">{error}</p>
-        </div>
-      )}
+      {/* ══════════════════════════════════════════════════════════════════════
+         Section: Templates Salvos
+         ══════════════════════════════════════════════════════════════════════ */}
+      <section className="mb-12">
+        <h2 className="text-xs font-semibold text-[#5e6388] uppercase tracking-wider mb-4 flex items-center gap-2">
+          <Layers size={14} />
+          Templates Salvos
+          {!templatesLoading && (
+            <span className="text-[#5e6388]/60">({filteredTemplates.length})</span>
+          )}
+        </h2>
 
-      {/* Empty state */}
-      {!loading && !error && templates.length === 0 && (
-        <div className="rounded-xl border border-border bg-bg-card p-12 text-center">
-          <Layers className="w-10 h-10 text-text-muted mx-auto mb-3" />
-          <p className="text-text-secondary">Nenhum template encontrado.</p>
-        </div>
-      )}
+        {/* Loading */}
+        {templatesLoading && (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="w-5 h-5 text-[#4ecdc4] animate-spin" />
+            <span className="ml-3 text-sm text-[#5e6388]">
+              Carregando templates...
+            </span>
+          </div>
+        )}
 
-      {/* Grid */}
-      {!loading && !error && templates.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {templates.map((tpl) => (
-            <div
-              key={tpl.id}
-              className={cn(
-                "group rounded-xl border border-border bg-bg-card",
-                "hover:border-accent/40 hover:bg-bg-card-hover",
-                "transition-all duration-200 overflow-hidden"
-              )}
+        {/* Error */}
+        {templatesError && !templatesLoading && (
+          <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 mb-4">
+            <p className="text-sm text-red-400">{templatesError}</p>
+          </div>
+        )}
+
+        {/* Grid */}
+        {!templatesLoading && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {/* "+ Novo" card */}
+            <button
+              onClick={handleNewTemplate}
+              className="group flex flex-col items-center justify-center aspect-square rounded-xl border-2 border-dashed border-white/[0.1] hover:border-[#4ecdc4]/40 bg-[#141736]/50 hover:bg-[#141736] transition-all duration-200"
             >
-              {/* Thumbnail */}
-              <div className="relative bg-bg-primary overflow-hidden" style={{ aspectRatio: tpl.format === 'story' ? '9/16' : '4/5' }}>
-                <img
-                  src={tpl.thumbnail}
-                  alt={tpl.name}
-                  className="w-full h-full object-contain group-hover:scale-[1.02] transition-transform duration-300"
-                />
-                {/* Format badge */}
-                <span
-                  className={cn(
-                    "absolute top-3 right-3 inline-flex items-center gap-1.5",
-                    "px-2.5 py-1 rounded-full text-xs font-medium",
-                    "bg-accent/20 text-accent backdrop-blur-sm"
-                  )}
-                >
-                  <FormatIcon format={tpl.format} />
-                  {formatLabel[tpl.format]}
-                  {tpl.format === "carousel" && ` ${tpl.slides} slides`}
-                </span>
+              <div className="w-12 h-12 rounded-xl bg-[#4ecdc4]/10 group-hover:bg-[#4ecdc4]/20 flex items-center justify-center mb-2 transition-colors">
+                <Plus size={24} className="text-[#4ecdc4]" />
               </div>
+              <span className="text-xs font-medium text-[#5e6388] group-hover:text-[#4ecdc4] transition-colors">
+                Novo Template
+              </span>
+            </button>
 
-              {/* Info */}
-              <div className="p-4">
-                <h3 className="text-text-primary font-semibold text-sm mb-3 truncate">
-                  {tpl.name}
-                </h3>
-
-                {/* Font pills */}
-                {tpl.fonts.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mb-4">
-                    {tpl.fonts.map((font) => (
-                      <span
-                        key={font}
-                        className={cn(
-                          "inline-flex items-center gap-1 px-2 py-0.5",
-                          "rounded-md text-[11px] font-medium",
-                          "bg-secondary/15 text-secondary-light"
-                        )}
-                      >
-                        <Type className="w-3 h-3" />
-                        {font}
-                      </span>
-                    ))}
+            {/* Template cards */}
+            {filteredTemplates.map((tpl) => (
+              <div
+                key={tpl.id}
+                className="group relative bg-[#141736] rounded-xl overflow-hidden border border-white/[0.04] hover:border-[#4ecdc4]/30 transition-all duration-200"
+              >
+                {/* Thumbnail */}
+                <button
+                  onClick={() => handleEditTemplate(tpl.id)}
+                  className="w-full"
+                >
+                  <div className="aspect-square bg-[#080b1e] flex items-center justify-center overflow-hidden">
+                    {tpl.thumbnail_url ? (
+                      <img
+                        src={tpl.thumbnail_url}
+                        alt={tpl.name}
+                        className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+                      />
+                    ) : (
+                      <Layout
+                        size={28}
+                        className="text-[#5e6388] opacity-30"
+                      />
+                    )}
                   </div>
-                )}
+                </button>
 
-                {/* Edit button */}
-                <Link
-                  href={`/templates/${tpl.id}`}
-                  className={cn(
-                    "block w-full text-center py-2 rounded-lg text-sm font-medium",
-                    "bg-accent/15 text-accent",
-                    "hover:bg-accent/25 transition-colors duration-150"
-                  )}
-                >
-                  Editar
-                </Link>
+                {/* Info */}
+                <div className="p-3 space-y-1.5">
+                  <p className="text-[12px] font-semibold text-[#e8eaff] truncate">
+                    {tpl.name}
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <SourceBadge source={tpl.source} />
+                    <span className="text-[10px] text-[#5e6388]">
+                      {tpl.aspect_ratio}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Hover actions */}
+                <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEditTemplate(tpl.id);
+                    }}
+                    className="w-7 h-7 rounded-md bg-black/60 backdrop-blur-sm flex items-center justify-center hover:bg-black/80 transition-colors"
+                    title="Editar"
+                  >
+                    <Pencil size={13} className="text-[#e8eaff]" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDuplicate(tpl.id);
+                    }}
+                    className="w-7 h-7 rounded-md bg-black/60 backdrop-blur-sm flex items-center justify-center hover:bg-black/80 transition-colors"
+                    title="Duplicar"
+                  >
+                    <Copy size={13} className="text-[#e8eaff]" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteTarget(tpl);
+                    }}
+                    className="w-7 h-7 rounded-md bg-black/60 backdrop-blur-sm flex items-center justify-center hover:bg-red-900/60 transition-colors"
+                    title="Excluir"
+                  >
+                    <Trash2 size={13} className="text-red-400" />
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+
+            {/* Empty state (no templates at all) */}
+            {filteredTemplates.length === 0 && !search && (
+              <div className="col-span-full border border-dashed border-white/[0.06] rounded-xl p-10 text-center">
+                <Layout
+                  size={32}
+                  className="mx-auto text-[#5e6388] opacity-30 mb-3"
+                />
+                <p className="text-sm text-[#5e6388]">
+                  Nenhum template salvo ainda
+                </p>
+                <p className="text-xs text-[#5e6388]/60 mt-1">
+                  Crie um design no editor e salve como template
+                </p>
+              </div>
+            )}
+
+            {/* No search results */}
+            {filteredTemplates.length === 0 && search && (
+              <div className="col-span-full py-8 text-center">
+                <p className="text-sm text-[#5e6388]">
+                  Nenhum template encontrado para &quot;{search}&quot;
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+         Section: Brand Assets
+         ══════════════════════════════════════════════════════════════════════ */}
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xs font-semibold text-[#5e6388] uppercase tracking-wider flex items-center gap-2">
+            <ImageIcon size={14} />
+            Brand Assets (Logos, Fotos, Texturas)
+            {!assetsLoading && (
+              <span className="text-[#5e6388]/60">({filteredAssets.length})</span>
+            )}
+          </h2>
+
+          {/* Upload controls */}
+          <div className="flex items-center gap-2">
+            <select
+              value={uploadType}
+              onChange={(e) =>
+                setUploadType(e.target.value as BrandAsset["type"])
+              }
+              className="px-2 py-1.5 rounded-lg text-xs bg-[#141736] border border-white/[0.06] text-[#e8eaff] focus:outline-none focus:border-[#4ecdc4]/40"
+            >
+              {ASSET_TYPE_OPTIONS.map((t) => (
+                <option key={t} value={t}>
+                  {ASSET_TYPE_LABELS[t]}
+                </option>
+              ))}
+            </select>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleUploadFile}
+              className="hidden"
+            />
+
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#4ecdc4]/10 text-[#4ecdc4] hover:bg-[#4ecdc4]/20 transition-colors disabled:opacity-50"
+            >
+              {uploading ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : (
+                <Upload size={13} />
+              )}
+              Upload
+            </button>
+          </div>
         </div>
+
+        {/* Assets loading */}
+        {assetsLoading && (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-5 h-5 text-[#4ecdc4] animate-spin" />
+            <span className="ml-3 text-sm text-[#5e6388]">
+              Carregando assets...
+            </span>
+          </div>
+        )}
+
+        {/* Assets error */}
+        {assetsError && !assetsLoading && (
+          <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 mb-4">
+            <p className="text-sm text-red-400">{assetsError}</p>
+          </div>
+        )}
+
+        {/* Assets grid */}
+        {!assetsLoading && (
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+            {filteredAssets.map((asset) => (
+              <div
+                key={asset.id}
+                className="group relative bg-[#141736] rounded-xl overflow-hidden border border-white/[0.04] hover:border-white/[0.1] transition-all duration-200"
+              >
+                {/* Image */}
+                <div className="aspect-square bg-[#080b1e] flex items-center justify-center overflow-hidden">
+                  {asset.mime_type?.startsWith("image/") ? (
+                    <img
+                      src={asset.file_url}
+                      alt={asset.name}
+                      className="w-full h-full object-contain p-1"
+                    />
+                  ) : (
+                    <ImageIcon
+                      size={24}
+                      className="text-[#5e6388] opacity-30"
+                    />
+                  )}
+                </div>
+
+                {/* Info */}
+                <div className="p-2">
+                  <p className="text-[10px] font-medium text-[#e8eaff] truncate">
+                    {asset.name}
+                  </p>
+                  <span
+                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium mt-1"
+                    style={{
+                      backgroundColor: "rgba(78,205,196,0.1)",
+                      color: "#4ecdc4",
+                    }}
+                  >
+                    {ASSET_TYPE_LABELS[asset.type]}
+                  </span>
+                </div>
+              </div>
+            ))}
+
+            {/* Empty state */}
+            {filteredAssets.length === 0 && !search && (
+              <div className="col-span-full border border-dashed border-white/[0.06] rounded-xl p-8 text-center">
+                <ImageIcon
+                  size={28}
+                  className="mx-auto text-[#5e6388] opacity-30 mb-2"
+                />
+                <p className="text-sm text-[#5e6388]">
+                  Nenhum asset da marca
+                </p>
+                <p className="text-xs text-[#5e6388]/60 mt-1">
+                  Faca upload de logos, fotos e texturas
+                </p>
+              </div>
+            )}
+
+            {/* No search results */}
+            {filteredAssets.length === 0 && search && (
+              <div className="col-span-full py-6 text-center">
+                <p className="text-sm text-[#5e6388]">
+                  Nenhum asset encontrado para &quot;{search}&quot;
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* ── Delete confirmation modal ── */}
+      {deleteTarget && (
+        <ConfirmDeleteModal
+          name={deleteTarget.name}
+          onConfirm={handleDeleteTemplate}
+          onCancel={() => setDeleteTarget(null)}
+        />
       )}
     </div>
   );

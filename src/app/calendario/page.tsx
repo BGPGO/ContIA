@@ -700,7 +700,7 @@ export default function CalendarioPage() {
               animate={{ opacity: 1, x: 0, width: "auto" }}
               exit={{ opacity: 0, x: 40, width: 0 }}
               transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-              className="shrink-0 flex items-start justify-center pt-4 overflow-hidden"
+              className="shrink-0 min-w-[400px] flex items-start justify-center pt-4 overflow-hidden"
             >
               <PhoneMockup
                 feedPosts={feedPreview.feedPosts}

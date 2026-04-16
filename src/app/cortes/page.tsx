@@ -15,9 +15,13 @@ import {
   MessageSquare,
   FileText,
   Palette,
+  Film,
+  Trash2,
+  Clock,
 } from "lucide-react";
 import { useEmpresa } from "@/hooks/useEmpresa";
 import { useVideoProject } from "@/hooks/useVideoProject";
+import { useVideoHistory } from "@/hooks/useVideoHistory";
 import { VideoPlayer } from "@/components/video/VideoPlayer";
 import { ChatPanel } from "@/components/video/ChatPanel";
 import { CutsPanel } from "@/components/video/CutsPanel";
@@ -52,7 +56,15 @@ export default function CortesPage() {
     adjustCut,
     toggleEdit,
     reset,
+    loadFromHistory,
   } = useVideoProject();
+
+  const {
+    projects: historyProjects,
+    loading: historyLoading,
+    refetch: refetchHistory,
+    deleteProject: deleteHistoryProject,
+  } = useVideoHistory(empresa?.id);
 
   const [urlInput, setUrlInput] = useState("");
   const [dragActive, setDragActive] = useState(false);
@@ -163,6 +175,87 @@ export default function CortesPage() {
             transition={{ duration: 0.4 }}
             className="max-w-2xl mx-auto space-y-8"
           >
+            {/* ── History section ── */}
+            {(historyLoading || historyProjects.length > 0) && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-px bg-border" />
+                  <span className="flex items-center gap-1.5 text-xs text-text-muted font-medium uppercase tracking-wide">
+                    <Clock className="w-3.5 h-3.5" />
+                    Projetos Anteriores
+                  </span>
+                  <div className="flex-1 h-px bg-border" />
+                </div>
+
+                {historyLoading ? (
+                  <div className="space-y-2 animate-pulse">
+                    {[1, 2, 3].map((i) => (
+                      <div
+                        key={i}
+                        className="h-14 rounded-xl bg-bg-card border border-border"
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {historyProjects.map((item) => {
+                      const cutCount = Array.isArray(item.cut_suggestions)
+                        ? item.cut_suggestions.length
+                        : 0;
+                      const dateStr = new Date(item.created_at).toLocaleDateString(
+                        "pt-BR",
+                        { day: "2-digit", month: "2-digit" }
+                      );
+                      return (
+                        <motion.div
+                          key={item.id}
+                          initial={{ opacity: 0, x: -8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          className="flex items-center gap-3 bg-bg-card border border-border rounded-xl px-4 py-3 group hover:border-secondary/40 transition-all cursor-pointer"
+                          onClick={() => loadFromHistory(item)}
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-secondary/10 border border-secondary/20 flex items-center justify-center shrink-0">
+                            <Film className="w-4 h-4 text-secondary-light" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-text-primary truncate">
+                              {item.title}
+                            </p>
+                            <p className="text-[11px] text-text-muted">
+                              {cutCount} {cutCount === 1 ? "corte" : "cortes"} sugeridos
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <span className="text-[11px] text-text-muted tabular-nums">
+                              {dateStr}
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void deleteHistoryProject(item.id);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 p-1 rounded text-text-muted hover:text-danger hover:bg-danger/10 transition-all"
+                              title="Remover do histórico"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-px bg-border" />
+                  <span className="text-xs text-text-muted font-medium uppercase tracking-wide">
+                    Novo Video
+                  </span>
+                  <div className="flex-1 h-px bg-border" />
+                </div>
+              </div>
+            )}
+
             {/* Header */}
             <div className="text-center space-y-2">
               <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-secondary/10 border border-secondary/20 mb-4">
@@ -372,7 +465,7 @@ export default function CortesPage() {
             {/* Top bar */}
             <div className="flex items-center gap-3">
               <button
-                onClick={reset}
+                onClick={() => { reset(); refetchHistory(); }}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-card border border-border text-xs text-text-secondary hover:text-text-primary hover:border-border-light transition-all"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />

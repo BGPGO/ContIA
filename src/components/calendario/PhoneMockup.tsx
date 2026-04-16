@@ -75,9 +75,9 @@ function FeedCell({ post }: { post: FeedPost }) {
 
       {/* Scheduled overlay */}
       {post.isScheduled && (
-        <div className="absolute inset-0 bg-black/35 flex flex-col items-center justify-center gap-0.5 backdrop-blur-[1px]">
-          <Clock size={12} className="text-white drop-shadow" />
-          <span className="text-[8px] font-medium text-white drop-shadow tracking-wide">
+        <div className="absolute inset-0 bg-black/35 flex flex-col items-center justify-center gap-1 backdrop-blur-[1px]">
+          <Clock size={14} className="text-white drop-shadow" />
+          <span className="text-[10px] font-medium text-white drop-shadow tracking-wide">
             {post.date}
           </span>
         </div>
@@ -85,8 +85,8 @@ function FeedCell({ post }: { post: FeedPost }) {
 
       {/* Hover caption preview */}
       {post.caption && !post.isScheduled && (
-        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-end p-1">
-          <p className="text-[7px] text-white leading-tight line-clamp-3">
+        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-end p-1.5">
+          <p className="text-[9px] text-white leading-tight line-clamp-3">
             {post.caption}
           </p>
         </div>
@@ -123,45 +123,45 @@ export function PhoneMockup({
       </p>
 
       {/* Phone frame */}
-      <div className="relative w-[280px] bg-white rounded-[40px] p-3 shadow-2xl shadow-black/30 border-[3px] border-gray-800">
+      <div className="relative w-[360px] bg-white rounded-[48px] p-3.5 shadow-2xl shadow-black/30 border-[3px] border-gray-800">
         {/* Notch / Dynamic Island */}
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-[90px] h-[24px] bg-gray-900 rounded-full z-10" />
+        <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-[110px] h-[28px] bg-gray-900 rounded-full z-10" />
 
         {/* Screen area */}
-        <div className="mt-7 rounded-[28px] overflow-hidden bg-white border border-gray-100">
+        <div className="mt-8 rounded-[34px] overflow-hidden bg-white border border-gray-100">
           {/* Status bar */}
-          <div className="flex items-center justify-between px-5 py-1.5 bg-white">
-            <span className="text-[10px] font-semibold text-black">{timeStr}</span>
-            <div className="flex items-center gap-1">
-              <Signal size={10} className="text-black" />
-              <Wifi size={10} className="text-black" />
-              <Battery size={10} className="text-black" />
+          <div className="flex items-center justify-between px-6 py-2 bg-white">
+            <span className="text-[11px] font-semibold text-black">{timeStr}</span>
+            <div className="flex items-center gap-1.5">
+              <Signal size={12} className="text-black" />
+              <Wifi size={12} className="text-black" />
+              <Battery size={12} className="text-black" />
             </div>
           </div>
 
           {/* Instagram header */}
-          <div className="px-3 py-1.5 border-b border-gray-100 flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <IgIcon size={14} className="text-black" />
-              <span className="text-[11px] font-bold text-black tracking-tight">
+          <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <IgIcon size={16} className="text-black" />
+              <span className="text-[13px] font-bold text-black tracking-tight">
                 Instagram
               </span>
             </div>
           </div>
 
           {/* Profile section */}
-          <div className="px-3 py-2.5 flex items-center gap-3 border-b border-gray-50">
+          <div className="px-4 py-3 flex items-center gap-4 border-b border-gray-50">
             {/* Avatar */}
             <div className="shrink-0">
               {profilePic ? (
                 <img
                   src={profilePic}
                   alt={username}
-                  className="w-14 h-14 rounded-full border-2 border-gray-200 object-cover"
+                  className="w-[68px] h-[68px] rounded-full border-2 border-gray-200 object-cover"
                 />
               ) : (
-                <div className="w-14 h-14 rounded-full border-2 border-gray-200 bg-gradient-to-br from-purple-400 via-pink-400 to-orange-300 flex items-center justify-center">
-                  <span className="text-white text-lg font-bold">
+                <div className="w-[68px] h-[68px] rounded-full border-2 border-gray-200 bg-gradient-to-br from-purple-400 via-pink-400 to-orange-300 flex items-center justify-center">
+                  <span className="text-white text-xl font-bold">
                     {username.charAt(0).toUpperCase()}
                   </span>
                 </div>
@@ -169,66 +169,66 @@ export function PhoneMockup({
             </div>
 
             {/* Stats */}
-            <div className="flex gap-4 text-center flex-1 justify-center">
+            <div className="flex gap-5 text-center flex-1 justify-center">
               <div className="flex flex-col">
-                <span className="text-[11px] font-bold text-black leading-none">
+                <span className="text-[13px] font-bold text-black leading-none">
                   {postsCount}
                 </span>
-                <span className="text-[9px] text-gray-500 mt-0.5">Posts</span>
+                <span className="text-[10px] text-gray-500 mt-0.5">Posts</span>
               </div>
               <div className="flex flex-col">
-                <span className="text-[11px] font-bold text-black leading-none">
+                <span className="text-[13px] font-bold text-black leading-none">
                   {formatFollowers(followersCount)}
                 </span>
-                <span className="text-[9px] text-gray-500 mt-0.5">Seguidores</span>
+                <span className="text-[10px] text-gray-500 mt-0.5">Seguidores</span>
               </div>
               <div className="flex flex-col">
-                <span className="text-[11px] font-bold text-black leading-none">
+                <span className="text-[13px] font-bold text-black leading-none">
                   -
                 </span>
-                <span className="text-[9px] text-gray-500 mt-0.5">Seguindo</span>
+                <span className="text-[10px] text-gray-500 mt-0.5">Seguindo</span>
               </div>
             </div>
           </div>
 
           {/* Username */}
-          <div className="px-3 py-1.5 border-b border-gray-100">
-            <span className="text-[10px] font-semibold text-black">
+          <div className="px-4 py-2 border-b border-gray-100">
+            <span className="text-[12px] font-semibold text-black">
               @{username}
             </span>
           </div>
 
           {/* Tab bar (grid / reels / tagged) */}
           <div className="flex border-b border-gray-100">
-            <div className="flex-1 py-1.5 border-b-2 border-black flex items-center justify-center">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2">
+            <div className="flex-1 py-2 border-b-2 border-black flex items-center justify-center">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2">
                 <rect x="3" y="3" width="7" height="7" />
                 <rect x="14" y="3" width="7" height="7" />
                 <rect x="3" y="14" width="7" height="7" />
                 <rect x="14" y="14" width="7" height="7" />
               </svg>
             </div>
-            <div className="flex-1 py-1.5 flex items-center justify-center">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2">
+            <div className="flex-1 py-2 flex items-center justify-center">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2">
                 <polygon points="5,3 19,12 5,21" />
               </svg>
             </div>
-            <div className="flex-1 py-1.5 flex items-center justify-center">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2">
+            <div className="flex-1 py-2 flex items-center justify-center">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                 <circle cx="12" cy="7" r="4" />
               </svg>
             </div>
           </div>
 
-          {/* Feed grid */}
-          <div className="grid grid-cols-3 gap-[1px] bg-gray-100 max-h-[280px] overflow-y-auto">
+          {/* Feed grid — 3 cols × 3 rows, cells ~112px each */}
+          <div className="grid grid-cols-3 gap-[1px] bg-gray-100" style={{ minHeight: "340px" }}>
             {loading
               ? Array.from({ length: 9 }).map((_, i) => (
                   <SkeletonCell key={i} />
                 ))
               : feedPosts.length > 0
-              ? feedPosts.map((post) => (
+              ? feedPosts.slice(0, 9).map((post) => (
                   <FeedCell key={post.id} post={post} />
                 ))
               : Array.from({ length: 9 }).map((_, i) => (
@@ -236,14 +236,14 @@ export function PhoneMockup({
                     key={i}
                     className="aspect-square bg-gray-50 flex items-center justify-center"
                   >
-                    <IgIcon size={12} className="text-gray-200" />
+                    <IgIcon size={14} className="text-gray-200" />
                   </div>
                 ))}
           </div>
         </div>
 
         {/* Home indicator */}
-        <div className="mt-2 mx-auto w-[100px] h-[4px] bg-gray-800 rounded-full" />
+        <div className="mt-2.5 mx-auto w-[120px] h-[5px] bg-gray-800 rounded-full" />
       </div>
 
       {/* Legend */}
