@@ -38,9 +38,9 @@ function AppContent({ children, pathname }: { children: React.ReactNode; pathnam
 
   return (
     <>
-      <div className="flex min-h-screen bg-bg-primary">
+      <div className={`flex bg-bg-primary ${isEditorPage ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
         <Sidebar />
-        <main className={`flex-1 bg-bg-primary pt-14 md:pt-0 ${isEditorPage ? 'overflow-hidden' : 'overflow-auto'}`}>
+        <main className={`flex-1 bg-bg-primary pt-14 md:pt-0 ${isEditorPage ? 'h-screen overflow-hidden' : 'overflow-auto'}`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={pathname}

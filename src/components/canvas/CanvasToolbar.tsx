@@ -39,6 +39,9 @@ import {
   Underline,
   Strikethrough,
   Highlighter,
+  Settings2,
+  ArrowUpDown,
+  Space,
 } from "lucide-react";
 import type { SelectionInfo, FabricCanvasRef, TextSelectionInfo } from "./FabricCanvas";
 
@@ -357,6 +360,103 @@ function ShapesDropdown({
                 </button>
               );
             })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Text Advanced Dropdown (line height, char spacing) ── */
+
+function TextAdvancedDropdown({
+  lineHeight,
+  charSpacing,
+  onLineHeightChange,
+  onCharSpacingChange,
+}: {
+  lineHeight: number;
+  charSpacing: number;
+  onLineHeightChange: (v: number) => void;
+  onCharSpacingChange: (v: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs transition-colors ${
+          open ? "bg-[#4ecdc4]/20 text-[#4ecdc4]" : "bg-[#141736] text-[#8b8fb0] hover:text-[#e8eaff]"
+        }`}
+        title="Espacamento e entrelinha"
+      >
+        <Settings2 size={13} />
+        <ChevronDown size={10} />
+      </button>
+
+      {open && (
+        <div className="absolute top-full mt-1 left-0 z-50 bg-[#141736] border border-white/10 rounded-xl p-3 shadow-2xl min-w-[200px]">
+          <p className="text-[10px] text-[#5e6388] uppercase tracking-wider mb-2 font-medium">Espacamento</p>
+
+          {/* Line Height */}
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div className="flex items-center gap-1.5">
+              <ArrowUpDown size={12} className="text-[#8b8fb0]" />
+              <span className="text-[11px] text-[#c0c3e0]">Entrelinha</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => onLineHeightChange(Math.max(0.5, lineHeight - 0.1))}
+                className="w-5 h-5 flex items-center justify-center rounded bg-[#080b1e] text-[#8b8fb0] hover:text-[#e8eaff] transition-colors"
+              >
+                <Minus size={10} />
+              </button>
+              <span className="text-[11px] text-[#e8eaff] font-mono w-8 text-center">
+                {lineHeight.toFixed(1)}
+              </span>
+              <button
+                onClick={() => onLineHeightChange(Math.min(4, lineHeight + 0.1))}
+                className="w-5 h-5 flex items-center justify-center rounded bg-[#080b1e] text-[#8b8fb0] hover:text-[#e8eaff] transition-colors"
+              >
+                <Plus size={10} />
+              </button>
+            </div>
+          </div>
+
+          {/* Char Spacing */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              <Space size={12} className="text-[#8b8fb0]" />
+              <span className="text-[11px] text-[#c0c3e0]">Entre letras</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => onCharSpacingChange(Math.max(-200, charSpacing - 20))}
+                className="w-5 h-5 flex items-center justify-center rounded bg-[#080b1e] text-[#8b8fb0] hover:text-[#e8eaff] transition-colors"
+              >
+                <Minus size={10} />
+              </button>
+              <span className="text-[11px] text-[#e8eaff] font-mono w-8 text-center">
+                {charSpacing}
+              </span>
+              <button
+                onClick={() => onCharSpacingChange(Math.min(800, charSpacing + 20))}
+                className="w-5 h-5 flex items-center justify-center rounded bg-[#080b1e] text-[#8b8fb0] hover:text-[#e8eaff] transition-colors"
+              >
+                <Plus size={10} />
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -931,6 +1031,22 @@ export function CanvasToolbar({
                   <AlignRight size={14} />
                 </ToolbarButton>
               </div>
+
+              <ToolbarSeparator />
+
+              {/* Advanced text: line height, char spacing — dropdown */}
+              <TextAdvancedDropdown
+                lineHeight={(() => {
+                  const obj = canvasRef.current?.getSelectedObject();
+                  return (obj as Record<string, unknown>)?.lineHeight as number ?? 1.2;
+                })()}
+                charSpacing={(() => {
+                  const obj = canvasRef.current?.getSelectedObject();
+                  return (obj as Record<string, unknown>)?.charSpacing as number ?? 0;
+                })()}
+                onLineHeightChange={(v) => updateProp({ lineHeight: v })}
+                onCharSpacingChange={(v) => updateProp({ charSpacing: v })}
+              />
             </>
           )}
 

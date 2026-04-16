@@ -817,94 +817,14 @@ export function PropertyPanel({
           </div>
         </div>
 
-        {/* ── Typography (text objects only) ── */}
+        {/* ── Text colors (text objects only) — font/size/spacing controls are in the top toolbar ── */}
         {isText && (
           <div>
-            <SectionHeader icon={Type} label="Tipografia" />
+            <SectionHeader icon={Type} label="Cores do Texto" />
 
-            {/* Font family */}
-            <div className="flex flex-col gap-1 mb-2.5">
-              <label className="text-[10px] text-[#8b8fb0] uppercase tracking-wide">
-                Fonte
-              </label>
-              <select
-                value={selection.props.fontFamily || "Plus Jakarta Sans"}
-                onChange={(e) => updateProp({ fontFamily: e.target.value })}
-                className="bg-[#141736] border border-white/10 rounded px-2.5 py-1.5 text-sm text-[#e8eaff] cursor-pointer focus:outline-none focus:border-[#4ecdc4]/40"
-              >
-                {[
-                  "Plus Jakarta Sans",
-                  "Inter",
-                  "Poppins",
-                  "Montserrat",
-                  "Playfair Display",
-                  "Roboto",
-                  "Open Sans",
-                  "Lato",
-                  "Formula1 Display",
-                  "Formula1 Wide",
-                  "Genius Techno",
-                  "Georgia",
-                  "Arial",
-                  "Courier New",
-                ].map((f) => (
-                  <option key={f} value={f}>
-                    {f}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2.5 mb-2.5">
-              <PropInput
-                label="Tamanho"
-                value={selection.props.fontSize || 48}
-                onChange={(v) => updateProp({ fontSize: Number(v) })}
-                min={8}
-                max={200}
-                suffix="px"
-              />
-              <FontWeightSelect
-                value={String(selection.props.fontWeight || "400")}
-                onChange={(w) => updateProp({ fontWeight: Number(w) })}
-              />
-            </div>
-
-            {/* Line height & letter spacing */}
-            <div className="grid grid-cols-2 gap-2.5 mb-2.5">
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] text-[#8b8fb0] uppercase tracking-wide">
-                  Entrelinha
-                </label>
-                <input
-                  type="number"
-                  defaultValue={1.3}
-                  step={0.1}
-                  min={0.5}
-                  max={3}
-                  onChange={(e) =>
-                    updateProp({ lineHeight: Number(e.target.value) })
-                  }
-                  className="bg-[#141736] border border-white/10 rounded px-2.5 py-1.5 text-sm text-[#e8eaff] focus:outline-none focus:border-[#4ecdc4]/40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] text-[#8b8fb0] uppercase tracking-wide">
-                  Espacamento
-                </label>
-                <input
-                  type="number"
-                  defaultValue={0}
-                  step={10}
-                  min={-200}
-                  max={800}
-                  onChange={(e) =>
-                    updateProp({ charSpacing: Number(e.target.value) })
-                  }
-                  className="bg-[#141736] border border-white/10 rounded px-2.5 py-1.5 text-sm text-[#e8eaff] focus:outline-none focus:border-[#4ecdc4]/40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                />
-              </div>
-            </div>
+            <p className="text-[10px] text-[#5e6388] mb-2.5 italic">
+              Fonte, tamanho, peso e espacamento: use a barra superior.
+            </p>
 
             {/* Text color */}
             <ColorSwatches
