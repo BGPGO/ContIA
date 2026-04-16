@@ -424,9 +424,16 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
           const canvas = fabricRef.current;
           if (canvas && containerRef.current) {
             const containerRect = containerRef.current.getBoundingClientRect();
-            // Convert mouse coords to canvas coords
-            const mouseX = (e.clientX - containerRect.left) / scale;
-            const mouseY = (e.clientY - containerRect.top) / scale;
+
+            // Convert mouse coords to canvas coords (accounting for pan + scale + centering)
+            const canvasDisplayW = dims.w * scale;
+            const canvasDisplayH = dims.h * scale;
+            const centerX = (containerRect.width - canvasDisplayW) / 2 + panOffset.x;
+            const centerY = (containerRect.height - canvasDisplayH) / 2 + panOffset.y;
+
+            // Mouse position relative to canvas top-left in canvas coordinate space
+            const mouseOnCanvasX = (e.clientX - containerRect.left - centerX) / scale;
+            const mouseOnCanvasY = (e.clientY - containerRect.top - centerY) / scale;
 
             const frameObj = canvas.getObjects().find((obj: any) => {
               if (obj.data?.role !== 'image-frame') return false;
@@ -434,7 +441,7 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
               const top = obj.top || 0;
               const w = obj.getScaledWidth?.() || obj.width || 0;
               const h = obj.getScaledHeight?.() || obj.height || 0;
-              return mouseX >= left && mouseX <= left + w && mouseY >= top && mouseY <= top + h;
+              return mouseOnCanvasX >= left && mouseOnCanvasX <= left + w && mouseOnCanvasY >= top && mouseOnCanvasY <= top + h;
             });
 
             if (frameObj && frameObj.data?.id) {
@@ -450,17 +457,19 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
                 const scY = fh / (img.height || 1);
                 const coverScale = Math.max(scX, scY);
 
+                // clipPath in Fabric.js is relative to the object's own coordinate space
                 img.set({
                   scaleX: coverScale,
                   scaleY: coverScale,
-                  left: frameObj.left,
-                  top: frameObj.top,
+                  left: frameObj.left || 0,
+                  top: frameObj.top || 0,
                   clipPath: new Rect({
-                    width: fw,
-                    height: fh,
-                    rx,
-                    ry,
-                    absolutePositioned: false,
+                    width: fw / coverScale,
+                    height: fh / coverScale,
+                    rx: rx / coverScale,
+                    ry: ry / coverScale,
+                    originX: 'center',
+                    originY: 'center',
                   }),
                   data: { id: crypto.randomUUID(), role: 'framed-image' },
                 });
@@ -479,7 +488,7 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
         };
         reader.readAsDataURL(imageFile);
       }
-    }, [addImageFromDataUrl, scale, saveHistory]);
+    }, [addImageFromDataUrl, scale, panOffset, dims.w, dims.h, saveHistory]);
 
     const handleDragOver = useCallback((e: React.DragEvent) => {
       e.preventDefault();
@@ -562,26 +571,6 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
         // ── Events: text editing ──
         canvasInstance.on("text:editing:entered", () => {
           onTextEditingChange?.(true);
-
-          // Prevent browser from scrolling to Fabric's hidden textarea
-          // Fabric.js creates a <textarea> for text editing that triggers scrollIntoView
-          requestAnimationFrame(() => {
-            const hiddenTextarea = document.querySelector('.upper-canvas')
-              ?.parentElement
-              ?.querySelector('textarea');
-            if (hiddenTextarea) {
-              hiddenTextarea.scrollIntoView = () => {};
-              hiddenTextarea.style.position = 'fixed';
-              hiddenTextarea.style.top = '0';
-              hiddenTextarea.style.left = '0';
-            }
-            const editorRoot = document.querySelector('[data-editor-root]');
-            if (editorRoot) {
-              editorRoot.scrollTop = 0;
-              editorRoot.scrollLeft = 0;
-            }
-            window.scrollTo(0, 0);
-          });
         });
         canvasInstance.on("text:editing:exited", () => {
           onTextEditingChange?.(false);
@@ -617,24 +606,44 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
           saveHistory();
         }
 
-        // ── Observe for hidden textareas and neutralize scrollIntoView ──
-        if (canvasElRef.current?.parentElement) {
-          const textareaObserver = new MutationObserver((mutations) => {
-            for (const m of mutations) {
-              for (const node of Array.from(m.addedNodes)) {
-                if (node instanceof HTMLTextAreaElement) {
-                  node.scrollIntoView = () => {};
-                  node.style.position = 'fixed';
-                  node.style.top = '0';
-                  node.style.left = '0';
-                }
+        // ── DEFINITIVO: Prevent ALL scroll caused by Fabric.js text editing ──
+        // Override focus() on textareas WITHIN the canvas container only
+        const origFocus = HTMLTextAreaElement.prototype.focus;
+        const canvasContainer = canvasElRef.current!.parentElement!;
+        const patchedFocus = new WeakSet<HTMLTextAreaElement>();
+
+        const patchTextarea = (ta: HTMLTextAreaElement) => {
+          if (patchedFocus.has(ta)) return;
+          patchedFocus.add(ta);
+
+          ta.focus = function (opts?: FocusOptions) {
+            origFocus.call(this, { ...opts, preventScroll: true });
+          };
+          ta.scrollIntoView = () => {};
+          ta.style.position = 'fixed';
+          ta.style.top = '0px';
+          ta.style.left = '0px';
+          ta.style.opacity = '0';
+        };
+
+        // Patch existing textareas
+        canvasContainer.querySelectorAll('textarea').forEach((ta) => patchTextarea(ta as HTMLTextAreaElement));
+
+        // Watch for new textareas
+        const textareaObserver = new MutationObserver((mutations) => {
+          for (const m of mutations) {
+            for (const node of Array.from(m.addedNodes)) {
+              if (node instanceof HTMLTextAreaElement) {
+                patchTextarea(node);
+              }
+              if (node instanceof HTMLElement) {
+                node.querySelectorAll?.('textarea').forEach((ta) => patchTextarea(ta as HTMLTextAreaElement));
               }
             }
-          });
-          textareaObserver.observe(canvasElRef.current.parentElement, { childList: true, subtree: true });
-          // Store for cleanup
-          (canvasInstance as any).__textareaObserver = textareaObserver;
-        }
+          }
+        });
+        textareaObserver.observe(canvasContainer, { childList: true, subtree: true });
+        (canvasInstance as any).__textareaObserver = textareaObserver;
 
         // ── Compute initial scale ──
         const s = computeScale();
@@ -675,32 +684,25 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
       return () => ro.disconnect();
     }, [computeScale]);
 
-    // ── Prevent scroll when Fabric.js text editing (browser scrollIntoView on hidden textarea) ──
-    useEffect(() => {
+    // ── Clamp pan so canvas doesn't leave viewport entirely ──
+    const clampPan = useCallback((offset: { x: number; y: number }, currentScale: number) => {
       const container = containerRef.current;
-      if (!container) return;
+      if (!container) return offset;
 
-      // Fabric.js creates a hidden textarea for text editing that triggers scrollIntoView
-      // We prevent any scroll on the editor page by capturing scroll events
-      const preventScroll = (e: Event) => {
-        const target = e.target as HTMLElement;
-        // Allow scroll inside designated scroll areas (property panel, layers, etc)
-        if (target.closest("[data-allow-scroll]")) return;
-        // Prevent the page from scrolling when editing text on canvas
-        if (container.contains(target)) {
-          e.preventDefault();
-          e.stopPropagation();
-        }
+      const cw = container.clientWidth;
+      const ch = container.clientHeight;
+      const canvasW = dims.w * currentScale;
+      const canvasH = dims.h * currentScale;
+
+      // Allow canvas to go at most 50% off screen in any direction
+      const maxPanX = Math.max(cw * 0.5, canvasW * 0.5);
+      const maxPanY = Math.max(ch * 0.5, canvasH * 0.5);
+
+      return {
+        x: Math.max(-maxPanX, Math.min(maxPanX, offset.x)),
+        y: Math.max(-maxPanY, Math.min(maxPanY, offset.y)),
       };
-
-      // Also prevent the parent page from scrolling
-      const parentEl = container.closest("[data-editor-root]") || document.body;
-      parentEl.addEventListener("scroll", preventScroll, { passive: false, capture: true });
-
-      return () => {
-        parentEl.removeEventListener("scroll", preventScroll, true);
-      };
-    }, []);
+    }, [dims.w, dims.h]);
 
     // ── Wheel handler: Ctrl+scroll = zoom to mouse, plain scroll = pan ──
     useEffect(() => {
@@ -724,26 +726,31 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
           const delta = e.deltaY > 0 ? -0.05 : 0.05;
 
           setScale((prev) => {
-            const next = Math.min(3, Math.max(0.1, prev + delta));
+            const fitScale = computeScale();
+            const minZoom = fitScale * 0.9; // 10% menor que "fit" permite ver bordas
+            const next = Math.min(3, Math.max(minZoom, prev + delta));
             const scaleDiff = next - prev;
-            setPanOffset((p) => ({
+            setPanOffset((p) => clampPan({
               x: p.x - (fx - 0.5) * dims.w * scaleDiff,
               y: p.y - (fy - 0.5) * dims.h * scaleDiff,
-            }));
+            }, next));
             return next;
           });
         } else {
           // PAN (scroll when zoomed)
-          setPanOffset((prev) => ({
-            x: prev.x - e.deltaX,
-            y: prev.y - e.deltaY,
-          }));
+          setScale((currentScale) => {
+            setPanOffset((prev) => clampPan({
+              x: prev.x - e.deltaX,
+              y: prev.y - e.deltaY,
+            }, currentScale));
+            return currentScale; // unchanged
+          });
         }
       };
 
       container.addEventListener("wheel", handleWheel, { passive: false });
       return () => container.removeEventListener("wheel", handleWheel);
-    }, [dims.w, dims.h]);
+    }, [dims.w, dims.h, computeScale, clampPan]);
 
     // ── Keyboard shortcuts ──
     useEffect(() => {
@@ -1404,17 +1411,19 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
           const scaleY = fh / (img.height || 1);
           const coverScale = Math.max(scaleX, scaleY);
 
+          // clipPath in Fabric.js is relative to the object's own coordinate space
           img.set({
             scaleX: coverScale,
             scaleY: coverScale,
-            left: frame.left,
-            top: frame.top,
+            left: frame.left || 0,
+            top: frame.top || 0,
             clipPath: new Rect({
-              width: fw,
-              height: fh,
-              rx,
-              ry,
-              absolutePositioned: false,
+              width: fw / coverScale,
+              height: fh / coverScale,
+              rx: rx / coverScale,
+              ry: ry / coverScale,
+              originX: 'center',
+              originY: 'center',
             }),
             data: { id: crypto.randomUUID(), role: 'framed-image' },
           });
