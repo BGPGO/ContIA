@@ -2,8 +2,9 @@ import { SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * Converte uma data URL base64 (PNG/JPEG/WebP) em Blob.
+ * Exportada para uso em outros módulos (ex: editor de posts).
  */
-function dataUrlToBlob(dataUrl: string): { blob: Blob; ext: string } | null {
+export function dataUrlToBlob(dataUrl: string): { blob: Blob; ext: string } | null {
   const match = dataUrl.match(/^data:(image\/(png|jpe?g|webp));base64,(.+)$/);
   if (!match) return null;
   const mime = match[1];

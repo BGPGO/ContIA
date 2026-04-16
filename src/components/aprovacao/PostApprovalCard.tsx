@@ -4,7 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CheckCircle, XCircle, Loader2, Clock, Image as ImageIcon } from "lucide-react";
+import { CheckCircle, XCircle, Loader2, Clock, ImageOff } from "lucide-react";
 import { Post, PostApproval } from "@/types";
 import { ApprovalModal } from "@/components/aprovacao/ApprovalModal";
 import { getPlataformaCor, getPlataformaLabel } from "@/lib/utils";
@@ -92,7 +92,7 @@ export function PostApprovalCard({
   }
 
   const createdAt = approval.createdAt
-    ? format(new Date(approval.createdAt), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR })
+    ? format(new Date(approval.createdAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
     : null;
 
   const postCreatedAt = post.created_at
@@ -115,27 +115,41 @@ export function PostApprovalCard({
         transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
         className="bg-[#0c0f24] border border-[#1e2348]/70 rounded-2xl overflow-hidden shadow-lg hover:border-[#4ecdc4]/20 transition-all duration-300 flex flex-col"
         style={{
-          background:
-            "linear-gradient(135deg, #0c0f24 0%, #10133a 100%)",
+          background: "linear-gradient(135deg, #0c0f24 0%, #10133a 100%)",
         }}
       >
-        {/* Thumbnail */}
+        {/* ── Hero image ── */}
         {hasThumbnail ? (
-          <div className="relative h-40 overflow-hidden bg-[#141736]">
+          <div
+            className="w-full overflow-hidden bg-[#080b1e] flex items-center justify-center"
+            style={{ maxHeight: "500px", aspectRatio: "1 / 1" }}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={post.midia_url!}
               alt={post.titulo}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
+              style={{ maxHeight: "500px" }}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0c0f24] via-transparent to-transparent" />
           </div>
         ) : (
-          <div className="h-10 bg-gradient-to-r from-[#4ecdc4]/[0.04] via-[#6c5ce7]/[0.03] to-transparent" />
+          /* Placeholder maior e mais evidente quando não há mídia */
+          <div
+            className="w-full flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-[#141736] to-[#0c0f24]"
+            style={{ minHeight: "200px", aspectRatio: "1 / 1", maxHeight: "300px" }}
+          >
+            <div className="w-16 h-16 rounded-2xl bg-[#1e2348] border border-white/10 flex items-center justify-center">
+              <ImageOff className="w-8 h-8 text-[#5e6388]" />
+            </div>
+            <p className="text-sm font-medium text-[#5e6388]">Sem mídia gerada</p>
+            <p className="text-[11px] text-[#5e6388]/60 text-center px-4">
+              O canvas estava vazio ou a imagem possuía restrição de exportação
+            </p>
+          </div>
         )}
 
-        {/* Body */}
-        <div className="p-4 flex-1 space-y-3">
+        {/* ── Body ── */}
+        <div className="p-4 flex-1 space-y-2.5">
           {/* Title */}
           <h3 className="text-[15px] font-semibold text-[#e8eaff] leading-snug line-clamp-2">
             {post.titulo}
@@ -143,7 +157,7 @@ export function PostApprovalCard({
 
           {/* Content preview */}
           {conteudoPreview && (
-            <p className="text-[12px] text-[#8b8fb0] leading-relaxed line-clamp-3">
+            <p className="text-[12px] text-[#8b8fb0] leading-relaxed line-clamp-2">
               {conteudoPreview}
             </p>
           )}
@@ -168,28 +182,21 @@ export function PostApprovalCard({
           )}
 
           {/* Meta: tematica + dates */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-0.5">
             {post.tematica && (
               <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#6c5ce7]/15 text-[#a29bfe] border border-[#6c5ce7]/20 font-medium">
                 {post.tematica}
               </span>
             )}
-            {!hasThumbnail && (
-              <span className="flex items-center gap-1 text-[11px] text-[#5e6388]">
-                <ImageIcon className="w-3 h-3" />
-                Sem midia
-              </span>
-            )}
           </div>
 
-          {/* Requested at */}
+          {/* Requested / created date */}
           {createdAt && (
             <div className="flex items-center gap-1.5 text-[11px] text-[#5e6388] pt-0.5">
               <Clock className="w-3 h-3 shrink-0" />
               <span>Solicitado em: {createdAt}</span>
             </div>
           )}
-
           {postCreatedAt && !createdAt && (
             <div className="flex items-center gap-1.5 text-[11px] text-[#5e6388]">
               <Clock className="w-3 h-3 shrink-0" />
@@ -201,7 +208,7 @@ export function PostApprovalCard({
         {/* Divider */}
         <div className="mx-4 border-t border-[#1e2348]/50" />
 
-        {/* Footer actions */}
+        {/* ── Footer actions ── */}
         <div className="p-4 flex gap-2.5">
           <button
             onClick={openReject}

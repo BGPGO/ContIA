@@ -10,13 +10,13 @@ import { PostApprovalCard } from "@/components/aprovacao/PostApprovalCard";
 
 function ApprovalSkeleton() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 animate-pulse">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 animate-pulse">
       {Array.from({ length: 3 }).map((_, i) => (
         <div
           key={i}
           className="rounded-2xl bg-[#0c0f24] border border-[#1e2348]/70 overflow-hidden"
         >
-          <div className="h-10 bg-[#141736]" />
+          <div className="bg-[#141736]" style={{ aspectRatio: "1 / 1" }} />
           <div className="p-4 space-y-3">
             <div className="h-4 bg-[#141736] rounded w-3/4" />
             <div className="h-3 bg-[#141736] rounded" />
@@ -147,11 +147,12 @@ export default function AprovacaoPage() {
       )}
 
       {/* ── Cards grid ── */}
+      {/* 1 coluna por padrão, 2 em md, 3 em xl — cards são mais altos com hero image */}
       {!loading && !error && items.length > 0 && (
         <AnimatePresence mode="popLayout">
           <motion.div
             layout
-            className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4"
+            className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
           >
             {items.map(({ post, approval }) => (
               <PostApprovalCard

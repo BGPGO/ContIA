@@ -20,7 +20,7 @@ import { useVisualTemplates } from "@/hooks/useVisualTemplates";
 import { useEmpresa } from "@/hooks/useEmpresa";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/client";
-import { externalizeCanvasImages } from "@/lib/canvas-storage";
+import { externalizeCanvasImages, dataUrlToBlob } from "@/lib/canvas-storage";
 import type { VisualTemplate, CopyToTemplatePayload } from "@/types/canvas";
 import { CANVAS_DIMENSIONS } from "@/types/canvas";
 import type { CopyContent } from "@/types/copy-studio";
@@ -839,10 +839,9 @@ function EditorContent() {
   }, [router, sessionId]);
 
   // ── Submit canvas art for approval ──
-  // Gera a imagem do canvas, cria um post no banco e chama o endpoint de aprovação.
-  // Se o usuário veio de uma copy session, vincula os dados da sessão ao post.
-  // Se veio direto (sem sessão), cria o post apenas com os dados do canvas.
-  // TODO: migrar midia_url para upload real no Supabase Storage quando o endpoint de upload de mídia for criado.
+  // Gera a imagem do canvas, faz upload para Supabase Storage e cria um post.
+  // Se o canvas estiver "tainted" (imagem externa sem CORS), exibe toast de erro
+  // e INTERROMPE o fluxo — não cria post sem mídia silenciosamente.
   const handleSubmitForApproval = useCallback(async () => {
     if (!isSupabaseConfigured()) {
       showToast("O fluxo de aprovação requer conexão com Supabase.", "error");
@@ -856,15 +855,58 @@ function EditorContent() {
     setIsSubmittingApproval(true);
     try {
       // 1. Exportar imagem do canvas como data URL
-      let midiaUrl: string | null = null;
+      // Se o canvas estiver tainted (imagem externa sem CORS), exportImage lança exceção.
+      // Nesse caso, exibimos toast de erro e INTERROMPEMOS — não criamos post sem mídia.
+      let dataUrl: string | null = null;
       try {
-        midiaUrl = exportImage({ format: "png", quality: 0.85, multiplier: 1 }) ?? null;
+        dataUrl = exportImage({ format: "png", quality: 0.85, multiplier: 1 }) ?? null;
       } catch (exportErr) {
-        console.warn("[Editor] Exportação de imagem falhou (canvas tainted):", exportErr);
-        // Continua sem imagem — midia_url ficará null
+        console.warn("[Editor] exportImage falhou (canvas tainted):", exportErr);
+        showToast(
+          "Não foi possível exportar a imagem do canvas. A imagem gerada por IA possui restrição CORS. " +
+          "Use uma imagem local ou gere novamente.",
+          "error"
+        );
+        return; // INTERROMPE — não cria post sem mídia
       }
 
-      // 2. Coletar dados da sessão (copy), se houver
+      if (!dataUrl) {
+        showToast("O canvas está vazio. Adicione algum conteúdo antes de enviar.", "error");
+        return;
+      }
+
+      // 2. Fazer upload do data URL para Supabase Storage
+      // Evita salvar um data URL enorme no banco (pode ter centenas de KB).
+      let midiaUrl: string = dataUrl; // fallback: data URL direto
+      const supabase = createClient();
+      try {
+        const converted = dataUrlToBlob(dataUrl);
+        if (converted) {
+          const storagePath = `${empresaId}/posts/${crypto.randomUUID()}.${converted.ext}`;
+          const { error: uploadError } = await supabase.storage
+            .from("brand-assets")
+            .upload(storagePath, converted.blob, {
+              contentType: converted.blob.type,
+              upsert: false,
+            });
+          if (uploadError) {
+            console.warn("[Editor] Upload da mídia falhou, usando data URL:", uploadError.message);
+          } else {
+            const { data: pub } = supabase.storage
+              .from("brand-assets")
+              .getPublicUrl(storagePath);
+            if (pub?.publicUrl) {
+              midiaUrl = pub.publicUrl;
+              console.log("[Editor] Mídia do post salva no Storage:", midiaUrl);
+            }
+          }
+        }
+      } catch (uploadErr) {
+        console.warn("[Editor] Exceção no upload da mídia, usando data URL:", uploadErr);
+        // Não bloqueia — continua com data URL
+      }
+
+      // 3. Coletar dados da sessão (copy), se houver
       let titulo = originalTemplateName || "Post sem título";
       let conteudo = "";
       let tematica = "";
@@ -879,7 +921,6 @@ function EditorContent() {
       // Buscar plataformas e tematica da copy session, se existir
       if (sessionId && isSupabaseConfigured()) {
         try {
-          const supabase = createClient();
           const { data: sessData } = await supabase
             .from("copy_sessions")
             .select("platforms, topic, current_copy")
@@ -899,8 +940,7 @@ function EditorContent() {
         }
       }
 
-      // 3. Criar o post no banco
-      const supabase = createClient();
+      // 4. Criar o post no banco
       const post = await createPost(supabase, {
         empresa_id: empresaId,
         titulo,
@@ -913,7 +953,7 @@ function EditorContent() {
         tematica,
       });
 
-      // 4. Enviar para aprovação
+      // 5. Enviar para aprovação
       await submitPostForApproval(post.id);
 
       showToast("Post enviado para aprovação!", "success");
