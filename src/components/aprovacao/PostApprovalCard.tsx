@@ -7,6 +7,7 @@ import { ptBR } from "date-fns/locale";
 import { CheckCircle, XCircle, Loader2, Clock, ImageOff } from "lucide-react";
 import { Post, PostApproval } from "@/types";
 import { ApprovalModal } from "@/components/aprovacao/ApprovalModal";
+import { ApproveAndScheduleModal } from "@/components/aprovacao/ApproveAndScheduleModal";
 import { getPlataformaCor, getPlataformaLabel } from "@/lib/utils";
 
 interface PostApprovalCardProps {
@@ -50,36 +51,33 @@ export function PostApprovalCard({
   onApprove,
   onReject,
 }: PostApprovalCardProps) {
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<"approve" | "reject">("approve");
+  // Estado para o modal de rejeição (fluxo existente)
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  // Estado para o novo modal consolidado de aprovação + agendamento
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   function showToast(message: string, type: "success" | "error") {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
+    setTimeout(() => setToast(null), 4000);
   }
 
   function openApprove() {
-    setModalMode("approve");
-    setModalOpen(true);
+    setScheduleModalOpen(true);
   }
 
   function openReject() {
-    setModalMode("reject");
-    setModalOpen(true);
+    setRejectModalOpen(true);
   }
 
-  async function handleConfirm(comment: string) {
+  // Handler do modal de rejeição (fluxo inalterado)
+  async function handleRejectConfirm(comment: string) {
     setSubmitting(true);
     try {
-      if (modalMode === "approve") {
-        await onApprove(approval.id, comment || undefined);
-        showToast("Post aprovado com sucesso!", "success");
-      } else {
-        await onReject(approval.id, comment);
-        showToast("Post rejeitado.", "success");
-      }
+      await onReject(approval.id, comment);
+      showToast("Post rejeitado.", "success");
     } catch (err) {
       showToast(
         err instanceof Error ? err.message : "Ocorreu um erro. Tente novamente.",
@@ -89,6 +87,15 @@ export function PostApprovalCard({
     } finally {
       setSubmitting(false);
     }
+  }
+
+  // Chamado pelo ApproveAndScheduleModal após sucesso completo ou sucesso parcial
+  function handleScheduleComplete() {
+    showToast("Post aprovado e agendado!", "success");
+  }
+
+  function handleScheduleError(message: string) {
+    showToast(message, "error");
   }
 
   const createdAt = approval.createdAt
@@ -215,7 +222,7 @@ export function PostApprovalCard({
             disabled={submitting}
             className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-[13px] font-medium border border-[#f87171]/30 text-[#f87171] bg-[#f87171]/[0.06] hover:bg-[#f87171]/[0.12] hover:border-[#f87171]/50 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {submitting && modalMode === "reject" ? (
+            {submitting ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
             ) : (
               <XCircle className="w-3.5 h-3.5" />
@@ -232,23 +239,30 @@ export function PostApprovalCard({
               boxShadow: "0 4px 12px rgba(52, 211, 153, 0.25)",
             }}
           >
-            {submitting && modalMode === "approve" ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <CheckCircle className="w-3.5 h-3.5" />
-            )}
+            <CheckCircle className="w-3.5 h-3.5" />
             Aprovar
           </button>
         </div>
       </motion.div>
 
-      {/* Modal */}
+      {/* Modal de rejeição — fluxo inalterado */}
       <ApprovalModal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        mode={modalMode}
+        isOpen={rejectModalOpen}
+        onClose={() => setRejectModalOpen(false)}
+        mode="reject"
         postTitle={post.titulo}
-        onConfirm={handleConfirm}
+        onConfirm={handleRejectConfirm}
+      />
+
+      {/* Modal consolidado de aprovação + agendamento */}
+      <ApproveAndScheduleModal
+        isOpen={scheduleModalOpen}
+        onClose={() => setScheduleModalOpen(false)}
+        post={post}
+        approval={approval}
+        onApprove={onApprove}
+        onComplete={handleScheduleComplete}
+        onError={handleScheduleError}
       />
 
       {/* Toast */}

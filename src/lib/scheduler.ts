@@ -1,4 +1,5 @@
 import { SupabaseClient } from "@supabase/supabase-js";
+import { createInstagramPublisherWithEmpresa } from "@/lib/publishers/instagram-publisher";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -63,9 +64,17 @@ const simulatedPublisher: PlatformPublisher = {
 //   platformPublishers.set("instagram", new InstagramPublisher());
 const platformPublishers = new Map<string, PlatformPublisher>();
 
-function getPublisher(_platform: string): PlatformPublisher {
-  // Retorna publisher real se existir, senao usa simulado
-  return platformPublishers.get(_platform) || simulatedPublisher;
+function getPublisher(
+  platform: string,
+  supabase?: SupabaseClient,
+  empresaId?: string
+): PlatformPublisher {
+  // Publisher real para Instagram — criado on-the-fly com contexto da empresa
+  if (platform === "instagram" && supabase && empresaId) {
+    return createInstagramPublisherWithEmpresa(supabase, empresaId);
+  }
+  // Retorna publisher registrado estaticamente, ou simulado como fallback
+  return platformPublishers.get(platform) || simulatedPublisher;
 }
 
 // ── Agendar post ─────────────────────────────────────────────────────────────
@@ -307,14 +316,16 @@ export async function processJob(
       await recordPublish(supabase, job.post_id, platform, "pendente");
 
       // Tentar publicar via publisher da plataforma
-      const publisher = getPublisher(platform);
+      const publisher = getPublisher(platform, supabase, job.empresa_id);
       const result = await publisher.publish(post);
 
       if (result.success) {
-        // Como nao temos APIs reais, registramos como 'simulado'
-        // Quando APIs forem integradas, o publisher real retornara success
-        // e o status sera 'publicado'
-        const publishStatus = platformPublishers.has(platform)
+        // Publisher real (ex: Instagram) retorna sucesso real → status 'publicado'
+        // Publisher simulado (fallback) → status 'simulado'
+        const isRealPublisher =
+          platform === "instagram" ||
+          platformPublishers.has(platform);
+        const publishStatus = isRealPublisher
           ? "publicado" as const
           : "simulado" as const;
 
