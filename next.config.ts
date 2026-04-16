@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  serverExternalPackages: ["@google/generative-ai"],
+  serverExternalPackages: ["@google/generative-ai", "puppeteer", "puppeteer-core"],
   experimental: {
     serverActions: {
       bodySizeLimit: "500mb",

@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.env*
+!.env.example
+.DS_Store
+*.log
+mz-screenshots
+psd-templates
+figma-*.png
+vitest.config.mts
+src/__tests__

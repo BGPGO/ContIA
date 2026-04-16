@@ -11,6 +11,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type { Empresa } from "@/types";
 
 const AUTH_ROUTES = ["/login", "/register", "/auth"];
+const PUBLIC_ROUTES = ["/privacidade", "/termos"];
 
 /* ─────────────────────────────────────────────────────────────
    AppContent — lives INSIDE EmpresaProvider so it can read context
@@ -74,6 +75,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAuthPage = AUTH_ROUTES.some((r) => pathname.startsWith(r));
 
+  const isPublicLegalPage = PUBLIC_ROUTES.some((r) => pathname.startsWith(r));
+
   if (isAuthPage) {
     return (
       <motion.div
@@ -85,6 +88,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </motion.div>
     );
+  }
+
+  if (isPublicLegalPage) {
+    return <>{children}</>;
   }
 
   return (

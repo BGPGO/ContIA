@@ -19,6 +19,7 @@ import {
   Paintbrush,
   MessageSquareText,
   Settings,
+  Wrench,
   ChevronDown,
   ChevronRight,
   Check,
@@ -26,6 +27,7 @@ import {
   Plus,
   Menu,
   X,
+  FileText,
   type LucideIcon,
 } from "lucide-react";
 import { useEmpresa } from "@/hooks/useEmpresa";
@@ -73,25 +75,27 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    id: "analisar",
-    label: "Analisar",
-    icon: BarChart3,
-    collapsible: true,
-    links: [
-      { label: "Analytics", href: "/analytics", icon: BarChart3 },
-      { label: "Concorrentes", href: "/concorrentes", icon: Users },
-      { label: "Noticias", href: "/noticias", icon: Newspaper },
-    ],
-  },
-  {
     id: "inteligencia",
     label: "Inteligencia",
     icon: Brain,
     collapsible: true,
     links: [
+      { label: "Inteligencia", href: "/insights", icon: Sparkles },
+      { label: "Comparativo", href: "/insights/comparar", icon: BarChart3 },
+      { label: "Relatorios", href: "/relatorios", icon: FileText },
       { label: "DNA da Marca", href: "/marca", icon: Brain },
       { label: "Materiais da Marca", href: "/marca/assets", icon: Palette },
-      { label: "Inteligencia", href: "/inteligencia", icon: Zap },
+    ],
+  },
+  {
+    id: "analisar",
+    label: "Analisar",
+    icon: BarChart3,
+    collapsible: true,
+    links: [
+      { label: "Analytics (Legacy)", href: "/analytics", icon: BarChart3 },
+      { label: "Concorrentes", href: "/concorrentes", icon: Users },
+      { label: "Noticias", href: "/noticias", icon: Newspaper },
     ],
   },
   {
@@ -100,6 +104,7 @@ const navSections: NavSection[] = [
     icon: Settings,
     collapsible: true,
     links: [
+      { label: "Setup", href: "/setup", icon: Wrench },
       { label: "Conexoes", href: "/conexoes", icon: Cable },
       { label: "Configuracoes", href: "/configuracoes", icon: Settings },
     ],
