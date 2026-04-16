@@ -89,7 +89,7 @@ function PortalDropdown({
     });
   }, [open, anchorRef]);
 
-  if (!open || typeof document === "undefined") return null;
+  if (!open) return null;
 
   return createPortal(
     <div

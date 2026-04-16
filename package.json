@@ -39,10 +39,10 @@
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.2",
     "typescript": "^6.0.2",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "@types/react-dom": "^19.2.3"
   },
   "devDependencies": {
-    "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.7.0",
     "jsdom": "^25.0.1",
     "vitest": "^4.1.1"
