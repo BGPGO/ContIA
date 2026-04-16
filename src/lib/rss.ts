@@ -36,9 +36,72 @@ const DEFAULT_FEEDS: Record<string, Array<{ nome: string; url: string; topico: s
   ],
 };
 
+/**
+ * Tenta descobrir a URL do feed RSS a partir de uma URL de site.
+ * Se a URL já for um feed válido, retorna ela mesma.
+ */
+export async function discoverFeedUrl(url: string): Promise<string> {
+  // Se já tem /feed, /rss, .xml, .atom — provavelmente é feed direto
+  if (/\/(feed|rss|atom)|\.xml|\.rss|\.atom/i.test(url)) {
+    return url;
+  }
+
+  // Tentar sufixos comuns de RSS
+  const candidates = [
+    url.replace(/\/$/, "") + "/feed/",
+    url.replace(/\/$/, "") + "/feed",
+    url.replace(/\/$/, "") + "/rss",
+    url.replace(/\/$/, "") + "/rss.xml",
+    url.replace(/\/$/, "") + "/atom.xml",
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      const feed = await parser.parseURL(candidate);
+      if (feed.items && feed.items.length > 0) {
+        return candidate;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  // Tentar buscar HTML e procurar <link rel="alternate" type="application/rss+xml">
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (res.ok) {
+      const html = await res.text();
+      const rssLink = html.match(/<link[^>]+type=["']application\/rss\+xml["'][^>]+href=["']([^"']+)["']/i);
+      const atomLink = html.match(/<link[^>]+type=["']application\/atom\+xml["'][^>]+href=["']([^"']+)["']/i);
+      const discovered = rssLink?.[1] || atomLink?.[1];
+      if (discovered) {
+        // Pode ser relativo
+        return discovered.startsWith("http") ? discovered : new URL(discovered, url).toString();
+      }
+    }
+  } catch { /* ignore */ }
+
+  // Retorna URL original como fallback
+  return url;
+}
+
 export async function parseFeed(feedUrl: string, fonte: string, topico: string): Promise<NoticiaItem[]> {
   try {
-    const feed = await parser.parseURL(feedUrl);
+    // Tenta parsear direto; se falhar, tenta descobrir feed RSS
+    let feed;
+    try {
+      feed = await parser.parseURL(feedUrl);
+    } catch {
+      const discoveredUrl = await discoverFeedUrl(feedUrl);
+      if (discoveredUrl !== feedUrl) {
+        feed = await parser.parseURL(discoveredUrl);
+      } else {
+        throw new Error(`URL nao eh feed RSS valido: ${feedUrl}`);
+      }
+    }
     return (feed.items || []).slice(0, 10).map((item) => ({
       id: item.guid || item.link || `${fonte}-${Date.now()}-${Math.random()}`,
       titulo: item.title || 'Sem titulo',

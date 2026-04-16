@@ -2,9 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { getNoticiasForNicho, NoticiaItem } from "@/lib/rss";
 import { AnalysisCache, cacheKey } from "@/lib/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getAdminSupabase } from "@/lib/supabase/admin";
 
-// Cache de noticias com TTL de 1 hora
-const noticiasCache = new AnalysisCache(60 * 60 * 1000);
+// Cache de noticias com TTL de 15 minutos (era 1h — muito longo, impedia refresh apos add feed)
+const noticiasCache = new AnalysisCache(15 * 60 * 1000);
+
+// Exporta funcao para invalidar cache de uma empresa (chamada quando feeds mudam)
+export function invalidateNoticiasCache(empresaId: string) {
+  // Invalida todos os nichos possíveis para esta empresa
+  for (const nicho of ["geral", "tecnologia", "marketing", "negocios"]) {
+    const key = cacheKey("noticias", empresaId, nicho);
+    noticiasCache.invalidate(key);
+  }
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -27,12 +37,30 @@ export async function GET(request: NextRequest) {
       }
 
       try {
+        // Tentar session client primeiro, admin como fallback
+        let empresa: { config_rss: unknown } | null = null;
         const supabase = await createClient();
-        const { data: empresa } = await supabase
+        const { data: empSession } = await supabase
           .from("empresas")
           .select("config_rss")
           .eq("id", empresaId)
           .single();
+        empresa = empSession;
+
+        // Fallback admin se session não retornou
+        if (!empresa) {
+          try {
+            const admin = getAdminSupabase();
+            const { data: empAdmin } = await admin
+              .from("empresas")
+              .select("config_rss")
+              .eq("id", empresaId)
+              .single();
+            empresa = empAdmin;
+          } catch { /* admin nao disponivel */ }
+        }
+
+        console.log("[noticias] config_rss:", empresa?.config_rss ? `${(empresa.config_rss as unknown[]).length} feeds` : "null");
 
         if (empresa?.config_rss && Array.isArray(empresa.config_rss) && empresa.config_rss.length > 0) {
           // Empresa tem feeds customizados — NUNCA usar defaults, mesmo que todos estejam desativados

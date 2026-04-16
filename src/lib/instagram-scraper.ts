@@ -61,6 +61,66 @@ const BROWSER_HEADERS = {
   "Accept-Language": "en-US,en;q=0.9",
 };
 
+// ── Strategy 0: Mobile API (i.instagram.com — less blocked on servers) ──────
+
+async function tryMobileAPI(username: string): Promise<IGScrapedProfile | null> {
+  try {
+    const res = await fetch(
+      `https://i.instagram.com/api/v1/users/web_profile_info/?username=${username}`,
+      {
+        headers: {
+          "User-Agent": "Instagram 275.0.0.27.98 Android (33/13; 420dpi; 1080x2400; samsung; SM-G991B; o1s; exynos2100; en_US; 458229258)",
+          "X-IG-App-ID": "936619743392459",
+          Accept: "*/*",
+        },
+        signal: AbortSignal.timeout(10000),
+      }
+    );
+
+    if (!res.ok) return null;
+
+    const json = await res.json();
+    const user = json?.data?.user;
+    if (!user) return null;
+
+    const posts: IGScrapedPost[] = (user.edge_owner_to_timeline_media?.edges || [])
+      .slice(0, 12)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((edge: any) => {
+        const node = edge.node;
+        const shortcode = node.shortcode || "";
+        return {
+          id: node.id || shortcode,
+          shortcode,
+          imageUrl: node.display_url || node.thumbnail_src || "",
+          caption: node.edge_media_to_caption?.edges?.[0]?.node?.text || "",
+          likes: node.edge_liked_by?.count || node.edge_media_preview_like?.count || 0,
+          comments: node.edge_media_to_comment?.count || 0,
+          timestamp: node.taken_at_timestamp
+            ? new Date(node.taken_at_timestamp * 1000).toISOString()
+            : "",
+          isVideo: node.is_video || false,
+          permalink: shortcode ? `https://www.instagram.com/p/${shortcode}/` : "",
+        };
+      });
+
+    return {
+      username: user.username,
+      fullName: user.full_name || "",
+      biography: user.biography || "",
+      followers: user.edge_followed_by?.count || 0,
+      following: user.edge_follow?.count || 0,
+      postCount: user.edge_owner_to_timeline_media?.count || 0,
+      profilePicUrl: user.profile_pic_url_hd || user.profile_pic_url || "",
+      posts,
+      scrapedAt: new Date().toISOString(),
+      partial: false,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ── Strategy 1: Business Discovery API (official, preferred) ────────────────
 // Uses our own IG Business token to query any public profile via
 // the Business Discovery endpoint. No scraping needed.
@@ -339,13 +399,17 @@ export async function scrapeInstagramPublicProfile(
   recordScrape(clean);
 
   // Try strategies in order of reliability
-  // 1. Business Discovery API (official IG API, most reliable on servers)
-  let result = await tryBusinessDiscovery(clean);
-  // 2. Public API (works locally, blocked on most servers)
+  // 1. Mobile API (i.instagram.com — less blocked on servers)
+  let result = await tryMobileAPI(clean);
+  // 2. Web Public API (www.instagram.com)
   if (!result) {
     result = await tryPublicAPI(clean);
   }
-  // 3. HTML scraping (last resort, often blocked)
+  // 3. Business Discovery API (requires valid IG Business token)
+  if (!result) {
+    result = await tryBusinessDiscovery(clean);
+  }
+  // 4. HTML scraping (last resort, often blocked)
   if (!result) {
     result = await tryHTMLScraping(clean);
   }
