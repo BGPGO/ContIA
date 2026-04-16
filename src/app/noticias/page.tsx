@@ -9,6 +9,7 @@ import {
   Plus,
   X,
   Trash2,
+  Pencil,
   ExternalLink,
   ToggleLeft,
   ToggleRight,
@@ -43,6 +44,18 @@ function formatRelativeDate(dateStr: string): string {
 
 // Stable topic colour mapping
 const TOPIC_COLORS: Record<string, string> = {
+  // Financeiro
+  Financas: "#10B981",
+  "Finanças": "#10B981",
+  Investimentos: "#059669",
+  Economia: "#0D9488",
+  "Gestao Patrimonial": "#14B8A6",
+  "Gestão Patrimonial": "#14B8A6",
+  "Mercado Imobiliario": "#0891B2",
+  "Mercado Imobiliário": "#0891B2",
+  Contabilidade: "#0E7490",
+  "Direito Empresarial": "#6366F1",
+  // Tech & Marketing
   "Inteligencia Artificial": "var(--color-accent)",
   "Intelig\u00eancia Artificial": "var(--color-accent)",
   Startups: "var(--color-warning)",
@@ -52,9 +65,10 @@ const TOPIC_COLORS: Record<string, string> = {
   SEO: "var(--color-info)",
   Tecnologia: "var(--color-accent-light)",
   Tech: "var(--color-accent-light)",
-  Gastronomia: "#e17055",
-  Geral: "var(--color-info)",
   Negocios: "var(--color-warning)",
+  "Negócios": "var(--color-warning)",
+  Geral: "var(--color-info)",
+  Outro: "var(--color-text-muted)",
 };
 
 function topicColor(topico: string): string {
@@ -63,25 +77,33 @@ function topicColor(topico: string): string {
 
 // ── add feed modal ───────────────────────────────────────────────────────────
 
-interface AddFeedModalProps {
+interface FeedModalProps {
   onClose: () => void;
-  onAdd: (feed: ConfigRSS) => void;
+  onSave: (feed: ConfigRSS) => void;
+  editFeed?: ConfigRSS | null;
 }
 
-function AddFeedModal({ onClose, onAdd }: AddFeedModalProps) {
-  const [nome, setNome] = useState("");
-  const [url, setUrl] = useState("");
-  const [topico, setTopico] = useState("Tecnologia");
+function FeedModal({ onClose, onSave, editFeed }: FeedModalProps) {
+  const [nome, setNome] = useState(editFeed?.nome || "");
+  const [url, setUrl] = useState(editFeed?.url || "");
+  const [topico, setTopico] = useState(editFeed?.topico || "Financas");
   const [error, setError] = useState("");
 
   const topicos = [
-    "Inteligencia Artificial",
-    "Startups",
-    "Redes Sociais",
+    "Financas",
+    "Investimentos",
+    "Economia",
+    "Gestao Patrimonial",
+    "Mercado Imobiliario",
     "Marketing Digital",
-    "SEO",
+    "Redes Sociais",
+    "Inteligencia Artificial",
     "Tecnologia",
-    "Gastronomia",
+    "Startups",
+    "Negocios",
+    "SEO",
+    "Contabilidade",
+    "Direito Empresarial",
     "Outro",
   ];
 
@@ -97,7 +119,7 @@ function AddFeedModal({ onClose, onAdd }: AddFeedModalProps) {
       setError("URL invalida. Inclua http:// ou https://");
       return;
     }
-    onAdd({ nome: nome.trim(), url: url.trim(), topico, ativo: true });
+    onSave({ nome: nome.trim(), url: url.trim(), topico, ativo: editFeed?.ativo ?? true });
     onClose();
   }
 
@@ -116,7 +138,7 @@ function AddFeedModal({ onClose, onAdd }: AddFeedModalProps) {
         exit={{ opacity: 0, scale: 0.95 }}
         className="relative w-full max-w-sm bg-bg-card backdrop-blur-xl border border-border rounded-xl p-4 shadow-2xl">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-text-primary">Adicionar Feed RSS</h2>
+          <h2 className="text-sm font-semibold text-text-primary">{editFeed ? "Editar Feed RSS" : "Adicionar Feed RSS"}</h2>
           <button
             onClick={onClose}
             className="p-1 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-card-hover transition-colors"
@@ -192,13 +214,15 @@ interface RSSConfigSectionProps {
   feeds: ConfigRSS[];
   saving: boolean;
   onAdd: (feed: ConfigRSS) => void;
+  onEdit: (index: number, feed: ConfigRSS) => void;
   onToggle: (index: number) => void;
   onDelete: (index: number) => void;
 }
 
-function RSSConfigSection({ feeds, saving, onAdd, onToggle, onDelete }: RSSConfigSectionProps) {
+function RSSConfigSection({ feeds, saving, onAdd, onEdit, onToggle, onDelete }: RSSConfigSectionProps) {
   const [collapsed, setCollapsed] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editIndex, setEditIndex] = useState<number | null>(null);
 
   function truncateUrl(url: string, max = 38): string {
     return url.length > max ? url.slice(0, max) + "..." : url;
@@ -207,8 +231,19 @@ function RSSConfigSection({ feeds, saving, onAdd, onToggle, onDelete }: RSSConfi
   return (
     <>
       <AnimatePresence>
-        {showModal && (
-          <AddFeedModal onClose={() => setShowModal(false)} onAdd={(feed) => { onAdd(feed); }} />
+        {(showModal || editIndex !== null) && (
+          <FeedModal
+            editFeed={editIndex !== null ? feeds[editIndex] : null}
+            onClose={() => { setShowModal(false); setEditIndex(null); }}
+            onSave={(feed) => {
+              if (editIndex !== null) {
+                onEdit(editIndex, feed);
+                setEditIndex(null);
+              } else {
+                onAdd(feed);
+              }
+            }}
+          />
         )}
       </AnimatePresence>
 
@@ -298,6 +333,13 @@ function RSSConfigSection({ feeds, saving, onAdd, onToggle, onDelete }: RSSConfi
                           >
                             {feed.topico}
                           </span>
+                          <button
+                            onClick={() => setEditIndex(idx)}
+                            className="text-text-muted hover:text-accent transition-colors"
+                            title="Editar feed"
+                          >
+                            <Pencil size={12} />
+                          </button>
                           <button
                             onClick={() => onToggle(idx)}
                             className="transition-colors"
@@ -499,6 +541,11 @@ export default function NoticiasPage() {
     persistFeeds(updatedFeeds);
   }, [feeds, persistFeeds]);
 
+  const handleEditFeed = useCallback((index: number, updated: ConfigRSS) => {
+    const updatedFeeds = feeds.map((f, i) => i === index ? updated : f);
+    persistFeeds(updatedFeeds);
+  }, [feeds, persistFeeds]);
+
   const handleToggleFeed = useCallback((index: number) => {
     const updatedFeeds = feeds.map((f, i) =>
       i === index ? { ...f, ativo: !f.ativo } : f
@@ -653,6 +700,7 @@ export default function NoticiasPage() {
         feeds={feeds}
         saving={savingFeeds}
         onAdd={handleAddFeed}
+        onEdit={handleEditFeed}
         onToggle={handleToggleFeed}
         onDelete={handleDeleteFeed}
       />
