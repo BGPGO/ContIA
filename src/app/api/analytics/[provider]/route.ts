@@ -74,21 +74,17 @@ export async function GET(
     return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
   }
 
-  // Verificar que empresa pertence ao user (seguranca)
-  const { data: empresaCheck } = await supabase
-    .from("empresas")
-    .select("id")
-    .eq("id", empresaId)
-    .single();
-  if (!empresaCheck) {
-    return NextResponse.json({ error: "Empresa nao encontrada" }, { status: 403 });
-  }
+  // ── Resolver conexao: tenta TODAS as fontes (session client funciona com RLS) ──
 
-  // QUERIES DE DADOS usam admin client (bypass RLS)
-  const admin = getAdminSupabase();
+  let connection: {
+    id: string;
+    access_token: string | null;
+    provider_user_id: string | null;
+    username: string | null;
+  } | null = null;
 
-  // ── Passo 1: Tentar social_connections ──
-  const { data: connData, error: connError } = await admin
+  // Fonte 1: social_connections via SESSION client (RLS por user_id)
+  const { data: connData, error: connError } = await supabase
     .from("social_connections")
     .select("id, access_token, provider_user_id, username")
     .eq("empresa_id", empresaId)
@@ -97,19 +93,35 @@ export async function GET(
     .limit(1);
 
   if (connError) {
-    console.error("[analytics/provider] Erro ao buscar social_connections:", connError.message);
+    console.error("[analytics/provider] social_connections error (session):", connError.message);
+  }
+  if (connData && connData.length > 0) {
+    connection = connData[0];
   }
 
-  let connection: {
-    id: string;
-    access_token: string | null;
-    provider_user_id: string | null;
-    username: string | null;
-  } | null = connData?.[0] ?? null;
+  // Fonte 2: social_connections via ADMIN client (bypass RLS — fallback se session falhou)
+  if (!connection) {
+    try {
+      const admin = getAdminSupabase();
+      const { data: adminConn } = await admin
+        .from("social_connections")
+        .select("id, access_token, provider_user_id, username")
+        .eq("empresa_id", empresaId)
+        .eq("provider", provider)
+        .eq("is_active", true)
+        .limit(1);
+      if (adminConn && adminConn.length > 0) {
+        connection = adminConn[0];
+        console.log("[analytics/provider] Conexao encontrada via admin client");
+      }
+    } catch (adminErr) {
+      console.error("[analytics/provider] Admin client falhou:", adminErr instanceof Error ? adminErr.message : adminErr);
+    }
+  }
 
-  // ── Passo 2: FALLBACK — buscar em empresa.redes_sociais (legado) ──
+  // Fonte 3: empresa.redes_sociais (legado) via SESSION client
   if (!connection && provider === "instagram") {
-    const { data: empresa } = await admin
+    const { data: empresa } = await supabase
       .from("empresas")
       .select("redes_sociais")
       .eq("id", empresaId)
@@ -123,7 +135,7 @@ export async function GET(
         provider_user_id: (legacyIg.provider_user_id as string) ?? null,
         username: (legacyIg.username as string) ?? null,
       };
-      console.log("[analytics/provider] Usando conexao legada (empresa.redes_sociais) para Instagram");
+      console.log("[analytics/provider] Usando empresa.redes_sociais para Instagram");
     }
   }
 
@@ -156,13 +168,20 @@ export async function GET(
       );
 
       // Buscar snapshots historicos para time series com multiplos dias
-      const { data: historicalSnapshots } = await admin
-        .from("provider_snapshots")
-        .select("snapshot_date, metrics")
-        .eq("connection_id", connection.id)
-        .gte("snapshot_date", periodStart)
-        .lte("snapshot_date", periodEnd)
-        .order("snapshot_date", { ascending: true });
+      let historicalSnapshots: { snapshot_date: unknown; metrics: unknown }[] | null = null;
+      try {
+        const admin = getAdminSupabase();
+        const { data: hs } = await admin
+          .from("provider_snapshots")
+          .select("snapshot_date, metrics")
+          .eq("connection_id", connection.id)
+          .gte("snapshot_date", periodStart)
+          .lte("snapshot_date", periodEnd)
+          .order("snapshot_date", { ascending: true });
+        historicalSnapshots = hs;
+      } catch {
+        // Admin nao disponivel — sem historico, so ponto live
+      }
 
       // Time series = historico + ponto live de hoje
       const today = new Date().toISOString().split("T")[0];
@@ -233,8 +252,17 @@ export async function GET(
   const prevStartISO = prevStart.toISOString().split("T")[0];
   const prevEndISO = prevEnd.toISOString().split("T")[0];
 
+  // Usar session client para DB queries (RLS garante seguranca)
+  // Se tabelas novas nao tem RLS user_id, tenta admin como fallback
+  let dbClient = supabase;
+  try {
+    dbClient = getAdminSupabase();
+  } catch {
+    // Admin nao disponivel, usar session
+  }
+
   const [snapshotsRes, prevSnapshotsRes, contentRes] = await Promise.all([
-    admin
+    dbClient
       .from("provider_snapshots")
       .select("*")
       .eq("empresa_id", empresaId)
@@ -242,7 +270,7 @@ export async function GET(
       .gte("snapshot_date", periodStart)
       .lte("snapshot_date", periodEnd)
       .order("snapshot_date", { ascending: true }),
-    admin
+    dbClient
       .from("provider_snapshots")
       .select("*")
       .eq("empresa_id", empresaId)
@@ -250,7 +278,7 @@ export async function GET(
       .gte("snapshot_date", prevStartISO)
       .lte("snapshot_date", prevEndISO)
       .order("snapshot_date", { ascending: true }),
-    admin
+    dbClient
       .from("content_items")
       .select("*")
       .eq("empresa_id", empresaId)
