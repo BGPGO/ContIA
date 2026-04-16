@@ -39,6 +39,8 @@ const DEFAULT_FEEDS: Record<string, Array<{ nome: string; url: string; topico: s
 /**
  * Tenta descobrir a URL do feed RSS a partir de uma URL de site.
  * Se a URL já for um feed válido, retorna ela mesma.
+ *
+ * Ordem: HTML <link> tag (mais rápido) → sufixos comuns → fallback URL original
  */
 export async function discoverFeedUrl(url: string): Promise<string> {
   // Se já tem /feed, /rss, .xml, .atom — provavelmente é feed direto
@@ -46,19 +48,48 @@ export async function discoverFeedUrl(url: string): Promise<string> {
     return url;
   }
 
-  // Tentar sufixos comuns de RSS
+  // PRIMEIRO: buscar HTML e procurar <link rel="alternate" type="application/rss+xml">
+  // Isso é rápido (1 request) e cobre casos como Valor Econômico (RSS em domínio diferente)
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; ContIA/1.0)" },
+      signal: AbortSignal.timeout(8000),
+      redirect: "follow",
+    });
+    if (res.ok) {
+      const html = await res.text();
+      // Buscar tanto href antes quanto depois do type (ambos patterns são válidos em HTML)
+      const rssLink =
+        html.match(/<link[^>]+type=["']application\/rss\+xml["'][^>]+href=["']([^"']+)["']/i)?.[1] ||
+        html.match(/<link[^>]+href=["']([^"']+)["'][^>]+type=["']application\/rss\+xml["']/i)?.[1];
+      const atomLink =
+        html.match(/<link[^>]+type=["']application\/atom\+xml["'][^>]+href=["']([^"']+)["']/i)?.[1] ||
+        html.match(/<link[^>]+href=["']([^"']+)["'][^>]+type=["']application\/atom\+xml["']/i)?.[1];
+      const discovered = rssLink || atomLink;
+      if (discovered) {
+        const fullUrl = discovered.startsWith("http") ? discovered : new URL(discovered, url).toString();
+        console.log(`[rss] Discovered feed via HTML: ${fullUrl}`);
+        return fullUrl;
+      }
+    }
+  } catch { /* timeout ou erro de fetch — segue para próxima */ }
+
+  // SEGUNDO: tentar sufixos comuns de RSS (com timeout curto de 5s cada)
+  const base = url.replace(/\/$/, "");
   const candidates = [
-    url.replace(/\/$/, "") + "/feed/",
-    url.replace(/\/$/, "") + "/feed",
-    url.replace(/\/$/, "") + "/rss",
-    url.replace(/\/$/, "") + "/rss.xml",
-    url.replace(/\/$/, "") + "/atom.xml",
+    base + "/feed/",
+    base + "/feed",
+    base + "/rss",
+    base + "/blog/feed/",
+    base + "/rss.xml",
+    base + "/atom.xml",
   ];
 
   for (const candidate of candidates) {
     try {
       const feed = await parser.parseURL(candidate);
       if (feed.items && feed.items.length > 0) {
+        console.log(`[rss] Found feed via suffix: ${candidate}`);
         return candidate;
       }
     } catch {
@@ -66,25 +97,8 @@ export async function discoverFeedUrl(url: string): Promise<string> {
     }
   }
 
-  // Tentar buscar HTML e procurar <link rel="alternate" type="application/rss+xml">
-  try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0" },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (res.ok) {
-      const html = await res.text();
-      const rssLink = html.match(/<link[^>]+type=["']application\/rss\+xml["'][^>]+href=["']([^"']+)["']/i);
-      const atomLink = html.match(/<link[^>]+type=["']application\/atom\+xml["'][^>]+href=["']([^"']+)["']/i);
-      const discovered = rssLink?.[1] || atomLink?.[1];
-      if (discovered) {
-        // Pode ser relativo
-        return discovered.startsWith("http") ? discovered : new URL(discovered, url).toString();
-      }
-    }
-  } catch { /* ignore */ }
-
-  // Retorna URL original como fallback
+  console.log(`[rss] No feed found for ${url}, using URL as-is`);
+  // Retorna URL original como fallback — parseFeed vai falhar e retornar []
   return url;
 }
 
