@@ -1,75 +1,73 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   Plus,
   X,
-  TrendingUp,
-  TrendingDown,
-  ChevronUp,
-  ChevronDown,
   Users,
-  Activity,
-  Clock,
-  Search,
+  RefreshCw,
+  Trash2,
+  ExternalLink,
+  Heart,
+  MessageCircle,
+  Eye,
+  AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import { useEmpresa } from "@/hooks/useEmpresa";
-import { concorrentesMock } from "@/lib/mock-data";
-import { cn, formatNumber, getPlataformaCor, getPlataformaLabel } from "@/lib/utils";
-import { Concorrente, ConcorrentePlataforma, PostConcorrente } from "@/types";
+import {
+  useConcorrentes,
+  ConcorrenteDB,
+  ConcorrentePostsResult,
+} from "@/hooks/useConcorrentes";
+import { cn, formatNumber } from "@/lib/utils";
+import type { IGScrapedPost } from "@/lib/instagram-scraper";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
-const PLATAFORMAS = ["instagram", "facebook", "linkedin", "twitter", "youtube", "tiktok"];
-
 function formatShortDate(dateStr: string): string {
+  if (!dateStr) return "-";
   const d = new Date(dateStr);
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 }
 
-// Deterministic "trend" derived from engagement rate — no random() on each render
-function getTrend(taxa: number): "up" | "down" {
-  return taxa >= 4.0 ? "up" : "down";
+function truncate(str: string, maxLen: number): string {
+  if (!str) return "";
+  return str.length > maxLen ? str.slice(0, maxLen) + "..." : str;
 }
 
-// ─── modal: adicionar concorrente ─────────────────────────────────────────────
+function getInstagramUsername(c: ConcorrenteDB): string | null {
+  const ig = c.plataformas?.find((p) => p.rede === "instagram");
+  return ig?.username || null;
+}
 
-interface AddConcorrenteModalProps {
+// ─── Add Concorrente Modal ──────────────────────────────────────────────────
+
+interface AddModalProps {
   onClose: () => void;
-  onAdd: (c: Concorrente) => void;
-  empresaId: string;
+  onAdd: (nome: string, username: string) => Promise<boolean>;
 }
 
-function AddConcorrenteModal({ onClose, onAdd, empresaId }: AddConcorrenteModalProps) {
+function AddConcorrenteModal({ onClose, onAdd }: AddModalProps) {
   const [nome, setNome] = useState("");
-  const [plataforma, setPlataforma] = useState("instagram");
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!nome.trim() || !username.trim()) {
       setError("Preencha nome e username.");
       return;
     }
-    const novo: Concorrente = {
-      id: `c-${Date.now()}`,
-      empresa_id: empresaId,
-      nome: nome.trim(),
-      plataformas: [
-        {
-          rede: plataforma,
-          username: username.trim(),
-          seguidores: 0,
-          taxa_engajamento: 0,
-          freq_postagem: "—",
-          posts_recentes: [],
-        },
-      ],
-      created_at: new Date().toISOString(),
-    };
-    onAdd(novo);
-    onClose();
+    setSaving(true);
+    const ok = await onAdd(nome.trim(), username.trim().replace(/^@/, ""));
+    setSaving(false);
+    if (ok) {
+      onClose();
+    } else {
+      setError("Erro ao salvar. Tente novamente.");
+    }
   }
 
   return (
@@ -78,10 +76,11 @@ function AddConcorrenteModal({ onClose, onAdd, empresaId }: AddConcorrenteModalP
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
-
-      <div className="relative w-full max-w-sm bg-bg-card backdrop-blur-xl border border-border rounded-xl p-4 fade-in shadow-2xl">
+      <div className="relative w-full max-w-sm bg-bg-card backdrop-blur-xl border border-border rounded-xl p-5 fade-in shadow-2xl">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-text-primary">Adicionar Concorrente</h2>
+          <h2 className="text-sm font-semibold text-text-primary">
+            Adicionar Concorrente
+          </h2>
           <button
             onClick={onClose}
             className="p-1 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-card-hover transition-colors"
@@ -92,40 +91,32 @@ function AddConcorrenteModal({ onClose, onAdd, empresaId }: AddConcorrenteModalP
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="space-y-1">
-            <label className="text-xs text-text-secondary">Nome do concorrente</label>
+            <label className="text-xs text-text-secondary">Nome</label>
             <input
               type="text"
               value={nome}
               onChange={(e) => setNome(e.target.value)}
-              placeholder="Ex: Acme Corp"
+              placeholder="Ex: Concorrente X"
               className="w-full px-2.5 py-1.5 rounded-lg bg-bg-card border border-border text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/40 transition-colors text-xs"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs text-text-secondary">Plataforma</label>
-            <select
-              value={plataforma}
-              onChange={(e) => setPlataforma(e.target.value)}
-              className="w-full px-2.5 py-1.5 rounded-lg bg-bg-card border border-border text-text-primary focus:outline-none focus:border-accent/40 transition-colors text-xs appearance-none"
-            >
-              {PLATAFORMAS.map((p) => (
-                <option key={p} value={p}>
-                  {getPlataformaLabel(p)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-xs text-text-secondary">Username / Handle</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="@usuario ou perfil"
-              className="w-full px-2.5 py-1.5 rounded-lg bg-bg-card border border-border text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/40 transition-colors text-xs"
-            />
+            <label className="text-xs text-text-secondary">
+              Instagram Username
+            </label>
+            <div className="relative">
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted text-xs">
+                @
+              </span>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="username"
+                className="w-full pl-6 pr-2.5 py-1.5 rounded-lg bg-bg-card border border-border text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/40 transition-colors text-xs"
+              />
+            </div>
           </div>
 
           {error && <p className="text-xs text-danger">{error}</p>}
@@ -140,9 +131,10 @@ function AddConcorrenteModal({ onClose, onAdd, empresaId }: AddConcorrenteModalP
             </button>
             <button
               type="submit"
-              className="flex-1 px-3 py-1.5 rounded-lg bg-accent/90 hover:bg-accent text-white transition-colors text-xs font-medium"
+              disabled={saving}
+              className="flex-1 px-3 py-1.5 rounded-lg bg-accent/90 hover:bg-accent text-white transition-colors text-xs font-medium disabled:opacity-50"
             >
-              Adicionar
+              {saving ? "Salvando..." : "Adicionar"}
             </button>
           </div>
         </form>
@@ -151,383 +143,274 @@ function AddConcorrenteModal({ onClose, onAdd, empresaId }: AddConcorrenteModalP
   );
 }
 
-// ─── posts table per platform ─────────────────────────────────────────────────
+// ─── Post Card ──────────────────────────────────────────────────────────────
 
-type SortField = "conteudo" | "data" | "curtidas" | "comentarios" | "compartilhamentos";
-
-interface PostsTableProps {
-  posts: PostConcorrente[];
-  plataformaLabel: string;
-  cor: string;
+interface PostCardProps {
+  post: IGScrapedPost;
 }
 
-function PostsTable({ posts, plataformaLabel, cor }: PostsTableProps) {
-  const [sortField, setSortField] = useState<SortField>("data");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-
-  function toggleSort(field: SortField) {
-    if (sortField === field) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortField(field);
-      setSortDir("desc");
-    }
-  }
-
-  const sorted = useMemo(() => {
-    return [...posts].sort((a, b) => {
-      let cmp = 0;
-      if (sortField === "conteudo") {
-        cmp = a.conteudo.localeCompare(b.conteudo);
-      } else if (sortField === "data") {
-        cmp = a.data.localeCompare(b.data);
-      } else {
-        cmp = a[sortField] - b[sortField];
-      }
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-  }, [posts, sortField, sortDir]);
-
-  if (posts.length === 0) {
-    return (
-      <p className="text-text-muted text-[11px] text-center py-2 italic">
-        Sem posts recentes em {plataformaLabel}.
-      </p>
-    );
-  }
-
-  function SortIcon({ field }: { field: SortField }) {
-    if (sortField !== field) {
-      return <ChevronUp size={10} className="opacity-20" />;
-    }
-    return sortDir === "asc" ? (
-      <ChevronUp size={10} style={{ color: cor }} />
-    ) : (
-      <ChevronDown size={10} style={{ color: cor }} />
-    );
-  }
-
-  const cols: { field: SortField; label: string; align: string }[] = [
-    { field: "conteudo", label: "Conteudo", align: "text-left" },
-    { field: "data", label: "Data", align: "text-center" },
-    { field: "curtidas", label: "Curtidas", align: "text-right" },
-    { field: "comentarios", label: "Coment.", align: "text-right" },
-    { field: "compartilhamentos", label: "Compart.", align: "text-right" },
-  ];
-
+function PostCard({ post }: PostCardProps) {
   return (
-    <div className="overflow-x-auto mt-2 rounded-lg border border-border-subtle">
-      <table className="w-full text-[11px]">
-        <thead>
-          <tr className="border-b border-border-subtle bg-bg-card/50">
-            {cols.map((c) => (
-              <th
-                key={c.field}
-                className={cn(
-                  "px-2.5 py-1.5 font-medium text-text-muted cursor-pointer select-none hover:text-text-secondary transition-colors",
-                  c.align
-                )}
-                onClick={() => toggleSort(c.field)}
-              >
-                <span className="inline-flex items-center gap-0.5">
-                  {c.label} <SortIcon field={c.field} />
-                </span>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((post, idx) => (
-            <tr
-              key={idx}
-              className="border-b border-border-subtle last:border-0 hover:bg-bg-card transition-colors"
-            >
-              <td className="px-2.5 py-1.5 text-text-secondary max-w-[180px]">
-                <span className="line-clamp-1 leading-snug">{post.conteudo}</span>
-              </td>
-              <td className="px-2.5 py-1.5 text-text-muted text-center whitespace-nowrap">
-                {formatShortDate(post.data)}
-              </td>
-              <td className="px-2.5 py-1.5 text-right">
-                <span className="text-danger/80 font-medium tabular-nums">
-                  {formatNumber(post.curtidas)}
-                </span>
-              </td>
-              <td className="px-2.5 py-1.5 text-right">
-                <span className="text-info/80 font-medium tabular-nums">
-                  {formatNumber(post.comentarios)}
-                </span>
-              </td>
-              <td className="px-2.5 py-1.5 text-right">
-                <span className="text-success/80 font-medium tabular-nums">
-                  {formatNumber(post.compartilhamentos)}
-                </span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-// ─── platform section ─────────────────────────────────────────────────────────
-
-interface PlatformSectionProps {
-  plat: ConcorrentePlataforma;
-}
-
-function PlatformSection({ plat }: PlatformSectionProps) {
-  const cor = getPlataformaCor(plat.rede);
-  const label = getPlataformaLabel(plat.rede);
-  const trend = getTrend(plat.taxa_engajamento);
-
-  return (
-    <div className="rounded-lg border border-border-subtle bg-bg-card/50 p-3 space-y-2">
-      {/* platform header row */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
-          <span
-            className="w-2 h-2 rounded-full shrink-0"
-            style={{ backgroundColor: cor }}
+    <a
+      href={post.permalink || `https://www.instagram.com/p/${post.shortcode}/`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group flex-shrink-0 w-[140px] rounded-lg border border-border-subtle bg-bg-card/50 overflow-hidden hover:border-accent/30 transition-all"
+    >
+      {/* Thumbnail */}
+      <div className="relative w-full aspect-square bg-bg-card overflow-hidden">
+        {post.imageUrl ? (
+          <img
+            src={post.imageUrl}
+            alt={truncate(post.caption, 40)}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            loading="lazy"
           />
-          <span className="font-medium text-xs text-text-primary">{label}</span>
-          <span className="text-[11px] text-text-muted">{plat.username}</span>
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-text-muted">
+            <Eye size={20} />
+          </div>
+        )}
+        {post.isVideo && (
+          <div className="absolute top-1.5 right-1.5 bg-black/60 text-white text-[9px] px-1 py-0.5 rounded">
+            VIDEO
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+          <ExternalLink
+            size={14}
+            className="absolute top-1.5 right-1.5 text-white/80"
+          />
         </div>
-        <span
-          className={cn(
-            "inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full",
-            trend === "up"
-              ? "bg-success/10 text-success"
-              : "bg-danger/10 text-danger"
-          )}
+      </div>
+
+      {/* Metrics */}
+      <div className="p-2 space-y-1">
+        <div className="flex items-center justify-between text-[10px]">
+          <span className="inline-flex items-center gap-0.5 text-danger/80">
+            <Heart size={9} />
+            {formatNumber(post.likes)}
+          </span>
+          <span className="inline-flex items-center gap-0.5 text-info/80">
+            <MessageCircle size={9} />
+            {formatNumber(post.comments)}
+          </span>
+        </div>
+        <p className="text-[10px] text-text-muted">
+          {formatShortDate(post.timestamp)}
+        </p>
+        {post.caption && (
+          <p className="text-[10px] text-text-secondary leading-tight line-clamp-2">
+            {truncate(post.caption, 80)}
+          </p>
+        )}
+      </div>
+    </a>
+  );
+}
+
+// ─── Post Grid Skeleton ─────────────────────────────────────────────────────
+
+function PostsSkeleton() {
+  return (
+    <div className="flex gap-2 overflow-hidden">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div
+          key={i}
+          className="flex-shrink-0 w-[140px] rounded-lg border border-border-subtle bg-bg-card/30 overflow-hidden animate-pulse"
         >
-          {trend === "up" ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-          {trend === "up" ? "Em alta" : "Em queda"}
-        </span>
-      </div>
-
-      {/* stats row */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="flex flex-col">
-          <span className="text-[10px] text-text-muted flex items-center gap-1">
-            <Users size={9} /> Seguidores
-          </span>
-          <span className="text-xs font-semibold text-text-primary tabular-nums">
-            {formatNumber(plat.seguidores)}
-          </span>
+          <div className="w-full aspect-square bg-bg-card-hover" />
+          <div className="p-2 space-y-1.5">
+            <div className="flex justify-between">
+              <div className="h-2.5 w-10 bg-bg-card-hover rounded" />
+              <div className="h-2.5 w-8 bg-bg-card-hover rounded" />
+            </div>
+            <div className="h-2 w-12 bg-bg-card-hover rounded" />
+          </div>
         </div>
-        <div className="flex flex-col">
-          <span className="text-[10px] text-text-muted flex items-center gap-1">
-            <Activity size={9} /> Engajamento
-          </span>
-          <span
-            className="text-xs font-semibold tabular-nums"
-            style={{ color: cor }}
-          >
-            {plat.taxa_engajamento.toFixed(1)}%
-          </span>
-        </div>
-        <div className="flex flex-col">
-          <span className="text-[10px] text-text-muted flex items-center gap-1">
-            <Clock size={9} /> Frequencia
-          </span>
-          <span className="text-xs font-semibold text-text-primary">
-            {plat.freq_postagem}
-          </span>
-        </div>
-      </div>
-
-      {/* posts recentes */}
-      <PostsTable posts={plat.posts_recentes} plataformaLabel={label} cor={cor} />
+      ))}
     </div>
   );
 }
 
-// ─── competitor detail (expandable) ──────────────────────────────────────────
+// ─── Concorrente Section ────────────────────────────────────────────────────
 
-interface CompetitorDetailProps {
-  concorrente: Concorrente;
+interface ConcorrenteSectionProps {
+  concorrente: ConcorrenteDB;
+  onRemove: (id: string) => void;
+  onFetchPosts: (
+    id: string,
+    username?: string,
+    force?: boolean
+  ) => Promise<ConcorrentePostsResult>;
 }
 
-function CompetitorDetail({ concorrente }: CompetitorDetailProps) {
-  const [expanded, setExpanded] = useState(false);
+function ConcorrenteSection({
+  concorrente,
+  onRemove,
+  onFetchPosts,
+}: ConcorrenteSectionProps) {
+  const [postsData, setPostsData] = useState<ConcorrentePostsResult | null>(
+    null
+  );
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [removing, setRemoving] = useState(false);
+
+  const igUsername = getInstagramUsername(concorrente);
+
+  const loadPosts = useCallback(
+    async (force = false) => {
+      if (!igUsername) return;
+      setLoadingPosts(true);
+      const result = await onFetchPosts(concorrente.id, igUsername, force);
+      setPostsData(result);
+      setLoadingPosts(false);
+      setLoaded(true);
+    },
+    [concorrente.id, igUsername, onFetchPosts]
+  );
+
+  // Auto-load on mount
+  useEffect(() => {
+    if (igUsername && !loaded && !loadingPosts) {
+      loadPosts();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [igUsername]);
+
+  const handleRemove = async () => {
+    if (!confirm(`Remover ${concorrente.nome}?`)) return;
+    setRemoving(true);
+    await onRemove(concorrente.id);
+  };
+
+  const profile = postsData?.profile;
+  const posts = postsData?.posts || [];
+  const scrapeError = postsData?.error;
 
   return (
     <div className="bg-bg-card backdrop-blur-xl border border-border rounded-xl overflow-hidden fade-in">
-      <button
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center justify-between p-3 text-left hover:bg-bg-card transition-colors"
-      >
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-accent/15 flex items-center justify-center shrink-0">
-            <span className="text-accent font-semibold text-[11px]">
-              {concorrente.nome.charAt(0).toUpperCase()}
-            </span>
+      {/* Header */}
+      <div className="flex items-center justify-between p-3 border-b border-border-subtle">
+        <div className="flex items-center gap-2.5 min-w-0">
+          {/* Avatar */}
+          <div className="w-9 h-9 rounded-full bg-accent/15 flex items-center justify-center shrink-0 overflow-hidden">
+            {profile?.profilePicUrl ? (
+              <img
+                src={profile.profilePicUrl}
+                alt={concorrente.nome}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-accent font-semibold text-sm">
+                {concorrente.nome.charAt(0).toUpperCase()}
+              </span>
+            )}
           </div>
-          <div>
-            <h3 className="font-medium text-text-primary text-sm leading-tight">
-              {concorrente.nome}
-            </h3>
-            <p className="text-[11px] text-text-muted">
-              {concorrente.plataformas.length}{" "}
-              {concorrente.plataformas.length === 1 ? "plataforma" : "plataformas"}
-            </p>
+
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h3 className="font-medium text-text-primary text-sm leading-tight truncate">
+                {concorrente.nome}
+              </h3>
+              {igUsername && (
+                <a
+                  href={`https://www.instagram.com/${igUsername}/`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] text-accent hover:underline shrink-0"
+                >
+                  @{igUsername}
+                </a>
+              )}
+            </div>
+            {profile && !profile.partial && (
+              <div className="flex items-center gap-3 text-[10px] text-text-muted mt-0.5">
+                <span>{formatNumber(profile.followers)} seguidores</span>
+                <span>{formatNumber(profile.postCount)} posts</span>
+              </div>
+            )}
           </div>
         </div>
-        <span className="text-text-muted">
-          {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </span>
-      </button>
 
-      {expanded && (
-        <div className="px-3 pb-3 space-y-2">
-          {concorrente.plataformas.map((plat) => (
-            <PlatformSection key={plat.rede} plat={plat} />
-          ))}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={() => loadPosts(true)}
+            disabled={loadingPosts}
+            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-card-hover transition-colors disabled:opacity-40"
+            title="Atualizar posts"
+          >
+            <RefreshCw
+              size={13}
+              className={cn(loadingPosts && "animate-spin")}
+            />
+          </button>
+          <button
+            onClick={handleRemove}
+            disabled={removing}
+            className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors disabled:opacity-40"
+            title="Remover concorrente"
+          >
+            <Trash2 size={13} />
+          </button>
         </div>
-      )}
-    </div>
-  );
-}
+      </div>
 
-// ─── comparison table ─────────────────────────────────────────────────────────
+      {/* Content */}
+      <div className="p-3">
+        {/* Loading state */}
+        {loadingPosts && !loaded && <PostsSkeleton />}
 
-type TableSortField = "nome" | "rede" | "seguidores" | "engajamento" | "frequencia";
+        {/* Error state */}
+        {scrapeError && !loadingPosts && (
+          <div className="flex items-center gap-2 text-warning text-xs py-2">
+            <AlertTriangle size={13} />
+            <span>{scrapeError}</span>
+          </div>
+        )}
 
-interface ComparisonTableProps {
-  concorrentes: Concorrente[];
-}
+        {/* Posts grid */}
+        {loaded && posts.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+            {posts.map((post) => (
+              <PostCard key={post.id || post.shortcode} post={post} />
+            ))}
+          </div>
+        )}
 
-function ComparisonTable({ concorrentes }: ComparisonTableProps) {
-  const [sortField, setSortField] = useState<TableSortField>("seguidores");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+        {/* Empty posts (profile loaded but no posts) */}
+        {loaded && !loadingPosts && posts.length === 0 && !scrapeError && (
+          <p className="text-text-muted text-xs text-center py-4">
+            {profile?.partial
+              ? "Dados parciais obtidos. O Instagram pode estar limitando o acesso. Tente novamente mais tarde."
+              : "Nenhum post encontrado."}
+          </p>
+        )}
 
-  const rows = useMemo(() => {
-    const flat = concorrentes.flatMap((c) =>
-      c.plataformas.map((p) => ({
-        nome: c.nome,
-        rede: p.rede,
-        seguidores: p.seguidores,
-        engajamento: p.taxa_engajamento,
-        frequencia: p.freq_postagem,
-      }))
-    );
-
-    return [...flat].sort((a, b) => {
-      let cmp = 0;
-      if (sortField === "nome") cmp = a.nome.localeCompare(b.nome);
-      else if (sortField === "rede") cmp = a.rede.localeCompare(b.rede);
-      else if (sortField === "seguidores") cmp = a.seguidores - b.seguidores;
-      else if (sortField === "engajamento") cmp = a.engajamento - b.engajamento;
-      else cmp = a.frequencia.localeCompare(b.frequencia);
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-  }, [concorrentes, sortField, sortDir]);
-
-  function toggleSort(field: TableSortField) {
-    if (sortField === field) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortField(field);
-      setSortDir("desc");
-    }
-  }
-
-  function SortIcon({ field }: { field: TableSortField }) {
-    if (sortField !== field) return <ChevronUp size={10} className="opacity-20" />;
-    return sortDir === "asc" ? (
-      <ChevronUp size={10} className="text-accent" />
-    ) : (
-      <ChevronDown size={10} className="text-accent" />
-    );
-  }
-
-  if (rows.length === 0) return null;
-
-  const cols: { field: TableSortField; label: string; align: string }[] = [
-    { field: "nome", label: "Concorrente", align: "text-left" },
-    { field: "rede", label: "Plataforma", align: "text-left" },
-    { field: "seguidores", label: "Seguidores", align: "text-right" },
-    { field: "engajamento", label: "Engajamento", align: "text-right" },
-    { field: "frequencia", label: "Frequencia", align: "text-left" },
-  ];
-
-  return (
-    <div className="bg-bg-card backdrop-blur-xl border border-border rounded-xl overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="border-b border-border">
-              {cols.map((c) => (
-                <th
-                  key={c.field}
-                  className={cn(
-                    "px-3 py-2.5 font-medium text-text-muted cursor-pointer select-none hover:text-text-secondary transition-colors text-[11px]",
-                    c.align
-                  )}
-                  onClick={() => toggleSort(c.field)}
-                >
-                  <span className="inline-flex items-center gap-0.5">
-                    {c.label} <SortIcon field={c.field} />
-                  </span>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, idx) => {
-              const cor = getPlataformaCor(row.rede);
-              return (
-                <tr
-                  key={idx}
-                  className="border-b border-border-subtle last:border-0 hover:bg-bg-card transition-colors"
-                >
-                  <td className="px-3 py-2 text-text-primary font-medium text-xs">{row.nome}</td>
-                  <td className="px-3 py-2">
-                    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium">
-                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: cor }} />
-                      <span style={{ color: cor }}>{getPlataformaLabel(row.rede)}</span>
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-text-secondary tabular-nums text-right text-xs">
-                    {formatNumber(row.seguidores)}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <span
-                      className="font-semibold tabular-nums text-xs"
-                      style={{ color: cor }}
-                    >
-                      {row.engajamento.toFixed(1)}%
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-text-secondary text-xs">{row.frequencia}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        {/* No username configured */}
+        {!igUsername && (
+          <p className="text-text-muted text-xs text-center py-4">
+            Sem username Instagram configurado.
+          </p>
+        )}
       </div>
     </div>
   );
 }
 
-// ─── main page ────────────────────────────────────────────────────────────────
+// ─── Main Page ──────────────────────────────────────────────────────────────
 
 export default function ConcorrentesPage() {
   const { empresa } = useEmpresa();
+  const {
+    concorrentes,
+    loading,
+    addConcorrente,
+    removeConcorrente,
+    fetchPosts,
+  } = useConcorrentes(empresa?.id);
   const [showModal, setShowModal] = useState(false);
-  const [extra, setExtra] = useState<Concorrente[]>([]);
-  const [search, setSearch] = useState("");
-
-  const concorrentes = useMemo(() => {
-    const base = empresa
-      ? concorrentesMock.filter((c) => c.empresa_id === empresa.id)
-      : [];
-    return [...base, ...extra].filter((c) =>
-      c.nome.toLowerCase().includes(search.toLowerCase())
-    );
-  }, [empresa, extra, search]);
 
   if (!empresa) {
     return (
@@ -539,65 +422,64 @@ export default function ConcorrentesPage() {
 
   return (
     <div className="fade-in space-y-4 p-4 max-w-6xl mx-auto">
-
-      {/* ── modal ─────────────────────────────────────────────────────── */}
+      {/* Modal */}
       {showModal && (
         <AddConcorrenteModal
           onClose={() => setShowModal(false)}
-          onAdd={(c) => setExtra((prev) => [...prev, c])}
-          empresaId={empresa.id}
+          onAdd={addConcorrente}
         />
       )}
 
-      {/* ── header ─────────────────────────────────────────────────────── */}
+      {/* Header */}
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold text-text-primary tracking-tight">
-          Rastreador de Concorrentes
-        </h1>
-        <div className="flex items-center gap-2">
-          {/* search */}
-          <div className="relative">
-            <Search
-              size={13}
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none"
-            />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar..."
-              className="w-40 pl-7 pr-2.5 py-1.5 rounded-lg bg-bg-card border border-border text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/30 transition-colors text-xs"
-            />
-          </div>
-          {/* add button */}
-          <button
-            onClick={() => setShowModal(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-text-secondary hover:text-text-primary hover:bg-bg-card-hover transition-colors text-xs"
-          >
-            <Plus size={13} />
-            Adicionar
-          </button>
-        </div>
-      </div>
-
-      {/* ── comparison table ───────────────────────────────────────────── */}
-      <ComparisonTable concorrentes={concorrentes} />
-
-      {/* ── competitor details ──────────────────────────────────────────── */}
-      {concorrentes.length === 0 ? (
-        <div className="bg-bg-card backdrop-blur-xl border border-border rounded-xl text-center py-10 space-y-2">
-          <Users size={28} className="text-text-muted mx-auto" />
-          <p className="text-text-secondary text-sm">Nenhum concorrente encontrado.</p>
-          <p className="text-text-muted text-xs">
-            {search
-              ? "Tente outro termo de busca."
-              : 'Clique em "Adicionar" para comecar.'}
+        <div>
+          <h1 className="text-xl font-semibold text-text-primary tracking-tight">
+            Monitoramento de Concorrentes
+          </h1>
+          <p className="text-xs text-text-muted mt-0.5">
+            Acompanhe os posts recentes dos concorrentes no Instagram
           </p>
         </div>
-      ) : (
-        <div className="space-y-2">
+        <button
+          onClick={() => setShowModal(true)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/90 hover:bg-accent text-white transition-colors text-xs font-medium"
+        >
+          <Plus size={13} />
+          Adicionar Concorrente
+        </button>
+      </div>
+
+      {/* Loading */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 size={20} className="animate-spin text-accent" />
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && concorrentes.length === 0 && (
+        <div className="bg-bg-card backdrop-blur-xl border border-border rounded-xl text-center py-12 space-y-3">
+          <Users size={32} className="text-text-muted mx-auto" />
+          <p className="text-text-secondary text-sm">
+            Nenhum concorrente cadastrado.
+          </p>
+          <p className="text-text-muted text-xs">
+            Clique em &quot;Adicionar Concorrente&quot; para monitorar perfis do
+            Instagram.
+          </p>
+        </div>
+      )}
+
+      {/* Concorrentes list */}
+      {!loading && concorrentes.length > 0 && (
+        <div className="space-y-3">
           {concorrentes.map((c) => (
-            <CompetitorDetail key={c.id} concorrente={c} />
+            <ConcorrenteSection
+              key={c.id}
+              concorrente={c}
+              onRemove={removeConcorrente}
+              onFetchPosts={fetchPosts}
+            />
           ))}
         </div>
       )}

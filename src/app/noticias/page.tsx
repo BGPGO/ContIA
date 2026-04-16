@@ -8,6 +8,7 @@ import {
   ChevronUp,
   Plus,
   X,
+  Trash2,
   ExternalLink,
   ToggleLeft,
   ToggleRight,
@@ -189,23 +190,15 @@ function AddFeedModal({ onClose, onAdd }: AddFeedModalProps) {
 
 interface RSSConfigSectionProps {
   feeds: ConfigRSS[];
-  onFeedsChange: (feeds: ConfigRSS[]) => void;
+  saving: boolean;
+  onAdd: (feed: ConfigRSS) => void;
+  onToggle: (index: number) => void;
+  onDelete: (index: number) => void;
 }
 
-function RSSConfigSection({ feeds, onFeedsChange }: RSSConfigSectionProps) {
+function RSSConfigSection({ feeds, saving, onAdd, onToggle, onDelete }: RSSConfigSectionProps) {
   const [collapsed, setCollapsed] = useState(true);
   const [showModal, setShowModal] = useState(false);
-
-  function toggleFeed(index: number) {
-    const updated = feeds.map((f, i) =>
-      i === index ? { ...f, ativo: !f.ativo } : f
-    );
-    onFeedsChange(updated);
-  }
-
-  function addFeed(feed: ConfigRSS) {
-    onFeedsChange([...feeds, feed]);
-  }
 
   function truncateUrl(url: string, max = 38): string {
     return url.length > max ? url.slice(0, max) + "..." : url;
@@ -215,7 +208,7 @@ function RSSConfigSection({ feeds, onFeedsChange }: RSSConfigSectionProps) {
     <>
       <AnimatePresence>
         {showModal && (
-          <AddFeedModal onClose={() => setShowModal(false)} onAdd={addFeed} />
+          <AddFeedModal onClose={() => setShowModal(false)} onAdd={(feed) => { onAdd(feed); }} />
         )}
       </AnimatePresence>
 
@@ -233,6 +226,9 @@ function RSSConfigSection({ feeds, onFeedsChange }: RSSConfigSectionProps) {
             <span className="text-[10px] text-text-muted bg-bg-card-hover border border-border px-1.5 py-0.5 rounded-full tabular-nums">
               {feeds.length}
             </span>
+            {saving && (
+              <Loader2 size={11} className="animate-spin text-text-muted" />
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -303,7 +299,7 @@ function RSSConfigSection({ feeds, onFeedsChange }: RSSConfigSectionProps) {
                             {feed.topico}
                           </span>
                           <button
-                            onClick={() => toggleFeed(idx)}
+                            onClick={() => onToggle(idx)}
                             className="transition-colors"
                             style={{ color: feed.ativo ? "var(--color-success)" : "var(--color-text-muted)" }}
                             title={feed.ativo ? "Desativar feed" : "Ativar feed"}
@@ -313,6 +309,13 @@ function RSSConfigSection({ feeds, onFeedsChange }: RSSConfigSectionProps) {
                             ) : (
                               <ToggleLeft size={16} />
                             )}
+                          </button>
+                          <button
+                            onClick={() => onDelete(idx)}
+                            className="text-text-muted hover:text-danger transition-colors"
+                            title="Remover feed"
+                          >
+                            <Trash2 size={13} />
                           </button>
                         </div>
                       </div>
@@ -461,19 +464,51 @@ function NewsCard({ noticia, index }: NewsCardProps) {
 // ── main page ────────────────────────────────────────────────────────────────
 
 export default function NoticiasPage() {
-  const { empresa } = useEmpresa();
+  const { empresa, updateEmpresa } = useEmpresa();
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [feeds, setFeeds] = useState<ConfigRSS[]>(empresa?.config_rss ?? []);
   const [noticias, setNoticias] = useState<Noticia[]>([]);
   const [loading, setLoading] = useState(true);
+  const [savingFeeds, setSavingFeeds] = useState(false);
   const [usingMock, setUsingMock] = useState(false);
 
-  // keep feeds in sync when empresa changes
+  // keep feeds in sync when empresa changes (mas nao durante salvamento local)
   useEffect(() => {
     if (empresa?.config_rss) {
       setFeeds(empresa.config_rss);
     }
   }, [empresa?.config_rss]);
+
+  // Persiste o array de feeds no Supabase via updateEmpresa do contexto
+  const persistFeeds = useCallback(async (updatedFeeds: ConfigRSS[]) => {
+    if (!empresa) return;
+    setFeeds(updatedFeeds);
+    setSavingFeeds(true);
+    try {
+      await updateEmpresa(empresa.id, { config_rss: updatedFeeds });
+    } catch (err) {
+      console.error("Erro ao salvar feeds RSS:", err);
+    } finally {
+      setSavingFeeds(false);
+    }
+  }, [empresa, updateEmpresa]);
+
+  const handleAddFeed = useCallback((feed: ConfigRSS) => {
+    const updatedFeeds = [...feeds, feed];
+    persistFeeds(updatedFeeds);
+  }, [feeds, persistFeeds]);
+
+  const handleToggleFeed = useCallback((index: number) => {
+    const updatedFeeds = feeds.map((f, i) =>
+      i === index ? { ...f, ativo: !f.ativo } : f
+    );
+    persistFeeds(updatedFeeds);
+  }, [feeds, persistFeeds]);
+
+  const handleDeleteFeed = useCallback((index: number) => {
+    const updatedFeeds = feeds.filter((_, i) => i !== index);
+    persistFeeds(updatedFeeds);
+  }, [feeds, persistFeeds]);
 
   const fetchNoticias = useCallback(async () => {
     if (!empresa) return;
@@ -599,7 +634,10 @@ export default function NoticiasPage() {
       {/* ── RSS config ──────────────────────────────────────────────────── */}
       <RSSConfigSection
         feeds={feeds}
-        onFeedsChange={setFeeds}
+        saving={savingFeeds}
+        onAdd={handleAddFeed}
+        onToggle={handleToggleFeed}
+        onDelete={handleDeleteFeed}
       />
 
       {/* ── topic filters ───────────────────────────────────────────────── */}

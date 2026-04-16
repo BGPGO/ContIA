@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   ArrowLeftRight,
   CalendarDays,
+  Clock,
   RefreshCw,
   Sparkles,
 } from "lucide-react";
@@ -49,6 +50,8 @@ interface CompareData {
   periodA: { start: string; end: string };
   periodB: { start: string; end: string };
   providers: ProviderKey[];
+  historical_limited?: boolean;
+  message?: string | null;
 }
 
 /* ── Helpers ────────────────────────────────────────────────── */
@@ -302,12 +305,48 @@ function CompareContent() {
       {/* Results */}
       {data && !loading && (
         <>
-          {data.comparisons.length === 0 ? (
+          {/* Banner: histórico em construção */}
+          {data.historical_limited && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="flex items-start gap-3 p-4 rounded-xl bg-accent/8 border border-accent/20"
+            >
+              <Clock size={16} className="text-accent mt-0.5 shrink-0" />
+              <div>
+                <p className="text-[13px] font-semibold text-accent mb-0.5">
+                  Comparativo histórico em construção
+                </p>
+                <p className="text-[12px] text-text-secondary leading-relaxed">
+                  {data.message ??
+                    "Os dados estão sendo coletados diariamente. Quanto mais tempo a conta ficar conectada, mais rico será o comparativo."}
+                </p>
+              </div>
+            </motion.div>
+          )}
+
+          {data.comparisons.length === 0 && !data.historical_limited ? (
             <EmptyState
               icon={ArrowLeftRight}
               title="Sem dados para comparar"
               description="Nao ha dados suficientes nos periodos selecionados para gerar uma comparacao."
             />
+          ) : data.comparisons.length === 0 && data.historical_limited ? (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              className="bg-bg-card border border-border rounded-xl p-8 text-center"
+            >
+              <Clock size={32} className="text-text-muted mx-auto mb-3" />
+              <p className="text-[14px] font-semibold text-text-primary mb-1">
+                Dados do período atual indisponíveis
+              </p>
+              <p className="text-[12px] text-text-secondary max-w-sm mx-auto">
+                Não foi possível buscar os dados ao vivo do Instagram neste momento. Tente novamente em alguns instantes.
+              </p>
+            </motion.div>
           ) : (
             <>
               {/* Comparison Chart */}

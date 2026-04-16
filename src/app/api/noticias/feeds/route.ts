@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { parseFeed, getDefaultFeeds } from "@/lib/rss";
+import { getDefaultFeeds } from "@/lib/rss";
 import { createClient } from "@/lib/supabase/server";
+import { getAdminSupabase } from "@/lib/supabase/admin";
 import { ConfigRSS } from "@/types";
 
 export async function GET(request: NextRequest) {
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validar URL
+    // Validar formato de URL
     try {
       new URL(url);
     } catch {
@@ -59,28 +60,40 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validar se eh um feed RSS valido tentando parsear
-    const testItems = await parseFeed(url, nome, topico);
-    if (testItems.length === 0) {
+    // Verificar autenticacao com client normal
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
       return NextResponse.json(
-        { error: "Nao foi possivel ler o feed RSS. Verifique se a URL eh de um feed valido." },
-        { status: 400 }
+        { error: "Nao autenticado." },
+        { status: 401 }
       );
     }
 
-    const supabase = await createClient();
-
-    // Buscar config_rss atual
-    const { data: empresa, error: fetchError } = await supabase
+    // Buscar config_rss atual — usar admin para garantir leitura mesmo com RLS
+    const admin = getAdminSupabase();
+    const { data: empresa, error: fetchError } = await admin
       .from("empresas")
-      .select("config_rss")
+      .select("id, user_id, config_rss")
       .eq("id", empresaId)
       .single();
 
-    if (fetchError) {
+    if (fetchError || !empresa) {
       return NextResponse.json(
         { error: "Empresa nao encontrada." },
         { status: 404 }
+      );
+    }
+
+    // Garantir que o usuario autenticado eh dono da empresa
+    if (empresa.user_id !== user.id) {
+      return NextResponse.json(
+        { error: "Sem permissao para modificar esta empresa." },
+        { status: 403 }
       );
     }
 
@@ -99,12 +112,14 @@ export async function POST(request: NextRequest) {
     const newFeed: ConfigRSS = { nome, url, topico, ativo: true };
     const updatedFeeds = [...currentFeeds, newFeed];
 
-    const { error: updateError } = await supabase
+    // Usar admin para garantir que o update nao seja bloqueado por RLS
+    const { error: updateError } = await admin
       .from("empresas")
       .update({ config_rss: updatedFeeds })
       .eq("id", empresaId);
 
     if (updateError) {
+      console.error("Erro ao atualizar config_rss:", updateError);
       return NextResponse.json(
         { error: "Erro ao salvar feed." },
         { status: 500 }
@@ -114,7 +129,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       feed: newFeed,
       feeds: updatedFeeds,
-      testItems: testItems.slice(0, 3),
     });
   } catch (error) {
     console.error("Erro ao adicionar feed:", error);
@@ -137,18 +151,38 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    // Verificar autenticacao
     const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
-    const { data: empresa, error: fetchError } = await supabase
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "Nao autenticado." },
+        { status: 401 }
+      );
+    }
+
+    const admin = getAdminSupabase();
+    const { data: empresa, error: fetchError } = await admin
       .from("empresas")
-      .select("config_rss")
+      .select("id, user_id, config_rss")
       .eq("id", empresaId)
       .single();
 
-    if (fetchError) {
+    if (fetchError || !empresa) {
       return NextResponse.json(
         { error: "Empresa nao encontrada." },
         { status: 404 }
+      );
+    }
+
+    if (empresa.user_id !== user.id) {
+      return NextResponse.json(
+        { error: "Sem permissao para modificar esta empresa." },
+        { status: 403 }
       );
     }
 
@@ -166,12 +200,13 @@ export async function DELETE(request: NextRequest) {
     const removed = currentFeeds[index];
     const updatedFeeds = currentFeeds.filter((_, i) => i !== index);
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await admin
       .from("empresas")
       .update({ config_rss: updatedFeeds })
       .eq("id", empresaId);
 
     if (updateError) {
+      console.error("Erro ao remover feed:", updateError);
       return NextResponse.json(
         { error: "Erro ao remover feed." },
         { status: 500 }

@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getAdminSupabase } from "@/lib/supabase/admin";
 import { METADATA_BY_PROVIDER } from "@/lib/drivers/metadata";
+import { fetchInstagramLive } from "@/lib/analytics/instagram-fetcher";
 import type { ProviderKey } from "@/types/providers";
 
 /**
  * GET /api/insights/compare?empresa_id=xxx&period_a_start=...&period_a_end=...&period_b_start=...&period_b_end=...
  *
  * Returns comparison data between two periods.
+ * Se provider_snapshots estiver vazio para o período A (Instagram), busca dados LIVE
+ * e retorna historical_limited: true para o frontend exibir banner informativo.
  */
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -30,6 +34,70 @@ export async function GET(req: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
+  }
+
+  // ── Resolver conexões Instagram (session → admin → legado) ──
+  type IgConnection = {
+    id: string;
+    access_token: string | null;
+    provider_user_id: string | null;
+    username: string | null;
+  };
+
+  let igConnection: IgConnection | null = null;
+
+  // Fonte 1: session client (RLS por user_id)
+  const { data: connSession } = await supabase
+    .from("social_connections")
+    .select("id, access_token, provider_user_id, username")
+    .eq("empresa_id", empresaId)
+    .eq("provider", "instagram")
+    .eq("is_active", true)
+    .limit(1);
+
+  if (connSession && connSession.length > 0) {
+    igConnection = connSession[0];
+  }
+
+  // Fonte 2: admin client (bypass RLS — fallback)
+  if (!igConnection) {
+    try {
+      const admin = getAdminSupabase();
+      const { data: connAdmin } = await admin
+        .from("social_connections")
+        .select("id, access_token, provider_user_id, username")
+        .eq("empresa_id", empresaId)
+        .eq("provider", "instagram")
+        .eq("is_active", true)
+        .limit(1);
+      if (connAdmin && connAdmin.length > 0) {
+        igConnection = connAdmin[0];
+      }
+    } catch {
+      // admin fallback silencioso
+    }
+  }
+
+  // Fonte 3: empresa.redes_sociais (legado)
+  if (!igConnection) {
+    const { data: empresa } = await supabase
+      .from("empresas")
+      .select("redes_sociais")
+      .eq("id", empresaId)
+      .single();
+
+    const legacyIg = (
+      empresa?.redes_sociais as Record<string, Record<string, string | boolean>> | null
+    )?.instagram;
+
+    if (legacyIg?.conectado && legacyIg.access_token) {
+      igConnection = {
+        id: `legacy-${empresaId}`,
+        access_token: legacyIg.access_token as string,
+        provider_user_id: (legacyIg.provider_user_id as string) ?? null,
+        username: (legacyIg.username as string) ?? null,
+      };
+    }
   }
 
   // Parallel: snapshots and content for both periods
@@ -77,11 +145,72 @@ export async function GET(req: NextRequest) {
       .eq("is_active", true),
   ]);
 
-  const snapshotsA = snapshotsARes.data ?? [];
+  let snapshotsA = snapshotsARes.data ?? [];
   const snapshotsB = snapshotsBRes.data ?? [];
   const contentA = contentARes.data ?? [];
   const contentB = contentBRes.data ?? [];
   const activeProviders = [...new Set((connectionsRes.data ?? []).map((c) => c.provider as ProviderKey))];
+
+  // ── Live fetch para Instagram quando período A não tem snapshots ──
+  let historicalLimited = false;
+  let historicalMessage = "";
+
+  // Calcular total de snapshots disponíveis globalmente para estimar dias de coleta
+  const { count: totalSnapshots } = await supabase
+    .from("provider_snapshots")
+    .select("id", { count: "exact", head: true })
+    .eq("empresa_id", empresaId)
+    .eq("provider", "instagram");
+
+  const igSnapshotsA = snapshotsA.filter((s) => s.provider === "instagram");
+  const igSnapshotsB = snapshotsB.filter((s) => s.provider === "instagram");
+
+  const igConnected = igConnection?.access_token && igConnection.provider_user_id;
+  const hasNoIgDataInA = igSnapshotsA.length === 0 && igConnected;
+
+  if (hasNoIgDataInA) {
+    historicalLimited = true;
+    const daysCollected = totalSnapshots ?? 0;
+    const daysNeeded = Math.max(0, 7 - daysCollected);
+
+    historicalMessage =
+      daysNeeded > 0
+        ? `Comparativo histórico em construção — os dados estão sendo coletados diariamente. Estarão disponíveis em aproximadamente ${daysNeeded} dia${daysNeeded > 1 ? "s" : ""}.`
+        : "Comparativo histórico em construção — os dados estão sendo coletados diariamente. Quanto mais tempo a conta ficar conectada, mais rico será o comparativo.";
+
+    // Buscar LIVE e criar snapshot sintético para período A
+    try {
+      const liveData = await fetchInstagramLive(
+        igConnection!.access_token!,
+        igConnection!.provider_user_id!,
+        30
+      );
+
+      const today = new Date().toISOString().split("T")[0];
+      const syntheticSnapshot = {
+        id: "live-synthetic",
+        empresa_id: empresaId,
+        connection_id: igConnection!.id,
+        provider: "instagram" as ProviderKey,
+        snapshot_date: today,
+        metrics: {
+          followers_count: liveData.kpis.followers,
+          reach: liveData.kpis.reach,
+          impressions: liveData.kpis.impressions,
+        },
+      };
+
+      // Injetar snapshot sintético no período A
+      snapshotsA = [...snapshotsA, syntheticSnapshot];
+    } catch (err) {
+      console.error("[compare] Falha ao buscar Instagram live:", err instanceof Error ? err.message : err);
+    }
+  } else if (igSnapshotsB.length === 0 && igSnapshotsA.length > 0) {
+    // Tem dados no A mas não no B — histórico parcial
+    historicalLimited = true;
+    historicalMessage =
+      "Comparativo histórico em construção — ainda não há dados suficientes para o período anterior. Continue conectado para acumular histórico.";
+  }
 
   // Aggregate per provider: latest snapshot metrics and content stats
   function aggregateByProvider(
@@ -202,5 +331,7 @@ export async function GET(req: NextRequest) {
     periodA: { start: periodAStart, end: periodAEnd },
     periodB: { start: periodBStart, end: periodBEnd },
     providers: activeProviders,
+    historical_limited: historicalLimited,
+    message: historicalMessage || null,
   });
 }
