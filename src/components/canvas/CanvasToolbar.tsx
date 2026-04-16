@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import {
   Undo2,
   Redo2,
@@ -63,6 +64,44 @@ interface CanvasToolbarProps {
 /* ═══════════════════════════════════════════════════════════════════════════
    Sub-components
    ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Portal Dropdown: renders dropdown in document.body so it's ALWAYS on top ── */
+
+function PortalDropdown({
+  anchorRef,
+  open,
+  children,
+  className = "",
+}: {
+  anchorRef: React.RefObject<HTMLElement | null>;
+  open: boolean;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (!open || !anchorRef.current) return;
+    const rect = anchorRef.current.getBoundingClientRect();
+    setPos({
+      top: rect.bottom + 4,
+      left: rect.left,
+    });
+  }, [open, anchorRef]);
+
+  if (!open || typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      data-toolbar-portal
+      className={`fixed bg-[#141736] border border-white/10 rounded-xl shadow-2xl ${className}`}
+      style={{ top: pos.top, left: pos.left, zIndex: 99999 }}
+    >
+      {children}
+    </div>,
+    document.body
+  );
+}
 
 function ToolbarButton({
   onClick,
@@ -141,17 +180,19 @@ function ColorPickerPopover({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
+  const btnRef = useRef<HTMLButtonElement>(null);
+
   return (
     <div className="relative" ref={popoverRef}>
       <button
+        ref={btnRef}
         type="button"
         onClick={() => setOpen(!open)}
         className="w-6 h-6 rounded-full border-2 border-white/20 hover:border-white/40 transition-all cursor-pointer"
         style={{ backgroundColor: value }}
         title="Escolher cor"
       />
-      {open && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-[200] bg-[#141736] border border-white/10 rounded-xl shadow-xl p-3 w-48">
+      <PortalDropdown anchorRef={btnRef} open={open} className="p-3 w-48">
           {/* Preset grid */}
           <div className="grid grid-cols-5 gap-1.5 mb-3">
             {colors.map((c) => (
@@ -199,8 +240,7 @@ function ColorPickerPopover({
               placeholder="#000000"
             />
           </div>
-        </div>
-      )}
+      </PortalDropdown>
     </div>
   );
 }
@@ -216,6 +256,7 @@ function HighlightColorPicker({
 }) {
   const [open, setOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
 
   const highlightColors = [
     "#facc15", // yellow
@@ -233,9 +274,10 @@ function HighlightColorPicker({
   useEffect(() => {
     if (!open) return;
     const handleClick = (e: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      if (popoverRef.current?.contains(target)) return;
+      if ((target as HTMLElement).closest?.("[data-toolbar-portal]")) return;
+      setOpen(false);
     };
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
@@ -244,6 +286,7 @@ function HighlightColorPicker({
   return (
     <div className="relative" ref={popoverRef}>
       <button
+        ref={btnRef}
         type="button"
         onClick={() => setOpen(!open)}
         title="Destaque / Highlight"
@@ -255,38 +298,36 @@ function HighlightColorPicker({
       >
         <Highlighter size={14} />
       </button>
-      {open && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-[200] bg-[#141736] border border-white/10 rounded-xl shadow-xl p-3 w-48">
-          <div className="grid grid-cols-5 gap-1.5 mb-2">
-            {highlightColors.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => {
-                  onChange(c);
-                  setOpen(false);
-                }}
-                className={`w-7 h-7 rounded-md border-2 transition-all cursor-pointer ${
-                  value === c
-                    ? "border-white/60 scale-110"
-                    : "border-transparent hover:border-white/20"
-                }`}
-                style={{ backgroundColor: c }}
-              />
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              onClear();
-              setOpen(false);
-            }}
-            className="w-full text-center text-[10px] text-[#8b8fb0] hover:text-[#e8eaff] py-1.5 rounded hover:bg-white/5 transition-colors cursor-pointer"
-          >
-            Remover destaque
-          </button>
+      <PortalDropdown anchorRef={btnRef} open={open} className="p-3 w-48">
+        <div className="grid grid-cols-5 gap-1.5 mb-2">
+          {highlightColors.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => {
+                onChange(c);
+                setOpen(false);
+              }}
+              className={`w-7 h-7 rounded-md border-2 transition-all cursor-pointer ${
+                value === c
+                  ? "border-white/60 scale-110"
+                  : "border-transparent hover:border-white/20"
+              }`}
+              style={{ backgroundColor: c }}
+            />
+          ))}
         </div>
-      )}
+        <button
+          type="button"
+          onClick={() => {
+            onClear();
+            setOpen(false);
+          }}
+          className="w-full text-center text-[10px] text-[#8b8fb0] hover:text-[#e8eaff] py-1.5 rounded hover:bg-white/5 transition-colors cursor-pointer"
+        >
+          Remover destaque
+        </button>
+      </PortalDropdown>
     </div>
   );
 }
@@ -382,11 +423,15 @@ function TextAdvancedDropdown({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (ref.current?.contains(target)) return;
+      if ((target as HTMLElement).closest?.("[data-toolbar-portal]")) return;
+      setOpen(false);
     };
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
@@ -395,6 +440,7 @@ function TextAdvancedDropdown({
   return (
     <div className="relative" ref={ref}>
       <button
+        ref={btnRef}
         onClick={() => setOpen(!open)}
         className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs transition-colors ${
           open ? "bg-[#4ecdc4]/20 text-[#4ecdc4]" : "bg-[#141736] text-[#8b8fb0] hover:text-[#e8eaff]"
@@ -405,61 +451,59 @@ function TextAdvancedDropdown({
         <ChevronDown size={10} />
       </button>
 
-      {open && (
-        <div className="absolute bottom-full mb-1 left-0 z-[200] bg-[#141736] border border-white/10 rounded-xl p-3 shadow-2xl min-w-[200px]">
-          <p className="text-[10px] text-[#5e6388] uppercase tracking-wider mb-2 font-medium">Espacamento</p>
+      <PortalDropdown anchorRef={btnRef} open={open} className="p-3 min-w-[200px]">
+        <p className="text-[10px] text-[#5e6388] uppercase tracking-wider mb-2 font-medium">Espacamento</p>
 
-          {/* Line Height */}
-          <div className="flex items-center justify-between gap-2 mb-2">
-            <div className="flex items-center gap-1.5">
-              <ArrowUpDown size={12} className="text-[#8b8fb0]" />
-              <span className="text-[11px] text-[#c0c3e0]">Entrelinha</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => onLineHeightChange(Math.max(0.5, lineHeight - 0.1))}
-                className="w-5 h-5 flex items-center justify-center rounded bg-[#080b1e] text-[#8b8fb0] hover:text-[#e8eaff] transition-colors"
-              >
-                <Minus size={10} />
-              </button>
-              <span className="text-[11px] text-[#e8eaff] font-mono w-8 text-center">
-                {lineHeight.toFixed(1)}
-              </span>
-              <button
-                onClick={() => onLineHeightChange(Math.min(4, lineHeight + 0.1))}
-                className="w-5 h-5 flex items-center justify-center rounded bg-[#080b1e] text-[#8b8fb0] hover:text-[#e8eaff] transition-colors"
-              >
-                <Plus size={10} />
-              </button>
-            </div>
+        {/* Line Height */}
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="flex items-center gap-1.5">
+            <ArrowUpDown size={12} className="text-[#8b8fb0]" />
+            <span className="text-[11px] text-[#c0c3e0]">Entrelinha</span>
           </div>
-
-          {/* Char Spacing */}
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5">
-              <Space size={12} className="text-[#8b8fb0]" />
-              <span className="text-[11px] text-[#c0c3e0]">Entre letras</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => onCharSpacingChange(Math.max(-200, charSpacing - 20))}
-                className="w-5 h-5 flex items-center justify-center rounded bg-[#080b1e] text-[#8b8fb0] hover:text-[#e8eaff] transition-colors"
-              >
-                <Minus size={10} />
-              </button>
-              <span className="text-[11px] text-[#e8eaff] font-mono w-8 text-center">
-                {charSpacing}
-              </span>
-              <button
-                onClick={() => onCharSpacingChange(Math.min(800, charSpacing + 20))}
-                className="w-5 h-5 flex items-center justify-center rounded bg-[#080b1e] text-[#8b8fb0] hover:text-[#e8eaff] transition-colors"
-              >
-                <Plus size={10} />
-              </button>
-            </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => onLineHeightChange(Math.max(0.5, lineHeight - 0.1))}
+              className="w-5 h-5 flex items-center justify-center rounded bg-[#080b1e] text-[#8b8fb0] hover:text-[#e8eaff] transition-colors"
+            >
+              <Minus size={10} />
+            </button>
+            <span className="text-[11px] text-[#e8eaff] font-mono w-8 text-center">
+              {lineHeight.toFixed(1)}
+            </span>
+            <button
+              onClick={() => onLineHeightChange(Math.min(4, lineHeight + 0.1))}
+              className="w-5 h-5 flex items-center justify-center rounded bg-[#080b1e] text-[#8b8fb0] hover:text-[#e8eaff] transition-colors"
+            >
+              <Plus size={10} />
+            </button>
           </div>
         </div>
-      )}
+
+        {/* Char Spacing */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <Space size={12} className="text-[#8b8fb0]" />
+            <span className="text-[11px] text-[#c0c3e0]">Entre letras</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => onCharSpacingChange(Math.max(-200, charSpacing - 20))}
+              className="w-5 h-5 flex items-center justify-center rounded bg-[#080b1e] text-[#8b8fb0] hover:text-[#e8eaff] transition-colors"
+            >
+              <Minus size={10} />
+            </button>
+            <span className="text-[11px] text-[#e8eaff] font-mono w-8 text-center">
+              {charSpacing}
+            </span>
+            <button
+              onClick={() => onCharSpacingChange(Math.min(800, charSpacing + 20))}
+              className="w-5 h-5 flex items-center justify-center rounded bg-[#080b1e] text-[#8b8fb0] hover:text-[#e8eaff] transition-colors"
+            >
+              <Plus size={10} />
+            </button>
+          </div>
+        </div>
+      </PortalDropdown>
     </div>
   );
 }
@@ -504,6 +548,10 @@ function FontFamilySelect({
   value: string;
   onChange: (font: string) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+
   const fonts = [
     "Plus Jakarta Sans",
     "Inter",
@@ -514,18 +562,52 @@ function FontFamilySelect({
     "Arial",
     "Courier New",
   ];
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (popoverRef.current?.contains(target)) return;
+      if ((target as HTMLElement).closest?.("[data-toolbar-portal]")) return;
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="bg-[#141736] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-[#e8eaff] cursor-pointer focus:outline-none focus:border-[#4ecdc4]/50 max-w-[140px]"
-    >
-      {fonts.map((f) => (
-        <option key={f} value={f}>
-          {f}
-        </option>
-      ))}
-    </select>
+    <div className="relative" ref={popoverRef}>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 bg-[#141736] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-[#e8eaff] cursor-pointer hover:border-[#4ecdc4]/50 transition-all max-w-[140px]"
+        title="Fonte"
+      >
+        <span className="truncate">{value}</span>
+        <ChevronDown size={10} className="text-[#5e6388] shrink-0" />
+      </button>
+      <PortalDropdown anchorRef={btnRef} open={open} className="w-[200px] overflow-hidden p-2">
+        {fonts.map((f) => (
+          <button
+            key={f}
+            type="button"
+            onClick={() => {
+              onChange(f);
+              setOpen(false);
+            }}
+            className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors cursor-pointer ${
+              value === f
+                ? "bg-[#4ecdc4]/20 text-[#4ecdc4]"
+                : "text-[#c0c3e0] hover:bg-white/5 hover:text-[#e8eaff]"
+            }`}
+            style={{ fontFamily: f }}
+          >
+            {f}
+          </button>
+        ))}
+      </PortalDropdown>
+    </div>
   );
 }
 
