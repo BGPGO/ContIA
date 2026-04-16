@@ -562,7 +562,7 @@ export function Sidebar() {
       </AnimatePresence>
 
       {/* ── Desktop Sidebar ── */}
-      <aside className="hidden md:flex flex-col w-[260px] min-h-screen shrink-0 border-r border-[#1e2348]/60 bg-[#0c0f24] relative z-30">
+      <aside className="hidden md:flex flex-col w-[260px] h-screen shrink-0 border-r border-[#1e2348]/60 bg-[#0c0f24] relative z-30 overflow-hidden">
         {/* Subtle side gradient */}
         <div className="absolute inset-0 bg-gradient-to-b from-[#4ecdc4]/[0.02] via-transparent to-[#6c5ce7]/[0.02] pointer-events-none" />
         <div className="relative flex flex-col h-full">
