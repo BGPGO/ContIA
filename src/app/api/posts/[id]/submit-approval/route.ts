@@ -29,35 +29,33 @@ export async function POST(
       // body pode ser vazio — ok
     }
 
-    // Buscar empresa do usuário para verificar ownership
-    const { data: empresa } = await supabase
-      .from("empresas")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (!empresa) {
-      return NextResponse.json(
-        { error: "Empresa não encontrada ou sem permissão." },
-        { status: 403 }
-      );
-    }
-
-    // Verificar que o post pertence à empresa do usuário
     const { data: post } = await supabase
       .from("posts")
       .select("id, empresa_id, status")
       .eq("id", postId)
-      .eq("empresa_id", empresa.id)
       .maybeSingle();
 
     if (!post) {
       return NextResponse.json({ error: "Post não encontrado." }, { status: 404 });
     }
 
+    const { data: empresa } = await supabase
+      .from("empresas")
+      .select("id")
+      .eq("id", post.empresa_id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!empresa) {
+      return NextResponse.json(
+        { error: "Sem permissão para enviar este post para aprovação." },
+        { status: 403 }
+      );
+    }
+
     const result = await submitForApproval(supabase, {
       postId,
-      empresaId: empresa.id,
+      empresaId: post.empresa_id as string,
       requestedBy: user.id,
       comment: body.comment,
     });
