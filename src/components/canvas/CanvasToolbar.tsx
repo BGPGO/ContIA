@@ -151,7 +151,7 @@ function ColorPickerPopover({
         title="Escolher cor"
       />
       {open && (
-        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-[200] bg-[#141736] border border-white/10 rounded-xl shadow-xl p-3 w-48">
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-[200] bg-[#141736] border border-white/10 rounded-xl shadow-xl p-3 w-48">
           {/* Preset grid */}
           <div className="grid grid-cols-5 gap-1.5 mb-3">
             {colors.map((c) => (
@@ -256,7 +256,7 @@ function HighlightColorPicker({
         <Highlighter size={14} />
       </button>
       {open && (
-        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-[200] bg-[#141736] border border-white/10 rounded-xl shadow-xl p-3 w-48">
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-[200] bg-[#141736] border border-white/10 rounded-xl shadow-xl p-3 w-48">
           <div className="grid grid-cols-5 gap-1.5 mb-2">
             {highlightColors.map((c) => (
               <button
@@ -337,7 +337,7 @@ function ShapesDropdown({
         <ChevronDown size={11} className="text-[#5e6388]" />
       </button>
       {open && (
-        <div className="absolute top-full left-0 mt-1 z-[200] bg-[#141736] border border-white/10 rounded-xl shadow-2xl w-[200px] overflow-hidden p-2">
+        <div className="absolute bottom-full left-0 mb-1 z-[200] bg-[#141736] border border-white/10 rounded-xl shadow-2xl w-[200px] overflow-hidden p-2">
           <div className="grid grid-cols-3 gap-1">
             {shapes.map((item) => {
               const Icon = item.icon;
@@ -406,7 +406,7 @@ function TextAdvancedDropdown({
       </button>
 
       {open && (
-        <div className="absolute top-full mt-1 left-0 z-[200] bg-[#141736] border border-white/10 rounded-xl p-3 shadow-2xl min-w-[200px]">
+        <div className="absolute bottom-full mb-1 left-0 z-[200] bg-[#141736] border border-white/10 rounded-xl p-3 shadow-2xl min-w-[200px]">
           <p className="text-[10px] text-[#5e6388] uppercase tracking-wider mb-2 font-medium">Espacamento</p>
 
           {/* Line Height */}
