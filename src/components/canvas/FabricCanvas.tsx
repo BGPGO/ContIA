@@ -676,17 +676,21 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
     }, [aspectRatio, dims.w, dims.h, computeScale]);
 
     // ── Resize observer for container ──
+    // Only reset scale if user hasn't manually zoomed
+    const userZoomedRef = useRef(false);
     useEffect(() => {
       const container = containerRef.current;
       if (!container) return;
       const ro = new ResizeObserver(() => {
-        setScale(computeScale());
+        if (!userZoomedRef.current) {
+          setScale(computeScale());
+        }
       });
       ro.observe(container);
       return () => ro.disconnect();
     }, [computeScale]);
 
-    // ── Clamp pan so canvas doesn't leave viewport entirely ──
+    // ── Clamp pan so canvas stays mostly visible ──
     const clampPan = useCallback((offset: { x: number; y: number }, currentScale: number) => {
       const container = containerRef.current;
       if (!container) return offset;
@@ -696,11 +700,22 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
       const canvasW = dims.w * currentScale;
       const canvasH = dims.h * currentScale;
 
-      // Keep canvas always visible — limit pan to the padding around it
-      const paddingX = Math.max(16, (cw - canvasW) / 2);
-      const paddingY = Math.max(16, (ch - canvasH) / 2);
-      const maxPanX = paddingX;
-      const maxPanY = paddingY;
+      let maxPanX: number;
+      let maxPanY: number;
+
+      if (canvasW <= cw) {
+        // Canvas fits in container — only allow small pan (padding)
+        maxPanX = Math.max(16, (cw - canvasW) / 2);
+      } else {
+        // Canvas is BIGGER than container (zoomed in) — allow pan to see edges
+        maxPanX = (canvasW - cw) / 2 + 40; // 40px extra margin
+      }
+
+      if (canvasH <= ch) {
+        maxPanY = Math.max(16, (ch - canvasH) / 2);
+      } else {
+        maxPanY = (canvasH - ch) / 2 + 40;
+      }
 
       return {
         x: Math.max(-maxPanX, Math.min(maxPanX, offset.x)),
@@ -728,10 +743,11 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
           const fy = mouseY / rect.height;
 
           const delta = e.deltaY > 0 ? -0.05 : 0.05;
+          userZoomedRef.current = true; // Mark that user manually zoomed
 
           setScale((prev) => {
             const fitScale = computeScale();
-            const minZoom = fitScale * 0.9; // 10% menor que "fit" permite ver bordas
+            const minZoom = fitScale * 0.9;
             const next = Math.min(3, Math.max(minZoom, prev + delta));
             const scaleDiff = next - prev;
             setPanOffset((p) => clampPan({
@@ -1136,6 +1152,7 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
         },
 
         zoomToFit: () => {
+          userZoomedRef.current = false; // Allow ResizeObserver to adjust again
           setScale(computeScale());
           setPanOffset({ x: 0, y: 0 });
         },

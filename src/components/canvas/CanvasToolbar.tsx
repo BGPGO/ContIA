@@ -724,7 +724,7 @@ export function CanvasToolbar({
   const hasContext = isText || isShape || isImage;
 
   return (
-    <div className="shrink-0 border-b border-white/10 bg-[#0c0f24] h-[96px] flex flex-col">
+    <div className="shrink-0 border-b border-white/10 bg-[#0c0f24] h-[96px] flex flex-col relative z-[60]">
       {/* Hidden file inputs */}
       <input
         ref={addImageInputRef}
@@ -892,7 +892,7 @@ export function CanvasToolbar({
       {/* ══════════════════════════════════════════════════════════════════
          ROW 2: Context toolbar — always 48px tall, content changes
          ══════════════════════════════════════════════════════════════════ */}
-      <div className="flex items-center gap-1.5 px-3 h-[48px] shrink-0 border-t border-white/5 bg-[#080b1e]/50 overflow-hidden">
+      <div className="flex items-center gap-1.5 px-3 h-[48px] shrink-0 border-t border-white/5 bg-[#080b1e]/50 overflow-x-auto overflow-y-visible">
         {!hasContext && (
           <span className="text-xs text-[#5e6388]">Selecione um elemento para editar</span>
         )}
