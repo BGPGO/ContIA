@@ -137,6 +137,30 @@ function extractSelectionInfo(obj: any): SelectionInfo {
 }
 
 /**
+ * Pré-processa canvas_json ANTES de loadFromJSON para injetar crossOrigin='anonymous'
+ * em TODO nó de imagem. Sem isso, Fabric v6 cria <img> sem CORS, o browser cacheia
+ * a resposta no-cors e qualquer toDataURL() depois falha com "tainted canvas",
+ * mesmo que a origem tenha ACAO: *. Aplicar crossOrigin DEPOIS é tarde demais.
+ */
+function preProcessCanvasJsonForCrossOrigin(json: any): any {
+  if (!json || typeof json !== "object") return json;
+  function walk(node: any) {
+    if (!node || typeof node !== "object") return;
+    const t = node.type;
+    if (t === "image" || t === "Image") {
+      if (typeof node.src === "string" && !node.src.startsWith("data:")) {
+        node.crossOrigin = "anonymous";
+      }
+    }
+    if (Array.isArray(node.objects)) node.objects.forEach(walk);
+    if (Array.isArray(node.slides)) node.slides.forEach(walk);
+    if (node.backgroundImage) walk(node.backgroundImage);
+  }
+  walk(json);
+  return json;
+}
+
+/**
  * After any loadFromJSON, iterate over canvas objects and ensure every
  * FabricImage has crossOrigin='anonymous'. This prevents canvas tainting
  * when the same images are later used in toDataURL().
@@ -627,7 +651,10 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
 
         // ── Load initial JSON if provided ──
         if (canvasJson) {
-          canvasInstance.loadFromJSON(canvasJson).then(() => {
+          const preprocessed = preProcessCanvasJsonForCrossOrigin(
+            JSON.parse(JSON.stringify(canvasJson))
+          );
+          canvasInstance.loadFromJSON(preprocessed).then(() => {
             patchCanvasCrossOrigin(canvasInstance);
             canvasInstance.renderAll();
             saveHistory();
@@ -890,7 +917,8 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
       isUndoRedoRef.current = true;
       historyIndexRef.current -= 1;
       const json = historyRef.current[historyIndexRef.current];
-      canvas.loadFromJSON(JSON.parse(json)).then(() => {
+      const parsed = preProcessCanvasJsonForCrossOrigin(JSON.parse(json));
+      canvas.loadFromJSON(parsed).then(() => {
         patchCanvasCrossOrigin(canvas);
         canvas.renderAll();
         isUndoRedoRef.current = false;
@@ -908,7 +936,8 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
       isUndoRedoRef.current = true;
       historyIndexRef.current += 1;
       const json = historyRef.current[historyIndexRef.current];
-      canvas.loadFromJSON(JSON.parse(json)).then(() => {
+      const parsed = preProcessCanvasJsonForCrossOrigin(JSON.parse(json));
+      canvas.loadFromJSON(parsed).then(() => {
         patchCanvasCrossOrigin(canvas);
         canvas.renderAll();
         isUndoRedoRef.current = false;
@@ -928,7 +957,10 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
         loadFromJSON: async (json: object) => {
           const canvas = fabricRef.current;
           if (!canvas) return;
-          await canvas.loadFromJSON(json);
+          const preprocessed = preProcessCanvasJsonForCrossOrigin(
+            JSON.parse(JSON.stringify(json))
+          );
+          await canvas.loadFromJSON(preprocessed);
           patchCanvasCrossOrigin(canvas);
           canvas.renderAll();
           saveHistory();
