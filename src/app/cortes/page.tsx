@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Scissors,
@@ -29,6 +29,13 @@ import { SubtitleStylePanel } from "@/components/video/SubtitleStylePanel";
 import { TranscriptionPanel } from "@/components/video/TranscriptionPanel";
 import type { VideoCut, SubtitleStyle } from "@/types/video";
 import { DEFAULT_SUBTITLE_STYLE } from "@/types/video";
+import type { CaptionStyle, Keyword, WordTimestamp } from '@/types/captions';
+import { captionStyleToLegacySubtitleStyle } from '@/types/captions';
+import { CaptionStyleGallery } from '@/components/video/CaptionStyleGallery';
+import { KeywordEditor } from '@/components/video/KeywordEditor';
+import { createClient } from '@/lib/supabase/client';
+import { renderCutInBrowser, downloadBlobAsFile, getBrowserRenderCapabilities } from '@/lib/captions/browser-render';
+import { RenderProgressModal } from '@/components/video/RenderProgressModal';
 
 /* ── Processing step labels ── */
 const processingSteps = [
@@ -72,9 +79,27 @@ export default function CortesPage() {
   const [showExportToast, setShowExportToast] = useState(false);
   const [activeTab, setActiveTab] = useState<RightPanelTab>("chat");
   const [subtitleStyle, setSubtitleStyle] = useState<SubtitleStyle>(DEFAULT_SUBTITLE_STYLE);
+  const [captionStyles, setCaptionStyles] = useState<CaptionStyle[]>([]);
+  const [selectedCaptionStyle, setSelectedCaptionStyle] = useState<CaptionStyle | null>(null);
+  const [keywords, setKeywords] = useState<Keyword[]>([]);
+  const [keywordsLoading, setKeywordsLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const videoSeekRef = useRef<((time: number) => void) | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  /* ── Render state ── */
+  const [renderState, setRenderState] = useState<{
+    open: boolean;
+    progress: number;
+    message: string;
+    status: 'rendering' | 'success' | 'error' | 'cancelled';
+    error?: string;
+    blob?: Blob;
+    mimeType?: string;
+    cutIndex?: number;
+  }>({ open: false, progress: 0, message: '', status: 'rendering' });
+  const renderAbortRef = useRef<AbortController | null>(null);
+  const [renderingIndex, setRenderingIndex] = useState<number | null>(null);
 
   const subtitlesEnabled = edits.find((e) => e.type === "subtitle")?.enabled ?? true;
 
@@ -140,11 +165,187 @@ export default function CortesPage() {
     [project]
   );
 
-  /* ── Export toast ── */
+  /* ── Load caption styles from API ── */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/video/styles');
+        if (!res.ok) return;
+        const json = await res.json() as { styles: CaptionStyle[] };
+        if (!cancelled && Array.isArray(json.styles)) {
+          setCaptionStyles(json.styles);
+        }
+      } catch {
+        /* ignore — galeria fica vazia silenciosamente */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  /* ── Select caption style from gallery ── */
+  const handleSelectCaptionStyle = useCallback((cs: CaptionStyle) => {
+    setSelectedCaptionStyle(cs);
+    setSubtitleStyle(captionStyleToLegacySubtitleStyle(cs));
+  }, []);
+
+  /* ── Regenerate keywords via GPT-4o-mini ── */
+  const handleRegenerateKeywords = useCallback(async () => {
+    if (!project?.transcription) return;
+    setKeywordsLoading(true);
+    try {
+      const transcriptionText = Array.isArray(project.transcription)
+        ? project.transcription.map((s: { text: string }) => s.text).join(' ')
+        : (typeof project.transcription === 'string' ? project.transcription : '');
+      const res = await fetch('/api/video/keywords/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transcription_text: transcriptionText,
+          language: 'pt-BR',
+        }),
+      });
+      if (res.ok) {
+        const json = await res.json() as { keywords?: unknown };
+        if (Array.isArray(json.keywords)) setKeywords(json.keywords as Keyword[]);
+      }
+    } catch {
+      /* silent fail */
+    } finally {
+      setKeywordsLoading(false);
+    }
+  }, [project?.transcription]);
+
+  /* ── Load persisted keywords when project loads ── */
+  useEffect(() => {
+    if (project?.keywords && Array.isArray(project.keywords)) {
+      setKeywords(project.keywords);
+    } else {
+      setKeywords([]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.id]);
+
+  /* ── Persist keywords to Supabase (fire-and-forget) ──
+     Persiste também lista vazia (ex: usuário removeu todas as palavras).
+     Só pula o primeiro efeito após (re)carregar um projeto para não
+     sobrescrever o valor recém-carregado com o state inicial ([]).  */
+  const supabaseClient = useMemo(() => createClient(), []);
+  const lastPersistedProjectId = useRef<string | null>(null);
+  useEffect(() => {
+    if (!project?.id) return;
+    if (lastPersistedProjectId.current !== project.id) {
+      // Primeira execução para este projeto — ignora (é hidratação do load).
+      lastPersistedProjectId.current = project.id;
+      return;
+    }
+    supabaseClient
+      .from('video_projects')
+      .update({ keywords })
+      .eq('id', project.id)
+      .then(() => {}, () => {});
+  }, [keywords, project?.id, supabaseClient]);
+
+  /* ── Export toast (stub para onExportAll) ── */
   const showExportMessage = () => {
     setShowExportToast(true);
     setTimeout(() => setShowExportToast(false), 3000);
   };
+
+  /* ── Render cut in browser ── */
+  const handleRenderCut = useCallback(async (index: number) => {
+    const cut = cuts[index];
+    if (!cut) return;
+
+    if (!selectedCaptionStyle) {
+      setShowExportToast(true);
+      setTimeout(() => setShowExportToast(false), 3000);
+      return;
+    }
+
+    const caps = getBrowserRenderCapabilities();
+    if (!caps.supported) {
+      setRenderState({
+        open: true,
+        progress: 0,
+        message: '',
+        status: 'error',
+        error: `Seu navegador não suporta render: ${caps.reason ?? 'não suportado'}. Use Chrome ou Edge atualizado.`,
+      });
+      return;
+    }
+
+    const videoUrl = project?.videoUrl;
+    if (!videoUrl) {
+      setRenderState({ open: true, progress: 0, message: '', status: 'error', error: 'Vídeo não disponível. Re-faça o upload.' });
+      return;
+    }
+
+    const words: WordTimestamp[] = project?.wordTimestamps ?? [];
+    if (words.length === 0) {
+      setRenderState({ open: true, progress: 0, message: '', status: 'error', error: 'Sem word-timestamps. Re-processe o vídeo.' });
+      return;
+    }
+
+    setRenderingIndex(index);
+    const abortCtl = new AbortController();
+    renderAbortRef.current = abortCtl;
+    setRenderState({ open: true, progress: 0, message: 'Iniciando...', status: 'rendering', cutIndex: index });
+
+    try {
+      const result = await renderCutInBrowser({
+        videoUrl,
+        cutStart: cut.startTime,
+        cutEnd: cut.endTime,
+        style: selectedCaptionStyle,
+        words,
+        keywords,
+        onProgress: (pct: number, msg: string) => {
+          setRenderState(prev => ({ ...prev, progress: pct, message: msg }));
+        },
+        signal: abortCtl.signal,
+      });
+
+      setRenderState({
+        open: true,
+        progress: 100,
+        message: 'Pronto!',
+        status: 'success',
+        blob: result.blob,
+        mimeType: result.mimeType,
+        cutIndex: index,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erro desconhecido';
+      setRenderState({
+        open: true,
+        progress: 0,
+        message: '',
+        status: msg === 'Cancelado' ? 'cancelled' : 'error',
+        error: msg !== 'Cancelado' ? msg : undefined,
+        cutIndex: index,
+      });
+    } finally {
+      setRenderingIndex(null);
+      renderAbortRef.current = null;
+    }
+  }, [cuts, selectedCaptionStyle, project, keywords]);
+
+  const handleRenderCancel = useCallback(() => {
+    renderAbortRef.current?.abort();
+  }, []);
+
+  const handleRenderDownload = useCallback(() => {
+    if (!renderState.blob || !renderState.mimeType) return;
+    const ext = renderState.mimeType.includes('mp4') ? 'mp4' : 'webm';
+    const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    const filename = `corte-${selectedCaptionStyle?.slug ?? 'legenda'}-${ts}.${ext}`;
+    downloadBlobAsFile(renderState.blob, filename);
+  }, [renderState.blob, renderState.mimeType, selectedCaptionStyle?.slug]);
+
+  const handleRenderClose = useCallback(() => {
+    setRenderState(prev => ({ ...prev, open: false }));
+  }, []);
 
   /* ── No empresa selected ── */
   if (!empresa) {
@@ -496,6 +697,9 @@ export default function CortesPage() {
                   cuts={cuts}
                   activeCut={activeCut}
                   onTimeUpdate={(t) => setCurrentTime(t)}
+                  selectedCaptionStyle={selectedCaptionStyle}
+                  wordTimestamps={project.wordTimestamps ?? []}
+                  captionKeywords={keywords}
                 />
 
                 {/* Video Analysis Summary */}
@@ -597,10 +801,34 @@ export default function CortesPage() {
                     />
                   )}
                   {activeTab === "estilo" && (
-                    <SubtitleStylePanel
-                      style={subtitleStyle}
-                      onChange={setSubtitleStyle}
-                    />
+                    <div className="space-y-6 flex-1 overflow-y-auto p-3">
+                      <section>
+                        <h3 className="text-white font-semibold text-base mb-1">Galeria de estilos virais</h3>
+                        <p className="text-xs text-zinc-500 mb-3">
+                          Clique num estilo para aplicar. Você pode ajustar detalhes abaixo.
+                        </p>
+                        <CaptionStyleGallery
+                          styles={captionStyles}
+                          selectedId={selectedCaptionStyle?.id ?? null}
+                          onSelect={handleSelectCaptionStyle}
+                          previewKeywords={keywords}
+                        />
+                      </section>
+
+                      <section>
+                        <KeywordEditor
+                          keywords={keywords}
+                          loading={keywordsLoading}
+                          onChange={setKeywords}
+                          onRegenerate={handleRegenerateKeywords}
+                        />
+                      </section>
+
+                      <SubtitleStylePanel
+                        style={subtitleStyle}
+                        onChange={setSubtitleStyle}
+                      />
+                    </div>
                   )}
                 </div>
               </div>
@@ -613,12 +841,25 @@ export default function CortesPage() {
               onEdit={(index) => {
                 setActiveCut(cuts[index]);
               }}
-              onExport={() => showExportMessage()}
+              onRender={handleRenderCut}
               onExportAll={showExportMessage}
+              renderingIndex={renderingIndex}
             />
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Render progress modal */}
+      <RenderProgressModal
+        open={renderState.open}
+        progress={renderState.progress}
+        message={renderState.message}
+        status={renderState.status}
+        error={renderState.error}
+        onCancel={handleRenderCancel}
+        onClose={handleRenderClose}
+        onDownload={renderState.blob ? handleRenderDownload : undefined}
+      />
 
       {/* Export toast */}
       <AnimatePresence>

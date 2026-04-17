@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect, useCallback, useMemo } from "react";
+import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import {
   Play,
   Pause,
@@ -17,6 +17,8 @@ import type {
   SubtitleStyle,
 } from "@/types/video";
 import { DEFAULT_SUBTITLE_STYLE } from "@/types/video";
+import type { CaptionStyle, WordTimestamp, Keyword } from "@/types/captions";
+import { getStyleComponent } from "@/lib/captions/registry";
 
 interface VideoPlayerProps {
   src: string;
@@ -28,6 +30,10 @@ interface VideoPlayerProps {
   cuts?: VideoCut[];
   onTimeUpdate?: (time: number) => void;
   activeCut?: VideoCut | null;
+  // Viral caption overlay (Fase 3.5)
+  selectedCaptionStyle?: CaptionStyle | null;
+  wordTimestamps?: WordTimestamp[];
+  captionKeywords?: Keyword[];
 }
 
 function formatTime(seconds: number): string {
@@ -73,17 +79,26 @@ export function VideoPlayer({
   cuts = [],
   onTimeUpdate,
   activeCut,
+  selectedCaptionStyle,
+  wordTimestamps = [],
+  captionKeywords = [],
 }: VideoPlayerProps) {
   const style = subtitleStyle ?? DEFAULT_SUBTITLE_STYLE;
   const videoRef = useRef<HTMLVideoElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
+  const rafRef = useRef<number | null>(null);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  // High-frequency time for smooth word-by-word rendering (updated via rAF when playing)
+  const [currentTimeFrame, setCurrentTimeFrame] = useState(0);
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [currentSegment, setCurrentSegment] = useState<TranscriptionSegment | null>(null);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+
+  // Whether to use the new viral overlay
+  const useViralOverlay = !!selectedCaptionStyle && wordTimestamps.length > 0;
 
   const togglePlay = useCallback(() => {
     const v = videoRef.current;
@@ -126,10 +141,32 @@ export function VideoPlayer({
     }
   }, [activeCut, currentTime]);
 
+  // rAF loop for smooth word-by-word rendering — only active while playing
+  useEffect(() => {
+    if (!useViralOverlay) return;
+    if (playing) {
+      const tick = () => {
+        if (videoRef.current) {
+          setCurrentTimeFrame(videoRef.current.currentTime);
+        }
+        rafRef.current = requestAnimationFrame(tick);
+      };
+      rafRef.current = requestAnimationFrame(tick);
+    }
+    return () => {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+  }, [playing, useViralOverlay]);
+
   const handleTimeUpdate = useCallback(() => {
     const v = videoRef.current;
     if (!v) return;
     setCurrentTime(v.currentTime);
+    // Also sync frame time when not in rAF mode (paused / legacy path)
+    if (!playing) setCurrentTimeFrame(v.currentTime);
     onTimeUpdate?.(v.currentTime);
 
     // Update subtitle segment
@@ -141,7 +178,7 @@ export function VideoPlayer({
     } else {
       setCurrentSegment(null);
     }
-  }, [onTimeUpdate, subtitles, showSubtitles]);
+  }, [onTimeUpdate, subtitles, showSubtitles, playing]);
 
   const handleProgressClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -201,6 +238,28 @@ export function VideoPlayer({
     }));
   }, [currentSegment]);
 
+  // Viral overlay: precompute StyleComp, keyword set and position style
+  const StyleComp = useMemo(
+    () => (selectedCaptionStyle ? getStyleComponent(selectedCaptionStyle.slug) : null),
+    [selectedCaptionStyle]
+  );
+
+  const captionKeywordSet = useMemo(
+    () => new Set(captionKeywords.map((k) => k.word.toLowerCase())),
+    [captionKeywords]
+  );
+
+  const viralPositionStyle: React.CSSProperties = useMemo(() => {
+    if (!selectedCaptionStyle) return {};
+    const pos = selectedCaptionStyle.position;
+    if (pos === "top") return { top: "8%" };
+    if (pos === "upper-third") return { top: "22%" };
+    if (pos === "center")
+      return { top: "50%", transform: "translate(-50%, -50%)", left: "50%" };
+    if (pos === "lower-third") return { bottom: "22%" };
+    return { bottom: "8%" }; // "bottom"
+  }, [selectedCaptionStyle]);
+
   // Text shadow for outline effect (viral style)
   const textShadow =
     style.bgColor === "transparent"
@@ -223,8 +282,50 @@ export function VideoPlayer({
         playsInline
       />
 
-      {/* Subtitle overlay */}
-      {showSubtitles && currentSegment && (
+      {/* Subtitle overlay — viral path (new) */}
+      {useViralOverlay && StyleComp && (
+        <div
+          style={{
+            position: "absolute",
+            left: selectedCaptionStyle!.position === "center" ? undefined : 0,
+            right: selectedCaptionStyle!.position === "center" ? undefined : 0,
+            textAlign: "center",
+            padding: "0 12px",
+            pointerEvents: "none",
+            zIndex: 10,
+            ...viralPositionStyle,
+          }}
+        >
+          {wordTimestamps
+            .filter(
+              (w) =>
+                currentTimeFrame >= w.start - 0.05 &&
+                currentTimeFrame <= w.end + 0.4
+            )
+            .map((w, idx) => {
+              const isActive =
+                currentTimeFrame >= w.start && currentTimeFrame <= w.end;
+              const isKeyword = captionKeywordSet.has(w.word.toLowerCase());
+              const keyword = captionKeywords.find(
+                (k) => k.word.toLowerCase() === w.word.toLowerCase()
+              );
+              return (
+                <StyleComp
+                  key={`${w.word}-${idx}-${w.start}`}
+                  word={w}
+                  isActive={isActive}
+                  isKeyword={isKeyword}
+                  keyword={keyword}
+                  style={selectedCaptionStyle!}
+                  currentSec={currentTimeFrame}
+                />
+              );
+            })}
+        </div>
+      )}
+
+      {/* Subtitle overlay — legacy path (backward compat) */}
+      {!useViralOverlay && showSubtitles && currentSegment && (
         <div
           className={`absolute left-1/2 -translate-x-1/2 max-w-[90%] text-center pointer-events-none z-10 ${positionMap[style.position]}`}
         >

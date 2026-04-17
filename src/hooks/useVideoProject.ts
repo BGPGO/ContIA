@@ -9,6 +9,7 @@ import type {
   VideoEdit,
   VideoAnalysis,
   TranscriptionSegment,
+  WordTimestamp,
 } from "@/types/video";
 
 /* ── DB persistence helpers ── */
@@ -26,6 +27,7 @@ async function persistProject(proj: VideoProject): Promise<void> {
       edits: proj.edits,
       gemini_analysis: proj.analysis ?? {},
       duration_seconds: proj.duration,
+      word_timestamps: proj.wordTimestamps ?? [],
       updated_at: new Date().toISOString(),
     });
     if (error) console.warn("[useVideoProject] upsert error:", error.message);
@@ -162,6 +164,7 @@ export function useVideoProject() {
         setProgress(15);
 
         let transcription: TranscriptionSegment[] = [];
+        let wordTimestamps: WordTimestamp[] = [];
         let aiSummary = "";
 
         // Try real Whisper transcription if we have the file
@@ -180,14 +183,19 @@ export function useVideoProject() {
 
             if (res.ok) {
               const data = await res.json();
-              transcription = (data.segments || []).map((s: any, i: number) => ({
+              transcription = (data.segments || []).map((s: { id?: string; start: number; end: number; text: string }, i: number) => ({
                 id: s.id || `seg-${i}`,
                 start: s.start,
                 end: s.end,
                 text: s.text,
               }));
+              wordTimestamps = (data.words || []).map((w: { word: string; start: number; end: number }) => ({
+                word: w.word,
+                start: w.start,
+                end: w.end,
+              })) as WordTimestamp[];
               aiSummary = `Transcrição real com ${transcription.length} segmentos. ${data.text?.substring(0, 200)}...`;
-              console.log(`[process] Whisper OK: ${transcription.length} segments`);
+              console.log(`[process] Whisper OK: ${transcription.length} segments, ${wordTimestamps.length} words`);
             } else {
               const err = await res.json().catch(() => ({}));
               console.warn("[process] Whisper failed:", err.error || res.status);
@@ -204,6 +212,7 @@ export function useVideoProject() {
         if (transcription.length === 0) {
           console.warn("[process] Using mock transcription");
           transcription = generateLocalTranscription(proj.duration);
+          wordTimestamps = generateLocalWordTimestamps(transcription);
           aiSummary = `Video "${proj.title}" com ${Math.round(proj.duration)}s. Transcrição automática não disponível — usando legendas de exemplo.`;
         }
 
@@ -257,6 +266,7 @@ export function useVideoProject() {
         const updated: VideoProject = {
           ...proj,
           transcription,
+          wordTimestamps,
           aiSummary,
           cuts,
           analysis: videoAnalysis,
@@ -404,6 +414,8 @@ export function useVideoProject() {
       transcription: unknown;
       edits: unknown;
       gemini_analysis: unknown;
+      word_timestamps?: unknown;
+      keywords?: unknown;
       created_at: string;
       updated_at: string;
     }) => {
@@ -428,6 +440,9 @@ export function useVideoProject() {
               { type: "logo", enabled: false, config: { position: "bottom-right" } },
             ],
         analysis: item.gemini_analysis as VideoAnalysis | null,
+        wordTimestamps: Array.isArray(item.word_timestamps)
+          ? (item.word_timestamps as WordTimestamp[])
+          : [],
         status: "analyzed",
         createdAt: item.created_at,
         updatedAt: item.updated_at,
@@ -488,6 +503,28 @@ function generateLocalTranscription(duration: number): TranscriptionSegment[] {
     });
   }
   return segments;
+}
+
+/**
+ * Generates uniform word-level timestamps from mock transcription segments.
+ * Each segment's words are evenly distributed across the segment's time span.
+ */
+function generateLocalWordTimestamps(segments: TranscriptionSegment[]): WordTimestamp[] {
+  const result: WordTimestamp[] = [];
+  for (const seg of segments) {
+    const words = seg.text.split(/\s+/).filter((w) => w.length > 0);
+    if (words.length === 0) continue;
+    const segDuration = seg.end - seg.start;
+    const wordDuration = segDuration / words.length;
+    words.forEach((word, i) => {
+      result.push({
+        word,
+        start: seg.start + i * wordDuration,
+        end: seg.start + (i + 1) * wordDuration,
+      });
+    });
+  }
+  return result;
 }
 
 function generateSmartCuts(transcription: TranscriptionSegment[]): VideoCut[] {

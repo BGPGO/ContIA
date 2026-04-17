@@ -1,3 +1,5 @@
+import type { WordTimestamp, Keyword } from './captions';
+
 export interface VideoProject {
   id: string;
   empresaId: string;
@@ -11,6 +13,8 @@ export interface VideoProject {
   edits: VideoEdit[];
   status: VideoProjectStatus;
   analysis?: VideoAnalysis | null;
+  wordTimestamps?: WordTimestamp[]; // word-level timestamps from Whisper (migration 012)
+  keywords?: Keyword[]; // prep Fase 3
   createdAt: string;
   updatedAt: string;
 }
@@ -92,6 +96,9 @@ export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
   animation: "pop",
   fontFamily: "sans",
 };
+
+// Re-export de CaptionStyle para conveniência
+export type { CaptionStyle, WordTimestamp, Keyword } from './captions';
 
 export const SUBTITLE_PRESETS: Record<string, { label: string; style: SubtitleStyle }> = {
   viral: {

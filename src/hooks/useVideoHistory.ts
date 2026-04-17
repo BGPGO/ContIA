@@ -12,6 +12,8 @@ export interface VideoHistoryItem {
   transcription: unknown[];
   edits: unknown[];
   gemini_analysis: unknown;
+  word_timestamps: unknown[];
+  keywords: unknown[];
   created_at: string;
   updated_at: string;
 }
@@ -28,7 +30,7 @@ export function useVideoHistory(empresaId: string | null | undefined) {
       const { data, error } = await supabase
         .from("video_projects")
         .select(
-          "id, title, status, duration_seconds, cut_suggestions, transcription, edits, gemini_analysis, created_at, updated_at"
+          "id, title, status, duration_seconds, cut_suggestions, transcription, edits, gemini_analysis, word_timestamps, keywords, created_at, updated_at"
         )
         .eq("empresa_id", empresaId)
         .order("created_at", { ascending: false })

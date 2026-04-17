@@ -8,6 +8,7 @@ import {
   Scissors,
   Clock,
   ChevronRight,
+  Film,
 } from "lucide-react";
 import type { VideoCut } from "@/types/video";
 
@@ -15,8 +16,9 @@ interface CutsPanelProps {
   cuts: VideoCut[];
   onPreview: (cut: VideoCut) => void;
   onEdit: (index: number) => void;
-  onExport: (index: number) => void;
+  onRender: (index: number) => void;
   onExportAll: () => void;
+  renderingIndex?: number | null;
 }
 
 function formatTime(seconds: number): string {
@@ -43,8 +45,9 @@ export function CutsPanel({
   cuts,
   onPreview,
   onEdit,
-  onExport,
+  onRender,
   onExportAll,
+  renderingIndex,
 }: CutsPanelProps) {
   if (cuts.length === 0) return null;
 
@@ -135,11 +138,22 @@ export function CutsPanel({
                   Editar
                 </button>
                 <button
-                  onClick={() => onExport(index)}
-                  className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-md bg-accent/10 text-[11px] text-accent hover:bg-accent/20 transition-all"
+                  onClick={() => onRender(index)}
+                  disabled={renderingIndex !== null && renderingIndex !== undefined}
+                  className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-md text-[11px] transition-all ${
+                    renderingIndex === index
+                      ? 'bg-yellow-400/20 text-yellow-400 cursor-wait'
+                      : renderingIndex !== null && renderingIndex !== undefined
+                      ? 'bg-accent/5 text-accent/40 cursor-not-allowed'
+                      : 'bg-accent/10 text-accent hover:bg-accent/20'
+                  }`}
                 >
-                  <Download className="w-3 h-3" />
-                  Exportar
+                  {renderingIndex === index ? (
+                    <Film className="w-3 h-3 animate-pulse" />
+                  ) : (
+                    <Download className="w-3 h-3" />
+                  )}
+                  {renderingIndex === index ? 'Renderizando...' : 'Renderizar'}
                 </button>
               </div>
             </div>
