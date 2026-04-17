@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export async function middleware(request: NextRequest) {
+  // v2: libera invite (cache-bust)
   // Skip auth when Supabase is not configured (mock mode)
   if (!isSupabaseConfigured()) {
     return NextResponse.next();
