@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   LayoutDashboard,
@@ -36,6 +36,7 @@ import { useEmpresa } from "@/hooks/useEmpresa";
 import { useUser } from "@/hooks/useUser";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { EmpresaWizard } from "@/components/empresas/EmpresaWizard";
+import { RoleBadge } from "@/components/empresas/RoleBadge";
 import type { Empresa } from "@/types";
 
 /* ── Types ── */
@@ -107,7 +108,11 @@ const navSections: NavSection[] = [
   },
 ];
 
+// Note: "Membros" link is generated dynamically based on current empresa in the component
+
+
 /* ── Icon color map for contextual icons ── */
+// Note: dynamic paths like /empresas/[id]/membros use a fallback color
 const iconColorMap: Record<string, string> = {
   "/dashboard": "text-[#4ecdc4]",
   "/criacao": "text-[#a29bfe]",
@@ -136,7 +141,26 @@ const STORAGE_KEY = "contia_sidebar_sections";
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { empresa, empresas, setEmpresaId } = useEmpresa();
+  const { empresa, empresas, setEmpresaId, myRole } = useEmpresa();
+
+  // Build nav sections dynamically to inject empresa-dependent links
+  const dynamicNavSections = useMemo(() => {
+    return navSections.map((section) => {
+      if (section.id === "sistema" && empresa) {
+        const membrosLink: NavLink = {
+          label: "Membros",
+          href: `/empresas/${empresa.id}/membros`,
+          icon: Users,
+        };
+        // Insert after Setup
+        const links = [...section.links];
+        const setupIdx = links.findIndex((l) => l.href === "/setup");
+        links.splice(setupIdx + 1, 0, membrosLink);
+        return { ...section, links };
+      }
+      return section;
+    });
+  }, [empresa]);
   const { user, signOut } = useUser();
   const supabaseConfigured = isSupabaseConfigured();
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -279,6 +303,11 @@ export function Sidebar() {
           <span className="flex-1 text-left text-[13px] text-[#e8eaff] truncate font-medium">
             {empresa?.nome ?? "Selecionar empresa"}
           </span>
+          {myRole && (
+            <span className="shrink-0 mr-1">
+              <RoleBadge role={myRole} size="sm" />
+            </span>
+          )}
           <ChevronDown
             className={`w-3.5 h-3.5 text-[#5e6388] transition-transform duration-200 ${
               dropdownOpen ? "rotate-180" : ""
@@ -338,7 +367,7 @@ export function Sidebar() {
         className="flex-1 px-3 py-2 flex flex-col gap-0.5 overflow-y-auto"
         aria-label="Menu principal"
       >
-        {navSections.map((section, sectionIdx) => {
+        {dynamicNavSections.map((section, sectionIdx) => {
           const open = isSectionOpen(section);
           const hasActive = sectionHasActive(section);
 

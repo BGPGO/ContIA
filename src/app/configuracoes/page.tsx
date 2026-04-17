@@ -19,16 +19,20 @@ import {
   Link2Off,
   Rss,
   Loader2,
+  Building2,
 } from "lucide-react";
 import { useEmpresa } from "@/hooks/useEmpresa";
 import { empresasMock } from "@/lib/mock-data";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { cn } from "@/lib/utils";
 import { Empresa, ConfigRSS } from "@/types";
+import { EmpresaSettingsPanel } from "@/components/empresas/EmpresaSettingsPanel";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
 type TabId =
+  | "empresa"
+  | "equipe"
   | "redes"
   | "ia"
   | "analytics"
@@ -45,6 +49,8 @@ interface TabItem {
 // ─── constants ────────────────────────────────────────────────────────────────
 
 const TABS: TabItem[] = [
+  { id: "empresa", label: "Empresa", icon: <Building2 size={14} /> },
+  { id: "equipe", label: "Equipe", icon: <Users size={14} /> },
   { id: "redes", label: "Redes Sociais", icon: <Share2 size={14} /> },
   { id: "ia", label: "Criacao IA", icon: <Sparkles size={14} /> },
   { id: "analytics", label: "Analytics", icon: <BarChart3 size={14} /> },
@@ -1507,13 +1513,56 @@ function NoticasRSSTab() {
   );
 }
 
+// ─── equipe tab ───────────────────────────────────────────────────────────────
+
+function EquipeTab() {
+  const { empresa } = useEmpresa();
+
+  if (!empresa) {
+    return (
+      <div className="bg-bg-card border border-border rounded-xl p-6 text-center text-text-muted text-sm">
+        Selecione uma empresa para gerenciar a equipe.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 fade-in">
+      <div className={glassCard}>
+        <h3 className={sectionTitleClass}>Membros da empresa</h3>
+        <p className="text-xs text-text-muted mb-4">
+          Gerencie quem tem acesso a esta empresa e seus papéis.
+        </p>
+        <a
+          href={`/empresas/${empresa.id}/membros`}
+          className="inline-flex items-center gap-1.5 px-4 h-8 rounded-lg text-xs font-medium text-white bg-accent hover:bg-accent/90 transition-colors duration-200"
+        >
+          <Users size={12} />
+          Gerenciar membros
+        </a>
+      </div>
+    </div>
+  );
+}
+
 // ─── main page ────────────────────────────────────────────────────────────────
 
 export default function ConfiguracoesPage() {
-  const [activeTab, setActiveTab] = useState<TabId>("redes");
+  const [activeTab, setActiveTab] = useState<TabId>("empresa");
+  const { empresa, myRole } = useEmpresa();
 
   function renderContent() {
     switch (activeTab) {
+      case "empresa":
+        return empresa ? (
+          <EmpresaSettingsPanel empresa={empresa} myRole={myRole} />
+        ) : (
+          <div className={glassCard}>
+            <p className="text-xs text-text-muted">Selecione uma empresa para editar.</p>
+          </div>
+        );
+      case "equipe":
+        return <EquipeTab />;
       case "redes":
         return <RedesSociaisTab />;
       case "ia":

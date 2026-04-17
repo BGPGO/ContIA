@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { EmpresaContext } from "@/hooks/useEmpresa";
 import { Empresa } from "@/types";
+import type { EmpresaRole, RbacAction } from "@/types/rbac";
+import { canDoAction } from "@/types/rbac";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/client";
 import { empresasMock } from "@/lib/mock-data";
@@ -12,6 +14,7 @@ export default function EmpresaProvider({ children }: { children: React.ReactNod
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [empresaId, setEmpresaId] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [myRole, setMyRole] = useState<EmpresaRole | null>(null);
 
   const configured = useMemo(() => isSupabaseConfigured(), []);
 
@@ -45,6 +48,46 @@ export default function EmpresaProvider({ children }: { children: React.ReactNod
       })
       .finally(() => setLoading(false));
   }, [configured]);
+
+  // Fetch role for current empresa
+  const fetchRole = useCallback(async (id: string) => {
+    if (!configured || !id) {
+      setMyRole(null);
+      return;
+    }
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.rpc("user_empresa_role", {
+        p_empresa_id: id,
+      });
+      if (error || data === null) {
+        setMyRole(null);
+      } else {
+        setMyRole(data as EmpresaRole);
+      }
+    } catch {
+      setMyRole(null);
+    }
+  }, [configured]);
+
+  // Re-fetch role when empresaId changes
+  useEffect(() => {
+    if (empresaId) {
+      fetchRole(empresaId);
+    } else {
+      setMyRole(null);
+    }
+  }, [empresaId, fetchRole]);
+
+  const refreshRole = useCallback(async () => {
+    if (empresaId) {
+      await fetchRole(empresaId);
+    }
+  }, [empresaId, fetchRole]);
+
+  const canDo = useCallback((action: RbacAction): boolean => {
+    return canDoAction(myRole, action);
+  }, [myRole]);
 
   // Persist selected empresa
   const handleSetEmpresaId = useCallback((id: string) => {
@@ -133,6 +176,9 @@ export default function EmpresaProvider({ children }: { children: React.ReactNod
         updateEmpresa: handleUpdateEmpresa,
         deleteEmpresa: handleDeleteEmpresa,
         refreshEmpresas,
+        myRole,
+        refreshRole,
+        canDo,
       }}
     >
       {children}

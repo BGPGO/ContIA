@@ -2,8 +2,9 @@
 
 import { createContext, useContext } from "react";
 import { Empresa } from "@/types";
+import type { EmpresaRole, RbacAction } from "@/types/rbac";
 
-interface EmpresaContextType {
+export interface EmpresaContextType {
   empresa: Empresa | null;
   empresas: Empresa[];
   loading: boolean;
@@ -12,6 +13,10 @@ interface EmpresaContextType {
   updateEmpresa: (id: string, data: Partial<Empresa>) => Promise<Empresa | null>;
   deleteEmpresa: (id: string) => Promise<boolean>;
   refreshEmpresas: () => Promise<void>;
+  // RBAC extensions
+  myRole: EmpresaRole | null;
+  refreshRole: () => Promise<void>;
+  canDo: (action: RbacAction) => boolean;
 }
 
 export const EmpresaContext = createContext<EmpresaContextType>({
@@ -23,6 +28,10 @@ export const EmpresaContext = createContext<EmpresaContextType>({
   updateEmpresa: async () => null,
   deleteEmpresa: async () => false,
   refreshEmpresas: async () => {},
+  // RBAC defaults
+  myRole: null,
+  refreshRole: async () => {},
+  canDo: () => false,
 });
 
 export function useEmpresa() {

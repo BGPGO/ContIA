@@ -8,6 +8,7 @@ export async function listEmpresas(supabase: SupabaseClient): Promise<Empresa[]>
   const { data, error } = await supabase
     .from("empresas")
     .select("*")
+    .is("deleted_at", null)
     .order("created_at", { ascending: true });
 
   if (error) throw error;
