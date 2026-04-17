@@ -15,9 +15,11 @@ export async function middleware(request: NextRequest) {
     path.startsWith("/register") ||
     path.startsWith("/auth/") ||
     path.startsWith("/conexoes") ||
+    path.startsWith("/invite/") ||
     path.startsWith("/api/instagram") ||
     path.startsWith("/api/psd-templates") ||
-    path.startsWith("/api/video")
+    path.startsWith("/api/video") ||
+    path.startsWith("/api/invites/")
   ) {
     return NextResponse.next();
   }
