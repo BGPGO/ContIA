@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Loader2, AlertCircle, Building2, CheckCircle } from 'lucide-react';
@@ -14,7 +14,7 @@ interface InviteDetails {
   requires_signup: boolean;
 }
 
-export default function AcceptInvitePage() {
+function AcceptInviteContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams.get('token');
@@ -72,7 +72,6 @@ export default function AcceptInvitePage() {
       }
 
       setAccepted(true);
-      // Redirect after short delay
       setTimeout(() => {
         router.push('/dashboard');
       }, 1500);
@@ -83,7 +82,6 @@ export default function AcceptInvitePage() {
     }
   }
 
-  // ── Loading ──
   if (loading) {
     return (
       <div className="min-h-screen bg-[#080b1e] flex items-center justify-center">
@@ -92,7 +90,6 @@ export default function AcceptInvitePage() {
     );
   }
 
-  // ── Invalid / error ──
   if (error && !details) {
     return (
       <div className="min-h-screen bg-[#080b1e] flex items-center justify-center p-4">
@@ -117,7 +114,6 @@ export default function AcceptInvitePage() {
   const redirectParam = encodeURIComponent(`/invite/accept?token=${token}`);
   const emailParam = encodeURIComponent(invite.email);
 
-  // ── Accepted ──
   if (accepted) {
     return (
       <div className="min-h-screen bg-[#080b1e] flex items-center justify-center p-4">
@@ -133,9 +129,7 @@ export default function AcceptInvitePage() {
   return (
     <div className="min-h-screen bg-[#080b1e] flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-[#0f1230] border border-[#1e2348]/80 rounded-2xl overflow-hidden shadow-2xl shadow-black/50">
-        {/* Card header */}
         <div className="px-6 pt-6 pb-4 text-center">
-          {/* Company logo/icon */}
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#6c5ce7]/30 to-[#4ecdc4]/30 border border-[#1e2348] flex items-center justify-center mx-auto mb-4">
             {invite.empresa_logo_url ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -158,7 +152,6 @@ export default function AcceptInvitePage() {
           </p>
         </div>
 
-        {/* Role info */}
         <div className="mx-6 mb-4 px-4 py-3 bg-[#141736] border border-[#1e2348] rounded-xl flex items-center gap-3">
           <RoleBadge role={invite.role} size="md" />
           <div>
@@ -171,7 +164,6 @@ export default function AcceptInvitePage() {
           </div>
         </div>
 
-        {/* Error inline */}
         {error && (
           <div className="mx-6 mb-4 flex items-center gap-2 px-3 py-2.5 bg-[#f87171]/[0.06] border border-[#f87171]/25 rounded-xl text-[#f87171] text-[12px]">
             <AlertCircle size={13} />
@@ -179,9 +171,7 @@ export default function AcceptInvitePage() {
           </div>
         )}
 
-        {/* Actions */}
         <div className="px-6 pb-6">
-          {/* Not logged in + requires signup */}
           {!user && requires_signup && (
             <div className="space-y-3">
               <p className="text-[12px] text-[#5e6388] text-center">
@@ -196,7 +186,6 @@ export default function AcceptInvitePage() {
             </div>
           )}
 
-          {/* Not logged in + already has account */}
           {!user && !requires_signup && (
             <div className="space-y-3">
               <p className="text-[12px] text-[#5e6388] text-center">
@@ -211,7 +200,6 @@ export default function AcceptInvitePage() {
             </div>
           )}
 
-          {/* Logged in + email matches */}
           {user && user.email === invite.email && (
             <button
               type="button"
@@ -224,7 +212,6 @@ export default function AcceptInvitePage() {
             </button>
           )}
 
-          {/* Logged in + email doesn't match */}
           {user && user.email !== invite.email && (
             <div className="space-y-3">
               <div className="flex items-start gap-2 px-3 py-3 bg-[#fbbf24]/[0.06] border border-[#fbbf24]/25 rounded-xl">
@@ -246,5 +233,19 @@ export default function AcceptInvitePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AcceptInvitePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#080b1e] flex items-center justify-center">
+          <Loader2 size={32} className="text-[#6c5ce7] animate-spin" />
+        </div>
+      }
+    >
+      <AcceptInviteContent />
+    </Suspense>
   );
 }
