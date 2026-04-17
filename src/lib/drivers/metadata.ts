@@ -447,7 +447,7 @@ export const METADATA_BY_PROVIDER: Record<ProviderKey, ProviderMetadata> = {
     color: '#8B5CF6',
     iconName: 'Database',
     category: 'crm',
-    status: 'coming_soon',
+    status: 'available',
     estimatedTime: '0 cliques',
     requirements: [
       {
