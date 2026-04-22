@@ -28,14 +28,16 @@ RUN npm run build
 FROM base AS runner
 WORKDIR /app
 
-# Chromium para Puppeteer (geração de PDF)
+# Chromium para Puppeteer (geração de PDF e criativos)
+# font-noto-emoji: renderiza emojis Unicode (📢 🚀 💰 etc) nos criativos
 RUN apk add --no-cache \
     chromium \
     nss \
     freetype \
     harfbuzz \
     ca-certificates \
-    ttf-freefont
+    ttf-freefont \
+    font-noto-emoji
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
