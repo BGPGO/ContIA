@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import type { MessageAttachment } from "@/lib/creatives/history";
 
 // ═══════════════════════════════════════════════════════════════════════
 // TYPES
@@ -12,6 +13,7 @@ export interface CreativeMessage {
   content: string;
   html?: string | null;
   pngUrl?: string | null;
+  attachments?: MessageAttachment[] | null;
   createdAt?: string;
 }
 
@@ -86,6 +88,9 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
   sendMessage: (text: string) => Promise<void>;
   error: string | null;
   reset: () => void;
+  pendingAttachments: MessageAttachment[];
+  addAttachment: (file: File) => Promise<void>;
+  removeAttachment: (url: string) => void;
 } {
   const [messages, setMessages] = useState<CreativeMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -96,6 +101,8 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
   const [model, setModelState] = useState<ModelKey>(getInitialModel);
   const [useBrandKit, setUseBrandKitState] = useState<boolean>(getInitialUseBrandKit);
   const [error, setError] = useState<string | null>(null);
+
+  const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
 
   const sendingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -114,6 +121,56 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
     if (typeof window !== "undefined") {
       localStorage.setItem("creative_use_brand_kit", v ? "true" : "false");
     }
+  }, []);
+
+  // ── Add attachment ──
+  const addAttachment = useCallback(
+    async (file: File) => {
+      if (!empresaId) return;
+      if (pendingAttachments.length >= 3) {
+        setError("Máximo de 3 imagens por mensagem.");
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        setError("Imagem muito grande (máx 5MB).");
+        return;
+      }
+      const mt = (file.type || "").toLowerCase();
+      if (!["image/png", "image/jpeg", "image/webp"].includes(mt)) {
+        setError("Formato inválido. Use PNG, JPG ou WEBP.");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("empresaId", empresaId);
+
+      try {
+        const res = await fetch("/api/creatives/upload", { method: "POST", body: formData });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(data.error || `Erro ${res.status} no upload`);
+        }
+        const data = (await res.json()) as { url: string; mediaType: string; name?: string };
+        const attachment: MessageAttachment = {
+          url: data.url,
+          mediaType: data.mediaType as MessageAttachment["mediaType"],
+          name: data.name || file.name,
+        };
+        setPendingAttachments((prev) => [...prev, attachment]);
+        setError(null);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Falha no upload da imagem";
+        console.error("[CreativeChat] addAttachment:", msg);
+        setError(msg);
+      }
+    },
+    [empresaId, pendingAttachments.length]
+  );
+
+  // ── Remove attachment ──
+  const removeAttachment = useCallback((url: string) => {
+    setPendingAttachments((prev) => prev.filter((a) => a.url !== url));
   }, []);
 
   // ── Render HTML to PNG ──
@@ -166,6 +223,7 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
         id: "temp-" + Date.now(),
         role: "user",
         content: text.trim(),
+        attachments: pendingAttachments.length > 0 ? pendingAttachments : null,
         createdAt: new Date().toISOString(),
       };
       const allMessages = [...messagesRef.current, userMessage];
@@ -315,9 +373,10 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
         setIsStreaming(false);
         sendingRef.current = false;
         abortControllerRef.current = null;
+        setPendingAttachments([]);
       }
     },
-    [empresaId, conversationId, model, useBrandKit, renderHtml]
+    [empresaId, conversationId, model, useBrandKit, renderHtml, pendingAttachments]
   );
 
   // ── Reset ──
@@ -350,5 +409,8 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
     sendMessage,
     error,
     reset,
+    pendingAttachments,
+    addAttachment,
+    removeAttachment,
   };
 }

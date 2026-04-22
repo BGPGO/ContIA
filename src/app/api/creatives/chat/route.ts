@@ -295,7 +295,8 @@ export async function POST(req: NextRequest) {
         conversation_id: activeConversationId,
         role: "user",
         content: lastUserMessage.content,
-      });
+        attachments: lastUserMessage.attachments ?? [],
+      } as Record<string, unknown>);
 
     if (msgErr) {
       console.error(

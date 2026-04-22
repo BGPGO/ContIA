@@ -1,9 +1,16 @@
 import type Anthropic from "@anthropic-ai/sdk";
 
+export interface MessageAttachment {
+  url: string;
+  mediaType: "image/png" | "image/jpeg" | "image/webp";
+  name?: string;
+}
+
 export interface RawMessage {
   role: "user" | "assistant";
   content: string;
   html?: string | null;
+  attachments?: MessageAttachment[] | null;
 }
 
 const MAX_MESSAGES = 6;
@@ -25,6 +32,14 @@ export function truncateHistory(
               ? "\n<!-- ...truncado... -->"
               : "");
       text = `${m.content}\n\n\`\`\`html\n${htmlPart}\n\`\`\``;
+    }
+    if (isLast && m.role === "user" && m.attachments && m.attachments.length > 0) {
+      const imageBlocks: Anthropic.Messages.ImageBlockParam[] = m.attachments.map((a) => ({
+        type: "image",
+        source: { type: "url", url: a.url },
+      }));
+      const textBlock: Anthropic.Messages.TextBlockParam = { type: "text", text };
+      return { role: "user", content: [...imageBlocks, textBlock] };
     }
     return { role: m.role, content: text };
   });

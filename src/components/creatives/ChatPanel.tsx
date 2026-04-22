@@ -1,9 +1,11 @@
 "use client";
 
-import { Palette } from "lucide-react";
+import { useRef } from "react";
+import { Palette, Paperclip, X } from "lucide-react";
 import { ChatInterface } from "@/components/studio/ChatInterface";
 import type { CopyChatMessage, QuickAction, QuickActionConfig } from "@/types/copy-studio";
 import type { CreativeMessage, ModelKey } from "@/hooks/useCreativeChat";
+import type { MessageAttachment } from "@/lib/creatives/history";
 
 // ═══════════════════════════════════════════════════════════════════════
 // TYPES
@@ -18,6 +20,9 @@ interface ChatPanelProps {
   onModelChange: (m: ModelKey) => void;
   useBrandKit: boolean;
   onUseBrandKitChange: (v: boolean) => void;
+  pendingAttachments: MessageAttachment[];
+  onAddAttachment: (file: File) => void;
+  onRemoveAttachment: (url: string) => void;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -64,7 +69,25 @@ export function ChatPanel({
   onModelChange,
   useBrandKit,
   onUseBrandKitChange,
+  pendingAttachments,
+  onAddAttachment,
+  onRemoveAttachment,
 }: ChatPanelProps) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleOpenFilePicker = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    const remainingSlots = 3 - pendingAttachments.length;
+    const toUpload = Array.from(files).slice(0, remainingSlots);
+    for (const f of toUpload) onAddAttachment(f);
+    e.target.value = "";
+  };
+
   // Adapta CreativeMessage[] para CopyChatMessage[]
   const adaptedMessages: CopyChatMessage[] = messages.map((msg) => ({
     id: msg.id,
@@ -141,6 +164,55 @@ export function ChatPanel({
             {useBrandKit ? "Identidade ativa · " : ""}Sonnet ~$0.06 · Opus ~$0.30 por criativo
           </span>
         </div>
+      </div>
+
+      {/* Attachment bar */}
+      <div className="shrink-0 px-4 py-2 border-b border-white/10 flex items-center gap-3 flex-wrap">
+        <button
+          type="button"
+          onClick={handleOpenFilePicker}
+          disabled={pendingAttachments.length >= 3}
+          title={
+            pendingAttachments.length >= 3
+              ? "Máximo de 3 imagens"
+              : "Anexar imagem (PNG, JPG, WEBP, máx 5MB)"
+          }
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 text-xs font-medium text-white/60 hover:text-white/80 hover:border-white/20 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+        >
+          <Paperclip className="w-3.5 h-3.5" />
+          <span>Anexar imagem</span>
+        </button>
+
+        {pendingAttachments.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {pendingAttachments.map((a) => (
+              <div key={a.url} className="relative group">
+                <img
+                  src={a.url}
+                  alt={a.name || "anexo"}
+                  className="w-14 h-14 rounded-md object-cover border border-white/10"
+                />
+                <button
+                  type="button"
+                  onClick={() => onRemoveAttachment(a.url)}
+                  className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-black/80 border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black cursor-pointer transition-all"
+                  title="Remover"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          multiple
+          hidden
+          onChange={handleFileChange}
+        />
       </div>
 
       {/* Chat interface */}

@@ -33,6 +33,9 @@ function CriativosPageInner({ empresaId }: { empresaId: string }) {
     setUseBrandKit,
     sendMessage,
     error,
+    pendingAttachments,
+    addAttachment,
+    removeAttachment,
   } = useCreativeChat({ empresaId });
 
   return (
@@ -47,6 +50,9 @@ function CriativosPageInner({ empresaId }: { empresaId: string }) {
           onModelChange={setModel}
           useBrandKit={useBrandKit}
           onUseBrandKitChange={setUseBrandKit}
+          pendingAttachments={pendingAttachments}
+          onAddAttachment={addAttachment}
+          onRemoveAttachment={removeAttachment}
         />
       </div>
       <div className="flex-[2] min-w-0">
