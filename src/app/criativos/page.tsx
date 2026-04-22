@@ -27,6 +27,7 @@ function CriativosPageInner({ empresaId }: { empresaId: string }) {
     streamingText,
     currentHtml,
     currentPngUrl,
+    currentPngUrls,
     model,
     setModel,
     useBrandKit,
@@ -59,6 +60,7 @@ function CriativosPageInner({ empresaId }: { empresaId: string }) {
         <PreviewPanel
           currentHtml={currentHtml}
           currentPngUrl={currentPngUrl}
+          currentPngUrls={currentPngUrls}
           isStreaming={isStreaming}
           error={error}
         />

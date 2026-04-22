@@ -20,11 +20,13 @@
     "@tailwindcss/postcss": "^4.2.2",
     "@types/node": "^25.5.0",
     "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.4.27",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "fabric": "^6.9.1",
     "html2canvas-pro": "^2.0.2",
+    "jszip": "^3.10.1",
     "lucide-react": "^1.0.1",
     "motion": "^12.38.0",
     "next": "^16.2.1",
@@ -39,8 +41,7 @@
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.2",
     "typescript": "^6.0.2",
-    "zod": "^4.3.6",
-    "@types/react-dom": "^19.2.3"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.7.0",

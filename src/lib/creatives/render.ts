@@ -53,33 +53,76 @@ function releaseSlot(): void {
   if (next) next();
 }
 
-export async function renderHtmlToPng(html: string): Promise<Buffer> {
+/**
+ * Conta quantos slides existem no HTML.
+ * Um slide é identificado por <section class="creative-slide"> (atributos adicionais permitidos).
+ * Retorna 0 se não houver nenhum slide marcado (modo single).
+ */
+export function countSlides(html: string): number {
+  const regex =
+    /<section\s[^>]*class\s*=\s*["'][^"']*creative-slide[^"']*["'][^>]*>/gi;
+  const matches = html.match(regex);
+  return matches ? matches.length : 0;
+}
+
+/**
+ * Renderiza o HTML e retorna um Buffer por slide.
+ * Se não houver slides marcados (countSlides == 0), retorna array com 1 buffer (modo single).
+ * O viewport é expandido verticalmente para acomodar N slides de 1350px cada.
+ */
+export async function renderHtmlToPngs(html: string): Promise<Buffer[]> {
+  const slideCount = countSlides(html);
+  const n = Math.max(1, slideCount); // 0 slides = single mode (usa 1 screenshot)
+
   await acquireSlot();
   try {
     const browser = await getBrowser();
     const page = await browser.newPage();
     try {
+      const viewportHeight = n > 1 ? n * 1350 : 1350;
       await page.setViewport({
         width: 1080,
-        height: 1350,
+        height: viewportHeight,
         deviceScaleFactor: 2,
       });
-      await page.setContent(html, {
-        waitUntil: "networkidle0",
-        timeout: 30000,
-      });
+      await page.setContent(html, { waitUntil: "networkidle0", timeout: 30000 });
       await page.evaluateHandle("document.fonts.ready");
-      // Puppeteer 24.x retorna Uint8Array; convertemos para Buffer para compatibilidade
-      const result = await page.screenshot({
-        type: "png",
-        clip: { x: 0, y: 0, width: 1080, height: 1350 },
-      });
+
+      const buffers: Buffer[] = [];
+
+      if (n <= 1) {
+        // Single slide — clip 1080×1350 no topo
+        const shot = await page.screenshot({
+          type: "png",
+          clip: { x: 0, y: 0, width: 1080, height: 1350 },
+        });
+        buffers.push(Buffer.from(shot as unknown as Uint8Array));
+      } else {
+        // Múltiplos slides — clip N vezes verticalmente
+        for (let i = 0; i < n; i++) {
+          const shot = await page.screenshot({
+            type: "png",
+            clip: { x: 0, y: i * 1350, width: 1080, height: 1350 },
+          });
+          buffers.push(Buffer.from(shot as unknown as Uint8Array));
+        }
+      }
+
       renderCount++;
-      return Buffer.from(result as Uint8Array);
+      return buffers;
     } finally {
       await page.close().catch(() => {});
     }
   } finally {
     releaseSlot();
   }
+}
+
+/**
+ * Wrapper de compatibilidade — retorna apenas o primeiro slide como Buffer.
+ * Comportamento idêntico ao original para todos os consumidores existentes.
+ */
+export async function renderHtmlToPng(html: string): Promise<Buffer> {
+  const buffers = await renderHtmlToPngs(html);
+  return buffers[0];
 }

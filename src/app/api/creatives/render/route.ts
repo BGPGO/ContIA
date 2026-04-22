@@ -4,7 +4,7 @@ export const maxDuration = 60;
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/rbac";
-import { renderHtmlToPng } from "@/lib/creatives/render";
+import { renderHtmlToPngs } from "@/lib/creatives/render";
 import { uploadPng } from "@/lib/creatives/storage";
 
 interface RenderBody {
@@ -62,16 +62,28 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const png = await renderHtmlToPng(body.html);
-    const storagePath = `${body.empresaId}/${body.messageId}.png`;
-    const url = await uploadPng(supabase, "creatives", storagePath, png);
+    const buffers = await renderHtmlToPngs(body.html);
 
+    const urls: string[] = [];
+    for (let i = 0; i < buffers.length; i++) {
+      const buf = buffers[i];
+      const path =
+        buffers.length === 1
+          ? `${body.empresaId}/${body.messageId}.png`
+          : `${body.empresaId}/${body.messageId}-slide-${String(i + 1).padStart(2, "0")}.png`;
+      const url = await uploadPng(supabase, "creatives", path, buf);
+      urls.push(url);
+    }
+
+    const firstUrl = urls[0];
+
+    // Atualiza message com png_url (primeiro slide, compat) + png_urls (array completo)
     await supabase
       .from("creative_messages")
-      .update({ png_url: url })
+      .update({ png_url: firstUrl, png_urls: urls } as Record<string, unknown>)
       .eq("id", body.messageId);
 
-    return NextResponse.json({ url });
+    return NextResponse.json({ url: firstUrl, urls });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Erro desconhecido";
     return NextResponse.json(

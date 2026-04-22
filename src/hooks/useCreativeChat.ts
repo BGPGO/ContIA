@@ -13,6 +13,7 @@ export interface CreativeMessage {
   content: string;
   html?: string | null;
   pngUrl?: string | null;
+  pngUrls?: string[] | null;
   attachments?: MessageAttachment[] | null;
   createdAt?: string;
 }
@@ -80,6 +81,7 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
   streamingText: string;
   currentHtml: string | null;
   currentPngUrl: string | null;
+  currentPngUrls: string[] | null;
   conversationId: string | null;
   model: ModelKey;
   setModel: (m: ModelKey) => void;
@@ -97,6 +99,7 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
   const [streamingText, setStreamingText] = useState("");
   const [currentHtml, setCurrentHtml] = useState<string | null>(null);
   const [currentPngUrl, setCurrentPngUrl] = useState<string | null>(null);
+  const [currentPngUrls, setCurrentPngUrls] = useState<string[] | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [model, setModelState] = useState<ModelKey>(getInitialModel);
   const [useBrandKit, setUseBrandKitState] = useState<boolean>(getInitialUseBrandKit);
@@ -187,14 +190,19 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
           throw new Error(`Erro ${response.status} ao renderizar PNG`);
         }
 
-        const data = (await response.json()) as { url: string };
+        const data = (await response.json()) as { url: string; urls?: string[] };
         const url = data.url;
+        const urls = data.urls ?? [url];
 
         setCurrentPngUrl(url);
+        setCurrentPngUrls(urls);
         setMessages((prev) =>
           prev.map((msg) =>
-            msg.id === messageId ? { ...msg, pngUrl: url } : msg
+            msg.id === messageId ? { ...msg, pngUrl: url, pngUrls: urls } : msg
           )
+        );
+        messagesRef.current = messagesRef.current.map((msg) =>
+          msg.id === messageId ? { ...msg, pngUrl: url, pngUrls: urls } : msg
         );
       } catch (err) {
         const msg =
@@ -216,6 +224,7 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
       setStreamingText("");
       setCurrentHtml(null);
       setCurrentPngUrl(null);
+      setCurrentPngUrls(null);
       setError(null);
 
       // Adiciona mensagem do usuário ao state imediatamente
@@ -390,6 +399,7 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
     setStreamingText("");
     setCurrentHtml(null);
     setCurrentPngUrl(null);
+    setCurrentPngUrls(null);
     setConversationId(null);
     setError(null);
     sendingRef.current = false;
@@ -401,6 +411,7 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
     streamingText,
     currentHtml,
     currentPngUrl,
+    currentPngUrls,
     conversationId,
     model,
     setModel,
