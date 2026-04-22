@@ -7,6 +7,8 @@ import {
   buildSystem,
   type EmpresaDna,
   type BrandKit,
+  type CustomFont,
+  type CustomLogo,
 } from "@/lib/creatives/system-prompt";
 import {
   truncateHistory,
@@ -87,7 +89,7 @@ async function loadEmpresaDna(
   return { nome, brandColors, tom, nicho };
 }
 
-// ── BrandKit loader (cores + fontes + logo diretos da tabela empresas) ──────
+// ── BrandKit loader (cores + fontes + logo + brand_assets) ──────────────────
 
 async function loadBrandKit(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -112,12 +114,47 @@ async function loadBrandKit(
     logo_url?: string | null;
   };
 
+  // Busca assets customizados (fontes e logos da tabela brand_assets)
+  const { data: assets } = await supabase
+    .from("brand_assets")
+    .select("id, name, type, file_url, file_name, mime_type")
+    .eq("empresa_id", empresaId)
+    .in("type", ["font", "logo"]);
+
+  const customFonts: CustomFont[] = (assets ?? [])
+    .filter((a: { type: string }) => a.type === "font")
+    .map((a: { name: string | null; file_url: string; file_name: string | null }) => {
+      const ext =
+        (a.file_name ?? "").toLowerCase().match(/\.(ttf|otf|woff2|woff)$/)?.[1] ?? "";
+      const format =
+        ext === "ttf" ? "truetype" :
+        ext === "otf" ? "opentype" :
+        ext === "woff2" ? "woff2" :
+        ext === "woff" ? "woff" : "truetype";
+      const name =
+        a.name && a.name !== "Sem nome"
+          ? a.name
+          : (a.file_name ?? "").replace(/\.\w+$/, "");
+      return { name: name.trim(), url: a.file_url, format };
+    })
+    .filter((f: CustomFont) => f.name && f.url);
+
+  const customLogos: CustomLogo[] = (assets ?? [])
+    .filter((a: { type: string }) => a.type === "logo")
+    .map((a: { name: string | null; file_url: string }) => ({
+      name: a.name && a.name !== "Sem nome" ? a.name : "Logo",
+      url: a.file_url,
+    }))
+    .filter((l: CustomLogo) => l.url);
+
   const hasAny =
     !!row.cor_primaria ||
     !!row.cor_secundaria ||
     (row.brand_colors && row.brand_colors.length > 0) ||
     (row.brand_fonts && row.brand_fonts.length > 0) ||
-    !!row.logo_url;
+    !!row.logo_url ||
+    customFonts.length > 0 ||
+    customLogos.length > 0;
 
   if (!hasAny) return null;
 
@@ -128,7 +165,32 @@ async function loadBrandKit(
     brandColors: row.brand_colors ?? null,
     brandFonts: row.brand_fonts ?? null,
     logoUrl: row.logo_url ?? null,
+    customFonts: customFonts.length > 0 ? customFonts : undefined,
+    customLogos: customLogos.length > 0 ? customLogos : undefined,
   };
+}
+
+// ── @font-face injector ──────────────────────────────────────────────────────
+
+function injectFontFaces(html: string, fonts: CustomFont[]): string {
+  if (!fonts || fonts.length === 0) return html;
+  const faces = fonts
+    .map(
+      (f) =>
+        `@font-face{font-family:'${f.name.replace(/'/g, "")}';src:url('${f.url}') format('${f.format}');font-display:swap;}`
+    )
+    .join("\n");
+  const styleBlock = `<style data-brand-fonts="true">\n${faces}\n</style>`;
+
+  if (/<\/head>/i.test(html)) {
+    return html.replace(/<\/head>/i, `${styleBlock}\n</head>`);
+  }
+  // Sem </head>: inserir logo após <body> de abertura
+  if (/<body[^>]*>/i.test(html)) {
+    return html.replace(/(<body[^>]*>)/i, `$1\n${styleBlock}`);
+  }
+  // Sem <body> tampouco: preceder o HTML inteiro
+  return `${styleBlock}\n${html}`;
 }
 
 // ── Main route handler ──────────────────────────────────────────────────────
@@ -281,10 +343,16 @@ export async function POST(req: NextRequest) {
         // Split prose and HTML from complete buffer
         const { prose, html } = splitProseAndHtml(buffer);
 
+        // Inject @font-face declarations for custom brand fonts (only when useBrandKit=true)
+        let finalHtml = html;
+        if (html && brandKit?.customFonts && brandKit.customFonts.length > 0) {
+          finalHtml = injectFontFaces(html, brandKit.customFonts);
+        }
+
         // Emit HTML event
-        if (html) {
+        if (finalHtml) {
           controller.enqueue(
-            encoder.encode(sseEncode("html", { html }))
+            encoder.encode(sseEncode("html", { html: finalHtml }))
           );
         }
 
@@ -297,7 +365,7 @@ export async function POST(req: NextRequest) {
               conversation_id: activeConversationId,
               role: "assistant",
               content: prose,
-              html: html || null,
+              html: finalHtml || null,
               model: resolvedModel,
               tokens_in: usage.input_tokens,
               tokens_out: usage.output_tokens,

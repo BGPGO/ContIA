@@ -37,6 +37,9 @@ import { useEmpresa } from "@/hooks/useEmpresa";
 import { useMarcaDNA } from "@/hooks/useMarcaDNA";
 import { DNAEditor } from "@/components/marca/DNAEditor";
 import { DNASourcesForm } from "@/components/marca/DNASourcesForm";
+import { LogoCard } from "@/components/marca/LogoCard";
+import { FontsSection } from "@/components/marca/FontsSection";
+import { OtherAssetsGrid } from "@/components/marca/OtherAssetsGrid";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import type { DNASintetizado } from "@/types";
@@ -1722,6 +1725,11 @@ export default function MarcaPage() {
     cor_secundaria: "#a29bfe",
   });
 
+  // Live state for logo and fonts (updated by upload components without full page reload)
+  const [liveLogo, setLiveLogo] = useState<string | null>(null);
+  const [liveLogoInitialized, setLiveLogoInitialized] = useState(false);
+  const [brandFonts, setBrandFonts] = useState<string[]>([]);
+
   // Check if Instagram is connected
   useEffect(() => {
     if (!empresa?.id) return;
@@ -1762,8 +1770,18 @@ export default function MarcaPage() {
       } else {
         setDesignDraftAssets([]);
       }
+      // Initialize live logo from empresa (only on first load)
+      if (!liveLogoInitialized) {
+        setLiveLogo(empresa.logo_url ?? null);
+        setLiveLogoInitialized(true);
+      }
+      // Initialize brand fonts
+      const fonts = (empresa as any).brand_fonts;
+      if (Array.isArray(fonts)) {
+        setBrandFonts(fonts as string[]);
+      }
     }
-  }, [empresa]);
+  }, [empresa, liveLogoInitialized]);
 
   // Derive marcaDNA
   const marcaDNA: MarcaDNAResponse | null = hookDna
@@ -2174,20 +2192,25 @@ export default function MarcaPage() {
             onEstiloChange={setDesignDraftEstilo}
           />
 
-          {/* Logo */}
-          <DesignLogoSection
-            empresa={empresa}
-            editing={editing}
-            logoUrl={designDraftLogoUrl}
-            onLogoUrlChange={setDesignDraftLogoUrl}
+          {/* Logo — upload-based rich card */}
+          <LogoCard
+            empresaId={empresa.id}
+            logoUrl={liveLogo}
+            onLogoUpdated={(url) => {
+              setLiveLogo(url);
+              setDesignDraftLogoUrl(url || "");
+            }}
           />
 
-          {/* Brand Assets */}
-          <DesignBrandAssetsSection
-            editing={editing}
-            assets={designDraftAssets}
-            onAssetsChange={setDesignDraftAssets}
+          {/* Fontes */}
+          <FontsSection
+            empresaId={empresa.id}
+            brandFonts={brandFonts}
+            onFontsUpdated={setBrandFonts}
           />
+
+          {/* Outros assets: elementos, texturas, fotos */}
+          <OtherAssetsGrid empresaId={empresa.id} />
 
           {/* Visual Analysis (from Instagram) */}
           <DesignVisualAnalysisSection marcaDNA={marcaDNA} />

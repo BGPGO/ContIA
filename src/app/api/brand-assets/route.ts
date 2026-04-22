@@ -6,6 +6,24 @@ import { createClient } from "@/lib/supabase/server";
 const BUCKET_NAME = "brand-assets";
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
+/* ── Font validation helpers ── */
+const FONT_MIMES = new Set([
+  "font/ttf", "font/otf", "font/woff", "font/woff2",
+  "application/x-font-ttf", "application/x-font-otf",
+  "application/x-font-woff", "application/x-font-woff2",
+  "application/font-woff", "application/font-woff2",
+  "application/vnd.ms-fontobject",
+  "application/octet-stream", // fallback comum
+]);
+
+const FONT_EXTENSIONS = /\.(ttf|otf|woff|woff2)$/i;
+
+function isValidFontFile(file: File): boolean {
+  const mimeOk = file.type ? FONT_MIMES.has(file.type.toLowerCase()) : false;
+  const extOk = FONT_EXTENSIONS.test(file.name);
+  return mimeOk || extOk; // aceita se QUALQUER check passar
+}
+
 /* ── GET: List brand assets (with optional type filter) ── */
 export async function GET(request: NextRequest) {
   try {
@@ -78,6 +96,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Tipo invalido. Use: ${validTypes.join(", ")}` }, { status: 400 });
     }
 
+    // Validação específica para fontes
+    if (type === "font" && !isValidFontFile(file)) {
+      return NextResponse.json(
+        { error: "Arquivo de fonte inválido. Use .ttf, .otf, .woff ou .woff2." },
+        { status: 400 }
+      );
+    }
+
     // Upload to Supabase Storage (bucket "brand-assets" must exist — created via Supabase dashboard)
     const ext = file.name.split(".").pop() || "bin";
     const storagePath = `${empresaId}/${type}/${crypto.randomUUID()}.${ext}`;
@@ -144,7 +170,69 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`[BrandAssets] Asset created: ${asset.id} (${name}, ${type})`);
-    return NextResponse.json(asset, { status: 201 });
+
+    // Side-effects em empresas — não falham o endpoint se derem erro
+    let logoUrlUpdated: string | undefined;
+    let fontNameAdded: string | undefined;
+
+    if (type === "logo") {
+      const { error: logoUpdateError } = await supabase
+        .from("empresas")
+        .update({ logo_url: fileUrl })
+        .eq("id", empresaId);
+
+      if (logoUpdateError) {
+        console.warn("[BrandAssets] Aviso: falha ao atualizar logo_url na empresa:", logoUpdateError.message);
+      } else {
+        logoUrlUpdated = fileUrl;
+        console.log(`[BrandAssets] empresas.logo_url atualizado para empresa ${empresaId}`);
+      }
+    }
+
+    if (type === "font") {
+      const { data: empresa, error: empresaFetchError } = await supabase
+        .from("empresas")
+        .select("brand_fonts")
+        .eq("id", empresaId)
+        .single();
+
+      if (empresaFetchError) {
+        console.warn("[BrandAssets] Aviso: falha ao buscar brand_fonts da empresa:", empresaFetchError.message);
+      } else {
+        const current = (empresa?.brand_fonts ?? []) as string[];
+        const rawFontName = name && name !== "Sem nome"
+          ? name
+          : file.name.replace(/\.(ttf|otf|woff|woff2)$/i, "");
+        const fontName = rawFontName.trim().slice(0, 80);
+
+        if (fontName && !current.includes(fontName)) {
+          const { error: fontUpdateError } = await supabase
+            .from("empresas")
+            .update({ brand_fonts: [...current, fontName] })
+            .eq("id", empresaId);
+
+          if (fontUpdateError) {
+            console.warn("[BrandAssets] Aviso: falha ao atualizar brand_fonts na empresa:", fontUpdateError.message);
+          } else {
+            fontNameAdded = fontName;
+            console.log(`[BrandAssets] empresas.brand_fonts: fonte "${fontName}" adicionada para empresa ${empresaId}`);
+          }
+        } else if (fontName && current.includes(fontName)) {
+          console.log(`[BrandAssets] empresas.brand_fonts: fonte "${fontName}" já existe, sem alteração`);
+        }
+      }
+    }
+
+    return NextResponse.json(
+      {
+        asset,
+        empresa_updated: {
+          logo_url: logoUrlUpdated,
+          font_added: fontNameAdded,
+        },
+      },
+      { status: 201 }
+    );
   } catch (err) {
     console.error("[BrandAssets] POST exception:", err);
     const message = (err as Error).message || "Erro interno";

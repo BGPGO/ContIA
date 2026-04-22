@@ -7,6 +7,17 @@ export interface EmpresaDna {
   nicho?: string | null;
 }
 
+export interface CustomFont {
+  name: string;   // nome exibido, usado em font-family (ex: "Bebas")
+  url: string;    // URL pública Supabase
+  format: string; // "truetype" | "opentype" | "woff" | "woff2"
+}
+
+export interface CustomLogo {
+  name: string;
+  url: string;
+}
+
 export interface BrandKit {
   nome?: string | null;
   primaryColor?: string | null;
@@ -14,6 +25,8 @@ export interface BrandKit {
   brandColors?: string[] | null;
   brandFonts?: string[] | null;
   logoUrl?: string | null;
+  customFonts?: CustomFont[] | null;
+  customLogos?: CustomLogo[] | null;
 }
 
 export const SYSTEM_PROMPT = `Você é um diretor de arte e copywriter experiente. Seu trabalho é criar criativos de Instagram sob demanda, em linguagem natural, conversando com o usuário como um designer humano faria.
@@ -80,17 +93,36 @@ function brandKitBlock(kit: BrandKit): string {
     }
   }
   const colors = [...colorSet];
-  const fonts = (kit.brandFonts ?? []).filter((f) => f && f.trim());
+
+  const customFonts = (kit.customFonts ?? []).filter((f) => f.name && f.url);
+  const googleFonts = (kit.brandFonts ?? []).filter((f) => f && f.trim());
 
   const linesColors =
     colors.length > 0
       ? colors.map((c) => `  - ${c}`).join("\n")
       : "  (nenhuma cor cadastrada — use neutros preto/branco/cinza)";
 
-  const linesFonts =
-    fonts.length > 0
-      ? fonts.map((f) => `  - ${f} (Google Fonts)`).join("\n")
-      : "  (nenhuma fonte cadastrada — escolha a que combina com a vibe)";
+  let linesFonts: string;
+  if (customFonts.length > 0) {
+    const customLines = customFonts
+      .map((f) => `  - ${f.name} (fonte customizada, arquivo hospedado)`)
+      .join("\n");
+    if (googleFonts.length > 0) {
+      const googleNote = `  Você também pode usar estas Google Fonts se fizerem sentido: ${googleFonts.join(", ")}.`;
+      linesFonts = `${customLines}\n\n${googleNote}`;
+    } else {
+      linesFonts = customLines;
+    }
+  } else if (googleFonts.length > 0) {
+    linesFonts = googleFonts.map((f) => `  - ${f} (Google Fonts)`).join("\n");
+  } else {
+    linesFonts = "  (nenhuma fonte cadastrada — escolha a que combina com a vibe)";
+  }
+
+  const customFontInstruction =
+    customFonts.length > 0
+      ? `\nPara usar as fontes customizadas: declare no CSS como \`font-family: '${customFonts[0].name}', serif;\` (ou sans-serif como fallback). O sistema injetará @font-face automaticamente — você não precisa escrever @font-face.\nUse essas fontes como principal do criativo. Se tiver 2+, pode usar uma pra display e outra pra body.`
+      : "";
 
   const logoLine = kit.logoUrl
     ? `URL: ${kit.logoUrl}`
@@ -104,7 +136,7 @@ CORES da marca (use exclusivamente estas + neutros preto/branco/cinza):
 ${linesColors}
 
 FONTES da marca (priorize, pode combinar com uma secundária se fizer sentido):
-${linesFonts}
+${linesFonts}${customFontInstruction}
 
 LOGO da marca:
   ${logoLine}
