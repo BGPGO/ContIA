@@ -7,6 +7,27 @@ import type { MessageAttachment } from "@/lib/creatives/history";
 // TYPES
 // ═══════════════════════════════════════════════════════════════════════
 
+export type StreamingPhase =
+  | "idle"
+  | "thinking"
+  | "writing"
+  | "designing"
+  | "rendering";
+
+export interface MessageUsage {
+  input_tokens: number;
+  output_tokens: number;
+  cache_creation_input_tokens: number;
+  cache_read_input_tokens: number;
+}
+
+export interface TokenTotals {
+  input: number;    // fresh input (sem cache)
+  output: number;
+  cacheWrite: number;
+  cacheRead: number;
+}
+
 export interface CreativeMessage {
   id: string;
   role: "user" | "assistant";
@@ -15,6 +36,9 @@ export interface CreativeMessage {
   pngUrl?: string | null;
   pngUrls?: string[] | null;
   attachments?: MessageAttachment[] | null;
+  usage?: MessageUsage | null;   // uso de tokens da mensagem
+  cost?: number;                 // custo em USD
+  model?: "sonnet" | "opus";    // modelo que gerou a mensagem
   createdAt?: string;
 }
 
@@ -60,6 +84,55 @@ function parseSSEChunk(chunk: string): SSEEvent[] {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// PRICING & COST CALCULATION
+// ═══════════════════════════════════════════════════════════════════════
+
+// Preços por 1M de tokens em USD
+const PRICING = {
+  sonnet: {
+    input: 3,
+    output: 15,
+    cacheWrite: 3.75,  // 25% a mais que input (padrão Anthropic)
+    cacheRead: 0.30,   // 10% do input
+  },
+  opus: {
+    input: 15,
+    output: 75,
+    cacheWrite: 18.75,
+    cacheRead: 1.50,
+  },
+} as const;
+
+function calculateCost(
+  usage: MessageUsage,
+  modelKey: "sonnet" | "opus"
+): number {
+  const rates = PRICING[modelKey];
+  const cost =
+    (usage.input_tokens * rates.input +
+      usage.cache_creation_input_tokens * rates.cacheWrite +
+      usage.cache_read_input_tokens * rates.cacheRead +
+      usage.output_tokens * rates.output) /
+    1_000_000;
+  return cost;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// PHASE DETECTION
+// ═══════════════════════════════════════════════════════════════════════
+
+function detectPhase(text: string): StreamingPhase {
+  if (!text || text.trim().length === 0) return "thinking";
+  const hasHtmlStart = /```html/i.test(text);
+  if (!hasHtmlStart) return "writing";
+  // Checa se o bloco html já fechou
+  const afterHtmlStart = text.split(/```html/i)[1] ?? "";
+  if (!afterHtmlStart.includes("```")) return "designing";
+  // HTML terminou mas stream ainda rolando — continua como designing
+  return "designing";
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // HOOK
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -79,6 +152,7 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
   messages: CreativeMessage[];
   isStreaming: boolean;
   streamingText: string;
+  streamingPhase: StreamingPhase;
   currentHtml: string | null;
   currentPngUrl: string | null;
   currentPngUrls: string[] | null;
@@ -93,10 +167,13 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
   pendingAttachments: MessageAttachment[];
   addAttachment: (file: File) => Promise<void>;
   removeAttachment: (url: string) => void;
+  totalCostUsd: number;
+  totalTokens: TokenTotals;
 } {
   const [messages, setMessages] = useState<CreativeMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
+  const [streamingPhase, setStreamingPhase] = useState<StreamingPhase>("idle");
   const [currentHtml, setCurrentHtml] = useState<string | null>(null);
   const [currentPngUrl, setCurrentPngUrl] = useState<string | null>(null);
   const [currentPngUrls, setCurrentPngUrls] = useState<string[] | null>(null);
@@ -104,6 +181,13 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
   const [model, setModelState] = useState<ModelKey>(getInitialModel);
   const [useBrandKit, setUseBrandKitState] = useState<boolean>(getInitialUseBrandKit);
   const [error, setError] = useState<string | null>(null);
+  const [totalCostUsd, setTotalCostUsd] = useState(0);
+  const [totalTokens, setTotalTokens] = useState<TokenTotals>({
+    input: 0,
+    output: 0,
+    cacheWrite: 0,
+    cacheRead: 0,
+  });
 
   const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
 
@@ -179,6 +263,7 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
   // ── Render HTML to PNG ──
   const renderHtml = useCallback(
     async (messageId: string, html: string) => {
+      setStreamingPhase("rendering");
       try {
         const response = await fetch("/api/creatives/render", {
           method: "POST",
@@ -209,6 +294,8 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
           err instanceof Error ? err.message : "Falha ao renderizar PNG";
         console.error("[CreativeChat] Falha ao renderizar PNG:", msg);
         setError("Falha ao renderizar PNG");
+      } finally {
+        setStreamingPhase("idle");
       }
     },
     [empresaId]
@@ -222,6 +309,7 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
       sendingRef.current = true;
       setIsStreaming(true);
       setStreamingText("");
+      setStreamingPhase("thinking");
       setCurrentHtml(null);
       setCurrentPngUrl(null);
       setCurrentPngUrls(null);
@@ -270,6 +358,7 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
         let accumulatedText = "";
         let receivedHtml: string | null = null;
         let receivedMessageId: string | null = null;
+        let receivedUsage: MessageUsage | null = null;
         let buffer = "";
 
         while (true) {
@@ -296,6 +385,7 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
                   accumulatedText += sse.data;
                 }
                 setStreamingText(accumulatedText);
+                setStreamingPhase(detectPhase(accumulatedText));
                 break;
               }
 
@@ -315,8 +405,10 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
                   const payload = JSON.parse(sse.data) as {
                     messageId?: string;
                     conversationId?: string;
+                    usage?: MessageUsage;
                   };
                   receivedMessageId = payload.messageId ?? null;
+                  receivedUsage = payload.usage ?? null;
                   if (payload.conversationId) {
                     setConversationId(payload.conversationId);
                   }
@@ -339,7 +431,10 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
           }
         }
 
-        // Adiciona mensagem do assistente ao state
+        // Calcula custo e monta mensagem do assistente
+        const modelKey: "sonnet" | "opus" = model;
+        const cost = receivedUsage ? calculateCost(receivedUsage, modelKey) : 0;
+
         const assistantId = receivedMessageId ?? "assistant-" + Date.now();
         const assistantMessage: CreativeMessage = {
           id: assistantId,
@@ -347,15 +442,32 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
           content: accumulatedText || "Criativo gerado.",
           html: receivedHtml,
           pngUrl: null,
+          pngUrls: null,
+          usage: receivedUsage,
+          cost,
+          model: modelKey,
           createdAt: new Date().toISOString(),
         };
         messagesRef.current = [...messagesRef.current, assistantMessage];
         setMessages(messagesRef.current);
         setStreamingText("");
 
+        // Acumula totais de tokens e custo
+        if (receivedUsage) {
+          setTotalCostUsd((prev) => prev + cost);
+          setTotalTokens((prev) => ({
+            input: prev.input + (receivedUsage?.input_tokens ?? 0),
+            output: prev.output + (receivedUsage?.output_tokens ?? 0),
+            cacheWrite: prev.cacheWrite + (receivedUsage?.cache_creation_input_tokens ?? 0),
+            cacheRead: prev.cacheRead + (receivedUsage?.cache_read_input_tokens ?? 0),
+          }));
+        }
+
         // Renderiza PNG se recebeu HTML
         if (receivedHtml && assistantId) {
           await renderHtml(assistantId, receivedHtml);
+        } else {
+          setStreamingPhase("idle");
         }
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") {
@@ -369,6 +481,7 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
 
         console.error("[CreativeChat] Erro ao enviar mensagem:", errorMessage);
         setError(errorMessage);
+        setStreamingPhase("idle");
 
         const errorMsg: CreativeMessage = {
           id: "error-" + Date.now(),
@@ -397,11 +510,14 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
     setMessages([]);
     setIsStreaming(false);
     setStreamingText("");
+    setStreamingPhase("idle");
     setCurrentHtml(null);
     setCurrentPngUrl(null);
     setCurrentPngUrls(null);
     setConversationId(null);
     setError(null);
+    setTotalCostUsd(0);
+    setTotalTokens({ input: 0, output: 0, cacheWrite: 0, cacheRead: 0 });
     sendingRef.current = false;
   }, []);
 
@@ -409,6 +525,7 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
     messages,
     isStreaming,
     streamingText,
+    streamingPhase,
     currentHtml,
     currentPngUrl,
     currentPngUrls,
@@ -423,5 +540,7 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
     pendingAttachments,
     addAttachment,
     removeAttachment,
+    totalCostUsd,
+    totalTokens,
   };
 }

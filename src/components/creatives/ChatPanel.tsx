@@ -1,10 +1,9 @@
 "use client";
 
-import { useRef } from "react";
-import { Palette, Paperclip, X } from "lucide-react";
-import { ChatInterface } from "@/components/studio/ChatInterface";
-import type { CopyChatMessage, QuickAction, QuickActionConfig } from "@/types/copy-studio";
-import type { CreativeMessage, ModelKey } from "@/hooks/useCreativeChat";
+import { Palette } from "lucide-react";
+import { CreativeChatInterface } from "./CreativeChatInterface";
+import type { QuickAction, QuickActionConfig } from "@/types/copy-studio";
+import type { CreativeMessage, ModelKey, StreamingPhase, TokenTotals } from "@/hooks/useCreativeChat";
 import type { MessageAttachment } from "@/lib/creatives/history";
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -15,6 +14,9 @@ interface ChatPanelProps {
   messages: CreativeMessage[];
   isStreaming: boolean;
   streamingText: string;
+  streamingPhase: StreamingPhase;
+  totalCostUsd: number;
+  totalTokens: TokenTotals;
   onSendMessage: (text: string) => void;
   model: ModelKey;
   onModelChange: (m: ModelKey) => void;
@@ -64,6 +66,9 @@ export function ChatPanel({
   messages,
   isStreaming,
   streamingText,
+  streamingPhase,
+  totalCostUsd,
+  totalTokens,
   onSendMessage,
   model,
   onModelChange,
@@ -73,29 +78,6 @@ export function ChatPanel({
   onAddAttachment,
   onRemoveAttachment,
 }: ChatPanelProps) {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  const handleOpenFilePicker = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-    const remainingSlots = 3 - pendingAttachments.length;
-    const toUpload = Array.from(files).slice(0, remainingSlots);
-    for (const f of toUpload) onAddAttachment(f);
-    e.target.value = "";
-  };
-
-  // Adapta CreativeMessage[] para CopyChatMessage[]
-  const adaptedMessages: CopyChatMessage[] = messages.map((msg) => ({
-    id: msg.id,
-    role: msg.role,
-    content: msg.content,
-    timestamp: msg.createdAt ?? new Date().toISOString(),
-  }));
-
   // Handler de quick action: recebe o QuickAction id, mas usa o prompt mapeado
   const handleQuickAction = (actionId: QuickAction) => {
     const action = CREATIVE_QUICK_ACTIONS.find((a) => a.id === actionId);
@@ -159,72 +141,41 @@ export function ChatPanel({
               </button>
             </div>
           </div>
-          {/* Cost label */}
-          <span className="text-[10px] text-white/30 whitespace-nowrap">
-            {useBrandKit ? "Identidade ativa · " : ""}Sonnet ~$0.06 · Opus ~$0.30 por criativo
-          </span>
+
+          {/* Cost tracker — mostra acumulado real após primeira resposta, preços esperados antes */}
+          <div className="flex items-center gap-3 text-[10px]">
+            {totalCostUsd > 0 ? (
+              <>
+                <span className="text-[#4ecdc4] font-mono">
+                  ${totalCostUsd.toFixed(3)}
+                </span>
+                <span className="text-white/30">
+                  {(totalTokens.input + totalTokens.output + totalTokens.cacheWrite + totalTokens.cacheRead).toLocaleString("pt-BR")} tokens
+                </span>
+              </>
+            ) : (
+              <span className="text-white/30 whitespace-nowrap">
+                {useBrandKit ? "Identidade ativa · " : ""}Sonnet ~$0.06 · Opus ~$0.30 por criativo
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Chat interface + attachment overlay */}
-      <div className="flex-1 min-h-0 relative">
-        <ChatInterface
-          messages={adaptedMessages}
+      {/* Chat interface (com paperclip e thumbnails integrados) */}
+      <div className="flex-1 min-h-0">
+        <CreativeChatInterface
+          messages={messages}
           isStreaming={isStreaming}
           streamingText={streamingText}
+          streamingPhase={streamingPhase}
           onSendMessage={onSendMessage}
           onQuickAction={handleQuickAction}
           quickActions={CREATIVE_QUICK_ACTIONS}
-          placeholder="      Descreva o criativo que você quer…"
-        />
-
-        {/* Pending attachments — linha acima do input */}
-        {pendingAttachments.length > 0 && (
-          <div className="absolute left-3 right-3 bottom-[72px] flex items-center gap-2 flex-wrap pointer-events-none z-10">
-            <div className="flex items-center gap-2 flex-wrap bg-[#080b1e]/90 backdrop-blur px-2 py-1.5 rounded-lg border border-white/10 pointer-events-auto">
-              {pendingAttachments.map((a) => (
-                <div key={a.url} className="relative group shrink-0">
-                  <img
-                    src={a.url}
-                    alt={a.name || "anexo"}
-                    className="w-12 h-12 rounded-md object-cover border border-white/10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => onRemoveAttachment(a.url)}
-                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-black/90 border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black cursor-pointer transition-all"
-                    title="Remover"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Paperclip fixo no canto bottom-left, alinhado com o input */}
-        <button
-          type="button"
-          onClick={handleOpenFilePicker}
-          disabled={pendingAttachments.length >= 3}
-          title={
-            pendingAttachments.length >= 3
-              ? "Máximo de 3 imagens"
-              : "Anexar imagem (PNG, JPG, WEBP, máx 5MB)"
-          }
-          className="absolute left-4 bottom-[18px] w-8 h-8 rounded-lg flex items-center justify-center text-white/50 hover:text-white/90 hover:bg-white/10 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed transition-all z-10"
-        >
-          <Paperclip className="w-4 h-4" />
-        </button>
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          multiple
-          hidden
-          onChange={handleFileChange}
+          placeholder="Descreva o criativo que você quer…"
+          pendingAttachments={pendingAttachments}
+          onAddAttachment={onAddAttachment}
+          onRemoveAttachment={onRemoveAttachment}
         />
       </div>
     </div>

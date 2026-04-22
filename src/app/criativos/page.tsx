@@ -25,6 +25,9 @@ function CriativosPageInner({ empresaId }: { empresaId: string }) {
     messages,
     isStreaming,
     streamingText,
+    streamingPhase,
+    totalCostUsd,
+    totalTokens,
     currentHtml,
     currentPngUrl,
     currentPngUrls,
@@ -46,6 +49,9 @@ function CriativosPageInner({ empresaId }: { empresaId: string }) {
           messages={messages}
           isStreaming={isStreaming}
           streamingText={streamingText}
+          streamingPhase={streamingPhase}
+          totalCostUsd={totalCostUsd}
+          totalTokens={totalTokens}
           onSendMessage={sendMessage}
           model={model}
           onModelChange={setModel}
