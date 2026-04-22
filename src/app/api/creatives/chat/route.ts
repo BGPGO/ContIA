@@ -3,7 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/rbac";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { getAnthropicClient, resolveModel } from "@/lib/ai/anthropic";
-import { buildSystem, type EmpresaDna } from "@/lib/creatives/system-prompt";
+import {
+  buildSystem,
+  type EmpresaDna,
+  type BrandKit,
+} from "@/lib/creatives/system-prompt";
 import {
   truncateHistory,
   splitProseAndHtml,
@@ -18,6 +22,7 @@ interface ChatBody {
   empresaId: string;
   conversationId?: string | null;
   model?: "sonnet" | "opus";
+  useBrandKit?: boolean;
 }
 
 // ── SSE encoder helper ──────────────────────────────────────────────────────
@@ -82,6 +87,50 @@ async function loadEmpresaDna(
   return { nome, brandColors, tom, nicho };
 }
 
+// ── BrandKit loader (cores + fontes + logo diretos da tabela empresas) ──────
+
+async function loadBrandKit(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  empresaId: string
+): Promise<BrandKit | null> {
+  const { data, error } = await supabase
+    .from("empresas")
+    .select(
+      "nome, cor_primaria, cor_secundaria, brand_colors, brand_fonts, logo_url"
+    )
+    .eq("id", empresaId)
+    .single();
+
+  if (error || !data) return null;
+
+  const row = data as {
+    nome?: string | null;
+    cor_primaria?: string | null;
+    cor_secundaria?: string | null;
+    brand_colors?: string[] | null;
+    brand_fonts?: string[] | null;
+    logo_url?: string | null;
+  };
+
+  const hasAny =
+    !!row.cor_primaria ||
+    !!row.cor_secundaria ||
+    (row.brand_colors && row.brand_colors.length > 0) ||
+    (row.brand_fonts && row.brand_fonts.length > 0) ||
+    !!row.logo_url;
+
+  if (!hasAny) return null;
+
+  return {
+    nome: row.nome ?? null,
+    primaryColor: row.cor_primaria ?? null,
+    secondaryColor: row.cor_secundaria ?? null,
+    brandColors: row.brand_colors ?? null,
+    brandFonts: row.brand_fonts ?? null,
+    logoUrl: row.logo_url ?? null,
+  };
+}
+
 // ── Main route handler ──────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -96,7 +145,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { messages, empresaId, conversationId, model } = body;
+  const { messages, empresaId, conversationId, model, useBrandKit } = body;
 
   if (!empresaId || !Array.isArray(messages)) {
     return NextResponse.json(
@@ -126,6 +175,19 @@ export async function POST(req: NextRequest) {
     dna = await loadEmpresaDna(supabase, empresaId);
   } catch (err) {
     console.warn("[creatives/chat] DNA load error:", (err as Error).message);
+  }
+
+  // ── 4b. Brand Kit (fontes/cores/logo) — só se usuário pediu ──
+  let brandKit: BrandKit | null = null;
+  if (useBrandKit) {
+    try {
+      brandKit = await loadBrandKit(supabase, empresaId);
+    } catch (err) {
+      console.warn(
+        "[creatives/chat] BrandKit load error:",
+        (err as Error).message
+      );
+    }
   }
 
   // ── 5. Resolve or create conversation ──
@@ -195,7 +257,7 @@ export async function POST(req: NextRequest) {
         const stream = anthropic.messages.stream({
           model: resolvedModel,
           max_tokens: 8000,
-          system: buildSystem(dna),
+          system: buildSystem({ dna, brandKit }),
           messages: truncateHistory(messages),
         });
 

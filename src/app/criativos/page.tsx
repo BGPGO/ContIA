@@ -29,6 +29,8 @@ function CriativosPageInner({ empresaId }: { empresaId: string }) {
     currentPngUrl,
     model,
     setModel,
+    useBrandKit,
+    setUseBrandKit,
     sendMessage,
     error,
   } = useCreativeChat({ empresaId });
@@ -43,6 +45,8 @@ function CriativosPageInner({ empresaId }: { empresaId: string }) {
           onSendMessage={sendMessage}
           model={model}
           onModelChange={setModel}
+          useBrandKit={useBrandKit}
+          onUseBrandKitChange={setUseBrandKit}
         />
       </div>
       <div className="flex-[2] min-w-0">

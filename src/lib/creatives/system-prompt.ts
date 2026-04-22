@@ -7,6 +7,15 @@ export interface EmpresaDna {
   nicho?: string | null;
 }
 
+export interface BrandKit {
+  nome?: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
+  brandColors?: string[] | null;
+  brandFonts?: string[] | null;
+  logoUrl?: string | null;
+}
+
 export const SYSTEM_PROMPT = `Você é um diretor de arte e copywriter experiente. Seu trabalho é criar criativos de Instagram sob demanda, em linguagem natural, conversando com o usuário como um designer humano faria.
 
 COMO RESPONDER
@@ -60,8 +69,60 @@ function dnaBlock(dna: EmpresaDna): string {
     : "";
 }
 
+function brandKitBlock(kit: BrandKit): string {
+  // Dedupe cores (primary + secondary + brandColors[])
+  const colorSet = new Set<string>();
+  if (kit.primaryColor) colorSet.add(kit.primaryColor);
+  if (kit.secondaryColor) colorSet.add(kit.secondaryColor);
+  if (kit.brandColors) {
+    for (const c of kit.brandColors) {
+      if (c && c.trim()) colorSet.add(c.trim());
+    }
+  }
+  const colors = [...colorSet];
+  const fonts = (kit.brandFonts ?? []).filter((f) => f && f.trim());
+
+  const linesColors =
+    colors.length > 0
+      ? colors.map((c) => `  - ${c}`).join("\n")
+      : "  (nenhuma cor cadastrada — use neutros preto/branco/cinza)";
+
+  const linesFonts =
+    fonts.length > 0
+      ? fonts.map((f) => `  - ${f} (Google Fonts)`).join("\n")
+      : "  (nenhuma fonte cadastrada — escolha a que combina com a vibe)";
+
+  const logoLine = kit.logoUrl
+    ? `URL: ${kit.logoUrl}`
+    : "(nenhum logo cadastrado — não inclua marca visual)";
+
+  return `IDENTIDADE VISUAL DA MARCA (ATIVA)
+
+O usuário ativou o modo "usar identidade da marca". Você tem LIBERDADE TOTAL sobre composição, copy, estilo, vibe e hierarquia — mas os elementos visuais abaixo são OBRIGATÓRIOS.
+
+CORES da marca (use exclusivamente estas + neutros preto/branco/cinza):
+${linesColors}
+
+FONTES da marca (priorize, pode combinar com uma secundária se fizer sentido):
+${linesFonts}
+
+LOGO da marca:
+  ${logoLine}
+
+Regras:
+- A paleta do criativo deve ser construída APENAS a partir das cores acima + neutros (preto, branco, cinzas). Pode escurecer/clarear essas cores, mas não introduza cores fora dessa lista.
+- A fonte principal do criativo deve ser uma das fontes da marca (quando cadastradas). Se a marca tiver só 1 fonte, use ela e escolha uma fonte neutra pra acento.
+- Se o logo foi fornecido, inclua-o no criativo de forma discreta mas visível (canto superior/inferior, header, footer — você escolhe a posição que funciona melhor com o design). Use <img src="URL_DO_LOGO" /> direto. Tamanho proporcional, geralmente entre 60×60px e 160×160px. Nunca distorça o aspect ratio.
+- Estilo, composição, copy, tamanhos, imagens de fundo, decoração — tudo continua sob seu critério. Essa restrição só cobre cores/fonte/logo.`;
+}
+
+export interface BuildSystemOpts {
+  dna?: EmpresaDna | null;
+  brandKit?: BrandKit | null;
+}
+
 export function buildSystem(
-  dna: EmpresaDna | null
+  opts: BuildSystemOpts = {}
 ): Anthropic.Messages.TextBlockParam[] {
   const system: Anthropic.Messages.TextBlockParam[] = [
     {
@@ -71,8 +132,8 @@ export function buildSystem(
     },
   ];
 
-  if (dna) {
-    const block = dnaBlock(dna);
+  if (opts.dna) {
+    const block = dnaBlock(opts.dna);
     if (block) {
       system.push({
         type: "text",
@@ -80,6 +141,14 @@ export function buildSystem(
         cache_control: { type: "ephemeral" },
       });
     }
+  }
+
+  if (opts.brandKit) {
+    system.push({
+      type: "text",
+      text: brandKitBlock(opts.brandKit),
+      cache_control: { type: "ephemeral" },
+    });
   }
 
   return system;

@@ -1,5 +1,6 @@
 "use client";
 
+import { Palette } from "lucide-react";
 import { ChatInterface } from "@/components/studio/ChatInterface";
 import type { CopyChatMessage, QuickAction, QuickActionConfig } from "@/types/copy-studio";
 import type { CreativeMessage, ModelKey } from "@/hooks/useCreativeChat";
@@ -15,6 +16,8 @@ interface ChatPanelProps {
   onSendMessage: (text: string) => void;
   model: ModelKey;
   onModelChange: (m: ModelKey) => void;
+  useBrandKit: boolean;
+  onUseBrandKitChange: (v: boolean) => void;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -59,6 +62,8 @@ export function ChatPanel({
   onSendMessage,
   model,
   onModelChange,
+  useBrandKit,
+  onUseBrandKitChange,
 }: ChatPanelProps) {
   // Adapta CreativeMessage[] para CopyChatMessage[]
   const adaptedMessages: CopyChatMessage[] = messages.map((msg) => ({
@@ -85,34 +90,55 @@ export function ChatPanel({
         </div>
 
         <div className="flex flex-col items-end gap-1">
-          {/* Model toggle */}
-          <div className="flex items-center rounded-lg border border-white/10 overflow-hidden">
+          <div className="flex items-center gap-2">
+            {/* Brand kit toggle */}
             <button
               type="button"
-              onClick={() => onModelChange("sonnet")}
-              className={`px-3 py-1.5 text-xs font-medium transition-all cursor-pointer ${
-                model === "sonnet"
-                  ? "bg-[#4ecdc4] text-black"
-                  : "bg-transparent text-white/60 hover:text-white/80"
+              onClick={() => onUseBrandKitChange(!useBrandKit)}
+              title={
+                useBrandKit
+                  ? "Usando cores, fonte e logo da marca"
+                  : "Ativar cores, fonte e logo da marca"
+              }
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer ${
+                useBrandKit
+                  ? "bg-[#ec4899] text-black border-[#ec4899]"
+                  : "bg-transparent text-white/60 border-white/10 hover:text-white/80 hover:border-white/20"
               }`}
             >
-              Sonnet
+              <Palette className="w-3.5 h-3.5" />
+              <span>Identidade</span>
             </button>
-            <button
-              type="button"
-              onClick={() => onModelChange("opus")}
-              className={`px-3 py-1.5 text-xs font-medium transition-all cursor-pointer ${
-                model === "opus"
-                  ? "bg-[#4ecdc4] text-black"
-                  : "bg-transparent text-white/60 hover:text-white/80"
-              }`}
-            >
-              Opus
-            </button>
+
+            {/* Model toggle */}
+            <div className="flex items-center rounded-lg border border-white/10 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => onModelChange("sonnet")}
+                className={`px-3 py-1.5 text-xs font-medium transition-all cursor-pointer ${
+                  model === "sonnet"
+                    ? "bg-[#4ecdc4] text-black"
+                    : "bg-transparent text-white/60 hover:text-white/80"
+                }`}
+              >
+                Sonnet
+              </button>
+              <button
+                type="button"
+                onClick={() => onModelChange("opus")}
+                className={`px-3 py-1.5 text-xs font-medium transition-all cursor-pointer ${
+                  model === "opus"
+                    ? "bg-[#4ecdc4] text-black"
+                    : "bg-transparent text-white/60 hover:text-white/80"
+                }`}
+              >
+                Opus
+              </button>
+            </div>
           </div>
           {/* Cost label */}
           <span className="text-[10px] text-white/30 whitespace-nowrap">
-            Sonnet ~$0.06 · Opus ~$0.30 por criativo
+            {useBrandKit ? "Identidade ativa · " : ""}Sonnet ~$0.06 · Opus ~$0.30 por criativo
           </span>
         </div>
       </div>

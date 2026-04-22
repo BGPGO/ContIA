@@ -67,6 +67,11 @@ function getInitialModel(): ModelKey {
   return "sonnet";
 }
 
+function getInitialUseBrandKit(): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem("creative_use_brand_kit") === "true";
+}
+
 export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
   messages: CreativeMessage[];
   isStreaming: boolean;
@@ -76,6 +81,8 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
   conversationId: string | null;
   model: ModelKey;
   setModel: (m: ModelKey) => void;
+  useBrandKit: boolean;
+  setUseBrandKit: (v: boolean) => void;
   sendMessage: (text: string) => Promise<void>;
   error: string | null;
   reset: () => void;
@@ -87,6 +94,7 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
   const [currentPngUrl, setCurrentPngUrl] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [model, setModelState] = useState<ModelKey>(getInitialModel);
+  const [useBrandKit, setUseBrandKitState] = useState<boolean>(getInitialUseBrandKit);
   const [error, setError] = useState<string | null>(null);
 
   const sendingRef = useRef(false);
@@ -98,6 +106,13 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
     setModelState(m);
     if (typeof window !== "undefined") {
       localStorage.setItem("creative_model", m);
+    }
+  }, []);
+
+  const setUseBrandKit = useCallback((v: boolean) => {
+    setUseBrandKitState(v);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("creative_use_brand_kit", v ? "true" : "false");
     }
   }, []);
 
@@ -168,6 +183,7 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
             empresaId,
             conversationId,
             model,
+            useBrandKit,
           }),
           signal: abortControllerRef.current.signal,
         });
@@ -301,7 +317,7 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
         abortControllerRef.current = null;
       }
     },
-    [empresaId, conversationId, model, renderHtml]
+    [empresaId, conversationId, model, useBrandKit, renderHtml]
   );
 
   // ── Reset ──
@@ -329,6 +345,8 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
     conversationId,
     model,
     setModel,
+    useBrandKit,
+    setUseBrandKit,
     sendMessage,
     error,
     reset,
