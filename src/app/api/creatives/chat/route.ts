@@ -1,0 +1,324 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { requireRole } from "@/lib/rbac";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { getAnthropicClient, resolveModel } from "@/lib/ai/anthropic";
+import { buildSystem, type EmpresaDna } from "@/lib/creatives/system-prompt";
+import {
+  truncateHistory,
+  splitProseAndHtml,
+  type RawMessage,
+} from "@/lib/creatives/history";
+
+export const runtime = "nodejs";
+export const maxDuration = 120;
+
+interface ChatBody {
+  messages: RawMessage[];
+  empresaId: string;
+  conversationId?: string | null;
+  model?: "sonnet" | "opus";
+}
+
+// ── SSE encoder helper ──────────────────────────────────────────────────────
+
+function sseEncode(event: string, data: unknown): string {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
+// ── DNA loader (inline, não modifica lib/creatives/) ────────────────────────
+
+async function loadEmpresaDna(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  empresaId: string
+): Promise<EmpresaDna | null> {
+  // Busca nome da empresa
+  const { data: empresa } = await supabase
+    .from("empresas")
+    .select("nome, nicho")
+    .eq("id", empresaId)
+    .single();
+
+  // Busca DNA sintetizado
+  const { data: marcaDnaRow } = await supabase
+    .from("marca_dna")
+    .select("dna_sintetizado")
+    .eq("empresa_id", empresaId)
+    .single();
+
+  const dnaJson =
+    marcaDnaRow?.dna_sintetizado as Record<string, unknown> | null | undefined;
+
+  if (!empresa && !dnaJson) return null;
+
+  // Normaliza campos do JSONB — suporta variações de nomenclatura
+  let brandColors: string[] | null = null;
+  if (dnaJson) {
+    const rawColors =
+      dnaJson["cores"] ??
+      dnaJson["brand_colors"] ??
+      dnaJson["brandColors"] ??
+      dnaJson["paleta"];
+    if (Array.isArray(rawColors)) {
+      brandColors = rawColors as string[];
+    } else if (typeof rawColors === "string" && rawColors.trim()) {
+      brandColors = [rawColors];
+    }
+  }
+
+  const tom =
+    (dnaJson?.["tom"] as string | undefined) ??
+    (dnaJson?.["tom_voz"] as string | undefined) ??
+    (dnaJson?.["tom_de_voz"] as string | undefined) ??
+    null;
+
+  const nicho =
+    (dnaJson?.["nicho"] as string | undefined) ??
+    (empresa?.nicho as string | undefined) ??
+    null;
+
+  const nome = empresa?.nome ?? null;
+
+  return { nome, brandColors, tom, nicho };
+}
+
+// ── Main route handler ──────────────────────────────────────────────────────
+
+export async function POST(req: NextRequest) {
+  // ── 1. Parse body ──
+  let body: ChatBody;
+  try {
+    body = (await req.json()) as ChatBody;
+  } catch {
+    return NextResponse.json(
+      { error: "Body inválido." },
+      { status: 400 }
+    );
+  }
+
+  const { messages, empresaId, conversationId, model } = body;
+
+  if (!empresaId || !Array.isArray(messages)) {
+    return NextResponse.json(
+      { error: "Campos obrigatórios faltando" },
+      { status: 400 }
+    );
+  }
+
+  // ── 2. Auth + RBAC ──
+  const supabase = await createClient();
+  const authz = await requireRole(supabase, empresaId, "post.create");
+  if (!authz.ok) return authz.response;
+
+  // ── 3. Rate limit ──
+  const ip = getClientIp(req);
+  const allowed = checkRateLimit(ip, "generate");
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Limite atingido, tente em alguns segundos." },
+      { status: 429 }
+    );
+  }
+
+  // ── 4. DNA da marca ──
+  let dna: EmpresaDna | null = null;
+  try {
+    dna = await loadEmpresaDna(supabase, empresaId);
+  } catch (err) {
+    console.warn("[creatives/chat] DNA load error:", (err as Error).message);
+  }
+
+  // ── 5. Resolve or create conversation ──
+  let activeConversationId = conversationId ?? null;
+
+  if (!activeConversationId) {
+    const lastUserMsg =
+      [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
+    const title = lastUserMsg.slice(0, 60) || "Novo criativo";
+
+    const { data: newConv, error: convErr } = await supabase
+      .from("creative_conversations")
+      .insert({
+        empresa_id: empresaId,
+        user_id: authz.user.id,
+        title,
+      })
+      .select("id")
+      .single();
+
+    if (convErr || !newConv) {
+      console.error(
+        "[creatives/chat] Failed to create conversation:",
+        convErr?.message
+      );
+      return NextResponse.json(
+        { error: "Falha ao criar conversa." },
+        { status: 500 }
+      );
+    }
+
+    activeConversationId = newConv.id as string;
+  }
+
+  // ── 6. Save user message ──
+  const lastUserMessage =
+    [...messages].reverse().find((m) => m.role === "user") ?? null;
+
+  if (lastUserMessage) {
+    const { error: msgErr } = await supabase
+      .from("creative_messages")
+      .insert({
+        conversation_id: activeConversationId,
+        role: "user",
+        content: lastUserMessage.content,
+      });
+
+    if (msgErr) {
+      console.error(
+        "[creatives/chat] Failed to save user message:",
+        msgErr.message
+      );
+    }
+  }
+
+  // ── 7. Stream from Anthropic ──
+  const anthropic = getAnthropicClient();
+  const resolvedModel = resolveModel(model);
+
+  const encoder = new TextEncoder();
+
+  const readable = new ReadableStream({
+    async start(controller) {
+      let buffer = "";
+
+      try {
+        const stream = anthropic.messages.stream({
+          model: resolvedModel,
+          max_tokens: 8000,
+          system: buildSystem(dna),
+          messages: truncateHistory(messages),
+        });
+
+        for await (const chunk of stream) {
+          if (
+            chunk.type === "content_block_delta" &&
+            chunk.delta.type === "text_delta"
+          ) {
+            const delta = chunk.delta.text;
+            buffer += delta;
+            controller.enqueue(
+              encoder.encode(sseEncode("text", { content: delta }))
+            );
+          }
+        }
+
+        // Await final message for accurate usage
+        const finalMsg = await stream.finalMessage();
+        const usage = finalMsg.usage;
+
+        // Split prose and HTML from complete buffer
+        const { prose, html } = splitProseAndHtml(buffer);
+
+        // Emit HTML event
+        if (html) {
+          controller.enqueue(
+            encoder.encode(sseEncode("html", { html }))
+          );
+        }
+
+        // Save assistant message
+        let savedMessageId: string | null = null;
+        try {
+          const { data: assistantMsg, error: assistantErr } = await supabase
+            .from("creative_messages")
+            .insert({
+              conversation_id: activeConversationId,
+              role: "assistant",
+              content: prose,
+              html: html || null,
+              model: resolvedModel,
+              tokens_in: usage.input_tokens,
+              tokens_out: usage.output_tokens,
+            })
+            .select("id")
+            .single();
+
+          if (assistantErr) {
+            console.error(
+              "[creatives/chat] Failed to save assistant message:",
+              assistantErr.message
+            );
+          } else {
+            savedMessageId = (assistantMsg?.id as string) ?? null;
+          }
+        } catch (saveErr) {
+          console.error(
+            "[creatives/chat] Exception saving assistant message:",
+            (saveErr as Error).message
+          );
+        }
+
+        // Update conversation.updated_at
+        try {
+          await supabase
+            .from("creative_conversations")
+            .update({ updated_at: new Date().toISOString() })
+            .eq("id", activeConversationId!);
+        } catch (updateErr) {
+          console.warn(
+            "[creatives/chat] Failed to update conversation timestamp:",
+            (updateErr as Error).message
+          );
+        }
+
+        // Emit done event
+        controller.enqueue(
+          encoder.encode(
+            sseEncode("done", {
+              messageId: savedMessageId,
+              conversationId: activeConversationId,
+              usage: {
+                input_tokens: usage.input_tokens,
+                output_tokens: usage.output_tokens,
+                cache_creation_input_tokens:
+                  (usage as unknown as Record<string, unknown>)[
+                    "cache_creation_input_tokens"
+                  ] ?? 0,
+                cache_read_input_tokens:
+                  (usage as unknown as Record<string, unknown>)[
+                    "cache_read_input_tokens"
+                  ] ?? 0,
+              },
+            })
+          )
+        );
+
+        controller.close();
+      } catch (err) {
+        console.error("[creatives/chat] Stream error:", err);
+        try {
+          controller.enqueue(
+            encoder.encode(
+              sseEncode("error", {
+                message:
+                  (err as Error).message || "Erro ao processar requisição.",
+              })
+            )
+          );
+        } catch {
+          // controller may already be closed
+        }
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(readable, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      "X-Accel-Buffering": "no",
+      Connection: "keep-alive",
+    },
+  });
+}

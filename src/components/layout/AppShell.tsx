@@ -19,7 +19,7 @@ const PUBLIC_ROUTES = ["/privacidade", "/termos"];
 function AppContent({ children, pathname }: { children: React.ReactNode; pathname: string }) {
   const { empresas, loading } = useEmpresa();
   const supabaseConfigured = isSupabaseConfigured();
-  const isEditorPage = pathname.startsWith("/studio/editor");
+  const isEditorPage = pathname.startsWith("/studio/editor") || pathname.startsWith("/criativos");
 
   // Show wizard automatically when Supabase is configured but user has no empresas
   const [wizardOpen, setWizardOpen] = useState(false);
