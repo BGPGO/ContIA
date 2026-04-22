@@ -166,8 +166,44 @@ export function ChatPanel({
         </div>
       </div>
 
-      {/* Attachment bar */}
-      <div className="shrink-0 px-4 py-2 border-b border-white/10 flex items-center gap-3 flex-wrap">
+      {/* Chat interface + attachment overlay */}
+      <div className="flex-1 min-h-0 relative">
+        <ChatInterface
+          messages={adaptedMessages}
+          isStreaming={isStreaming}
+          streamingText={streamingText}
+          onSendMessage={onSendMessage}
+          onQuickAction={handleQuickAction}
+          quickActions={CREATIVE_QUICK_ACTIONS}
+          placeholder="      Descreva o criativo que você quer…"
+        />
+
+        {/* Pending attachments — linha acima do input */}
+        {pendingAttachments.length > 0 && (
+          <div className="absolute left-3 right-3 bottom-[72px] flex items-center gap-2 flex-wrap pointer-events-none z-10">
+            <div className="flex items-center gap-2 flex-wrap bg-[#080b1e]/90 backdrop-blur px-2 py-1.5 rounded-lg border border-white/10 pointer-events-auto">
+              {pendingAttachments.map((a) => (
+                <div key={a.url} className="relative group shrink-0">
+                  <img
+                    src={a.url}
+                    alt={a.name || "anexo"}
+                    className="w-12 h-12 rounded-md object-cover border border-white/10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => onRemoveAttachment(a.url)}
+                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-black/90 border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black cursor-pointer transition-all"
+                    title="Remover"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Paperclip fixo no canto bottom-left, alinhado com o input */}
         <button
           type="button"
           onClick={handleOpenFilePicker}
@@ -177,33 +213,10 @@ export function ChatPanel({
               ? "Máximo de 3 imagens"
               : "Anexar imagem (PNG, JPG, WEBP, máx 5MB)"
           }
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 text-xs font-medium text-white/60 hover:text-white/80 hover:border-white/20 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+          className="absolute left-4 bottom-[18px] w-8 h-8 rounded-lg flex items-center justify-center text-white/50 hover:text-white/90 hover:bg-white/10 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed transition-all z-10"
         >
-          <Paperclip className="w-3.5 h-3.5" />
-          <span>Anexar imagem</span>
+          <Paperclip className="w-4 h-4" />
         </button>
-
-        {pendingAttachments.length > 0 && (
-          <div className="flex items-center gap-2 flex-wrap">
-            {pendingAttachments.map((a) => (
-              <div key={a.url} className="relative group">
-                <img
-                  src={a.url}
-                  alt={a.name || "anexo"}
-                  className="w-14 h-14 rounded-md object-cover border border-white/10"
-                />
-                <button
-                  type="button"
-                  onClick={() => onRemoveAttachment(a.url)}
-                  className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-black/80 border border-white/20 flex items-center justify-center text-white/80 hover:text-white hover:bg-black cursor-pointer transition-all"
-                  title="Remover"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
 
         <input
           ref={fileInputRef}
@@ -212,19 +225,6 @@ export function ChatPanel({
           multiple
           hidden
           onChange={handleFileChange}
-        />
-      </div>
-
-      {/* Chat interface */}
-      <div className="flex-1 min-h-0">
-        <ChatInterface
-          messages={adaptedMessages}
-          isStreaming={isStreaming}
-          streamingText={streamingText}
-          onSendMessage={onSendMessage}
-          onQuickAction={handleQuickAction}
-          quickActions={CREATIVE_QUICK_ACTIONS}
-          placeholder="Descreva o criativo que você quer…"
         />
       </div>
     </div>
