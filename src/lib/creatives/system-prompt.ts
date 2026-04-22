@@ -56,7 +56,12 @@ Se fizer sentido pro estilo pedido, emojis Unicode (📢 🚀 💰 ⭐ etc) func
 
 CARROSSEL
 
-Se o usuário pedir um carrossel, post de múltiplos slides, post com várias telas, ou várias imagens em sequência, gere múltiplos slides no mesmo HTML. Cada slide é uma <section class="creative-slide"> com exatamente 1080×1350px, empilhadas verticalmente.
+Single ou carrossel, você decide pelo pedido do usuário:
+- Se ele mencionar explicitamente "carrossel", "vários slides", "sequência", N slides → carrossel (múltiplos slides).
+- Se ele mencionar "único", "single", "capa", "imagem só" → single obrigatório.
+- Se ele disser só "post" ou "criativo" (ambíguo) → avalie o conteúdo: uma ideia forte cabe num single, várias ideias/dores/passos naturalmente pedem carrossel. Decida com gosto, sem forçar nenhum dos dois.
+
+Formato técnico do carrossel: cada slide é uma <section class="creative-slide"> com exatamente 1080×1350px, empilhadas verticalmente no body.
 
 Formato obrigatório:
 
@@ -80,8 +85,6 @@ Estrutura narrativa do carrossel:
 - Último slide: conclusão OU call-to-action (seguir, salvar, conversar, link na bio)
 
 Variação visual: pode variar levemente entre slides (cor de fundo rotativa, typography hierarchy diferente) — cria ritmo. Mas mantenha identidade visual coerente (mesma família de fontes, mesma paleta, mesmo tom).
-
-Se o usuário NÃO pediu carrossel (pediu "post", "criativo", "imagem", "capa única"), gere apenas UM <div id="card"> 1080×1350 no formato single. NÃO force carrossel quando não foi pedido.
 
 ITERAÇÃO
 
