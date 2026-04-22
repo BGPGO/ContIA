@@ -24,6 +24,43 @@ function isValidFontFile(file: File): boolean {
   return mimeOk || extOk; // aceita se QUALQUER check passar
 }
 
+/**
+ * Deriva o content-type real do arquivo.
+ * Browsers mandam "application/octet-stream" pra fontes frequentemente — o bucket
+ * do Supabase rejeita esse MIME. A gente reescreve baseado na extensão.
+ */
+function resolveContentType(file: File): string {
+  const ext = file.name.toLowerCase().split(".").pop() || "";
+  const browserType = (file.type || "").toLowerCase();
+
+  // Map por extensão (precedência pra fontes e formatos com MIME quebrado)
+  const byExtension: Record<string, string> = {
+    ttf: "font/ttf",
+    otf: "font/otf",
+    woff: "font/woff",
+    woff2: "font/woff2",
+    svg: "image/svg+xml",
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    webp: "image/webp",
+    gif: "image/gif",
+  };
+
+  // Se browser mandou octet-stream ou vazio, usa a extensão
+  if (!browserType || browserType === "application/octet-stream") {
+    return byExtension[ext] || "application/octet-stream";
+  }
+
+  // Se browser mandou algo específico mas é fonte, prefere a extensão
+  // (evita "application/font-sfnt" etc que bucket pode rejeitar)
+  if (byExtension[ext] && (ext === "ttf" || ext === "otf" || ext === "woff" || ext === "woff2")) {
+    return byExtension[ext];
+  }
+
+  return browserType;
+}
+
 /* ── GET: List brand assets (with optional type filter) ── */
 export async function GET(request: NextRequest) {
   try {
@@ -108,14 +145,15 @@ export async function POST(request: NextRequest) {
     const ext = file.name.split(".").pop() || "bin";
     const storagePath = `${empresaId}/${type}/${crypto.randomUUID()}.${ext}`;
 
-    console.log(`[BrandAssets] Uploading: ${file.name} (${file.size} bytes, ${file.type}) -> ${storagePath}`);
+    const resolvedContentType = resolveContentType(file);
+    console.log(`[BrandAssets] Uploading: ${file.name} (${file.size} bytes, browser=${file.type}, resolved=${resolvedContentType}) -> ${storagePath}`);
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
     const { error: uploadError } = await supabase.storage
       .from(BUCKET_NAME)
       .upload(storagePath, buffer, {
-        contentType: file.type,
+        contentType: resolvedContentType,
         upsert: false,
       });
 
@@ -152,7 +190,7 @@ export async function POST(request: NextRequest) {
         file_url: fileUrl,
         file_name: file.name,
         file_size: file.size,
-        mime_type: file.type,
+        mime_type: resolvedContentType,
         metadata: {},
         tags,
       })
