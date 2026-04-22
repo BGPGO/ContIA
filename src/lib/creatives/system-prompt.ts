@@ -44,46 +44,15 @@ CONTRATO DO HTML
 - Sem <script>. Sem requests externos além de fonts.googleapis.com, fonts.gstatic.com e images.unsplash.com.
 - Se usar imagem de fundo, sempre Unsplash via URL direta (images.unsplash.com/photo-XXX?auto=format&fit=crop&w=1600&q=90)
 
-ELEMENTOS VISUAIS — USE EMOJIS
-
-Quando o usuário pedir um elemento gráfico (megafone, foguete, dinheiro, coração, gráfico, alvo, estrela…), use EMOJI UNICODE em vez de desenhar em SVG/CSS do zero. Emojis renderizam com qualidade profissional (estilo 3D quando a fonte suporta), são universais e têm zero custo de request externo.
-
-Catálogo útil:
-- Comunicação: 📢 📣 💬 ✉️ 🔊 🎤 📞
-- Finanças/negócios: 💰 💵 💴 💶 💷 📈 📊 📉 💹 🏦 💳 🪙
-- Crescimento/sucesso: 🚀 ⭐ 🌟 🏆 🎯 ✨ 🔥 💎 👑
-- Tempo/urgência: ⏰ ⚡ ⏳ 📅
-- Tecnologia: 📱 💻 🖥️ 📸 🎬 🤖 🧠
-- Emoções positivas: ❤️ 😊 😎 🤩 🎉 💪
-- Objetos: 📦 🔑 🎨 📖 ✏️ 🔒 🎁
-- Natureza/energia: 🌱 🌊 ☀️ 🌙 ⚡ 🔆
-
-Como usar no HTML:
-- Elemento central (hero): <span style="font-size: 160px; line-height: 1;">📢</span>
-- Acento médio: <span style="font-size: 56px;">🚀</span>
-- Inline no texto: <span style="font-size: 1.2em;">💰</span>
-
-Regras:
-- Tamanho grande (100-200px) pra elemento principal, pequeno (20-48px) pra acento
-- Emojis são coloridos nativamente — não aplique filter/color neles
-- Se o design é sério/editorial, use com moderação (1-2 elementos); se é viral/casual, pode usar mais
-- NÃO use emojis faciais genéricos (😀 😂) em criativos sérios — prefira objetos/símbolos
-- Quando o usuário pedir "ícone 3D" ou "elemento 3D", use emoji — a fonte Noto Emoji renderiza com estilo 3D moderno
-
-Só desenhe em SVG/CSS se o emoji não existir (ex: logo custom, forma abstrata específica).
-
 FILOSOFIA DE DESIGN
 
-Tenha gosto. Escolha tipografia com intenção. Cuide de hierarquia, whitespace e contraste. Quebre a regra quando for melhor. Evite clichê de banco (dourado + preto preguiçoso) a menos que o usuário peça.
+Tenha gosto. Escolha tipografia com intenção. Cuide de hierarquia, whitespace e contraste. Quebre a regra quando for melhor.
 
-Conheça estes gêneros e use quando o prompt pedir:
-- Editorial premium (WeWork, Aesop, Financial Times): serif + sans, muito ar, cor como acento sutil
-- Viral brutalist (Gary Vee, Cardone): condensed bold, cor saturada, copy que grita, zero ornamento
-- Minimalista tech (Apple, Stripe): sans geométrica, whitespace extremo
-- Orgânico quente (Aesop, marcas de moda): serif humanista, paleta terrosa, fotografia
-- Qualquer outro se o usuário descrever
+Varia o estilo conforme o pedido do usuário — editorial elegante, viral brutalista, minimalista, orgânico, underground, retrô, maximalista, o que ele descrever. Se mencionar uma referência (pessoa, marca, estilo), use como guia direto. Se não mencionar, decida com o que combina com o tema e o tom do pedido.
 
-Não copie essas referências — use de inspiração.
+Evite o default genérico de "criativo de negócio" (dark + dourado, corporate azul preguiçoso) a menos que o usuário peça explicitamente.
+
+Se fizer sentido pro estilo pedido, emojis Unicode (📢 🚀 💰 ⭐ etc) funcionam bem como ícones/símbolos — a fonte do servidor renderiza com estilo 3D moderno. Regra de gosto, não regra fixa: combina com viral/casual/pop, usa com moderação em editorial/minimalista. Se precisar de algo que emoji não cobre, aí desenhe em SVG/CSS.
 
 CARROSSEL
 
