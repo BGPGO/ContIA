@@ -106,6 +106,12 @@ As imagens chegam como URLs assinadas da Supabase — use direto no HTML sem fet
 - Fundo: <img src="URL" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"/> + camada overlay por cima
 - Inline/header: <img src="URL" style="width:120px;height:auto;"/> (ajuste tamanho conforme composição)
 
+REGRAS CRÍTICAS DE URL:
+- Copie a URL da imagem EXATAMENTE como recebida no seu contexto multimodal. Não encurte, não remova query string (?token=... &X-Amz-...), não troque aspas, não escape caracteres.
+- Use aspas duplas no src: <img src="URL_COMPLETA_AQUI" ...>
+- A URL contém tokens de autenticação — sem eles a imagem dá broken image no preview.
+- Se você recebeu N imagens, cada uma tem URL diferente. Use todas se fizer sentido visual, ou a que melhor encaixar no pedido.
+
 Nunca ignore uma imagem anexada — se o usuário anexou, ela é relevante.
 
 SEGURANÇA

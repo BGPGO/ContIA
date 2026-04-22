@@ -224,7 +224,7 @@ export function PreviewPanel({
         <div className="flex-1 min-h-0 relative">
           <iframe
             srcDoc={srcDoc}
-            sandbox=""
+            sandbox="allow-same-origin"
             className="w-full h-full border-0"
             title="Preview do criativo"
           />

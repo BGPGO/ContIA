@@ -75,6 +75,40 @@ function PhaseIndicator({ phase }: { phase: StreamingPhase }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// EXTRAIR PROSA (sem HTML)
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * Divide o content do assistant em prosa + indicador de código.
+ * A prosa é a frase explicativa ("Fiz com fundo preto..."), o HTML fica escondido.
+ */
+function extractProse(content: string): {
+  prose: string;
+  hasCode: boolean;
+  code: string;
+} {
+  // Caso 1: bloco ```html ... ``` (padrão do output do Claude)
+  const fenced = content.match(/```html\s*\n([\s\S]*?)(\n```|$)/i);
+  if (fenced && typeof fenced.index === "number") {
+    return {
+      prose: content.slice(0, fenced.index).trim(),
+      hasCode: true,
+      code: (fenced[1] ?? "").trim(),
+    };
+  }
+  // Caso 2: HTML inline sem fence (<!DOCTYPE ou <html)
+  const bareStart = content.search(/<!DOCTYPE html>|<html/i);
+  if (bareStart >= 0) {
+    return {
+      prose: content.slice(0, bareStart).trim(),
+      hasCode: true,
+      code: content.slice(bareStart).trim(),
+    };
+  }
+  return { prose: content, hasCode: false, code: "" };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // MESSAGE BUBBLE
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -118,6 +152,9 @@ function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
   }
 
   // Assistant message
+  const { prose, hasCode, code } = extractProse(message.content);
+  const cost = typeof message.cost === "number" ? message.cost : 0;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -127,7 +164,7 @@ function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
     >
       <div className="max-w-[85%] space-y-1.5">
         <div className="bg-[#141736] text-[#e8eaff] border border-white/5 rounded-2xl rounded-bl-md px-4 py-3 text-sm leading-relaxed whitespace-pre-line">
-          {message.content}
+          {prose || (hasCode ? "Desenhando criativo…" : "")}
           {isStreaming && (
             <motion.span
               animate={{ opacity: [1, 0] }}
@@ -135,15 +172,48 @@ function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
               className="inline-block w-0.5 h-4 bg-[#4ecdc4] ml-0.5 align-middle"
             />
           )}
+
+          {/* Barra de progresso animada enquanto o Claude desenha o HTML */}
+          {isStreaming && hasCode && (
+            <div className="mt-3 h-1 w-full rounded-full bg-white/5 overflow-hidden">
+              <motion.div
+                className="h-full bg-gradient-to-r from-[#4ecdc4] to-[#6c5ce7]"
+                initial={{ width: "15%" }}
+                animate={{ width: ["15%", "85%", "15%"] }}
+                transition={{
+                  duration: 2.4,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              />
+            </div>
+          )}
+
+          {/* HTML colapsável — só depois do streaming terminar */}
+          {!isStreaming && hasCode && code.length > 0 && (
+            <details className="mt-3 group">
+              <summary className="cursor-pointer text-[11px] text-white/40 hover:text-white/70 select-none list-none flex items-center gap-1 transition-colors">
+                <svg
+                  className="w-3 h-3 transition-transform group-open:rotate-90"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+                Ver HTML gerado ({code.length.toLocaleString("pt-BR")} caracteres)
+              </summary>
+              <pre className="mt-2 max-h-64 overflow-auto text-[10px] font-mono text-white/50 bg-black/30 rounded-md p-2 whitespace-pre-wrap break-all">
+                {code}
+              </pre>
+            </details>
+          )}
         </div>
 
-        {/* Badge de custo — aparece apenas quando cost está disponível.
-            O campo cost? ainda não está no tipo CreativeMessage (Beta adicionará).
-            Usamos cast seguro para não bloquear tsc agora. */}
-        {typeof (message as { cost?: number }).cost === "number" &&
-          (message as { cost?: number }).cost! > 0 && (
+        {/* Badge de custo — aparece apenas quando cost está disponível */}
+        {cost > 0 && (
           <div className="mt-1 text-[10px] text-white/30 font-mono">
-            ~${(message as { cost?: number }).cost!.toFixed(3)}
+            ~${cost.toFixed(3)}
           </div>
         )}
 
