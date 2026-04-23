@@ -62,6 +62,7 @@ export interface Post {
   titulo: string;
   conteudo: string;
   midia_url: string | null;
+  midia_urls?: string[];
   plataformas: string[];
   status:
     | "rascunho"

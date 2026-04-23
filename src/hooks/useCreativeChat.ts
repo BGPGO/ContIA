@@ -54,6 +54,7 @@ export interface ConversationSummary {
   // thumb omitida: GET /api/creatives retorna apenas summary (sem messages),
   // buscar thumb exigiria N+1 requests — skip intencional.
   thumbUrl?: string | null;
+  slidesCount?: number;
 }
 
 export interface UseCreativeChatOpts {
@@ -303,6 +304,7 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
           created_at: string;
           updated_at: string;
           thumb_url?: string | null;
+          slides_count?: number;
         }>;
       };
       const mapped: ConversationSummary[] = (data.conversations ?? [])
@@ -312,6 +314,7 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
           createdAt: c.created_at,
           updatedAt: c.updated_at,
           thumbUrl: c.thumb_url ?? null,
+          slidesCount: typeof c.slides_count === "number" ? c.slides_count : 0,
         }))
         .sort(
           (a, b) =>
@@ -707,6 +710,7 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
             createdAt: now,
             updatedAt: now,
             thumbUrl: null,
+            slidesCount: 0,
           };
           setConversations((prev) => [newEntry, ...prev]);
         }

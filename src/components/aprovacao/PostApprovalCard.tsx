@@ -4,10 +4,11 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CheckCircle, XCircle, Loader2, Clock, ImageOff } from "lucide-react";
+import { CheckCircle, XCircle, Loader2, Clock, ImageOff, Layers } from "lucide-react";
 import { Post, PostApproval } from "@/types";
 import { ApprovalModal } from "@/components/aprovacao/ApprovalModal";
 import { ApproveAndScheduleModal } from "@/components/aprovacao/ApproveAndScheduleModal";
+import { InstagramPostModal } from "@/components/aprovacao/InstagramPostModal";
 import { getPlataformaCor, getPlataformaLabel } from "@/lib/utils";
 
 interface PostApprovalCardProps {
@@ -55,6 +56,8 @@ export function PostApprovalCard({
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   // Estado para o novo modal consolidado de aprovação + agendamento
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  // Estado para o modal Instagram expandido
+  const [igModalOpen, setIgModalOpen] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
@@ -120,7 +123,8 @@ export function PostApprovalCard({
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.97 }}
         transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-        className="bg-[#0c0f24] border border-[#1e2348]/70 rounded-2xl overflow-hidden shadow-lg hover:border-[#4ecdc4]/20 transition-all duration-300 flex flex-col"
+        onClick={() => setIgModalOpen(true)}
+        className="bg-[#0c0f24] border border-[#1e2348]/70 rounded-2xl overflow-hidden shadow-lg hover:border-[#4ecdc4]/30 hover:shadow-[#4ecdc4]/5 transition-all duration-300 flex flex-col cursor-pointer"
         style={{
           background: "linear-gradient(135deg, #0c0f24 0%, #10133a 100%)",
         }}
@@ -128,7 +132,7 @@ export function PostApprovalCard({
         {/* ── Hero image ── */}
         {hasThumbnail ? (
           <div
-            className="w-full overflow-hidden bg-[#080b1e] flex items-center justify-center"
+            className="relative w-full overflow-hidden bg-[#080b1e] flex items-center justify-center"
             style={{ maxHeight: "500px", aspectRatio: "1 / 1" }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -138,6 +142,13 @@ export function PostApprovalCard({
               className="w-full h-full object-contain"
               style={{ maxHeight: "500px" }}
             />
+            {/* Badge de carrossel */}
+            {post.midia_urls && post.midia_urls.length > 1 && (
+              <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-md bg-black/70 backdrop-blur-sm text-white text-[10px] font-semibold">
+                <Layers className="w-3 h-3" />
+                <span>{post.midia_urls.length} slides</span>
+              </div>
+            )}
           </div>
         ) : (
           /* Placeholder maior e mais evidente quando não há mídia */
@@ -218,7 +229,7 @@ export function PostApprovalCard({
         {/* ── Footer actions ── */}
         <div className="p-4 flex gap-2.5">
           <button
-            onClick={openReject}
+            onClick={(e) => { e.stopPropagation(); openReject(); }}
             disabled={submitting}
             className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-[13px] font-medium border border-[#f87171]/30 text-[#f87171] bg-[#f87171]/[0.06] hover:bg-[#f87171]/[0.12] hover:border-[#f87171]/50 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
           >
@@ -231,7 +242,7 @@ export function PostApprovalCard({
           </button>
 
           <button
-            onClick={openApprove}
+            onClick={(e) => { e.stopPropagation(); openApprove(); }}
             disabled={submitting}
             className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-[13px] font-semibold text-white transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
             style={{
@@ -263,6 +274,22 @@ export function PostApprovalCard({
         onApprove={onApprove}
         onComplete={handleScheduleComplete}
         onError={handleScheduleError}
+      />
+
+      {/* Modal Instagram expandido */}
+      <InstagramPostModal
+        open={igModalOpen}
+        onClose={() => setIgModalOpen(false)}
+        post={post}
+        approval={approval}
+        onApprove={() => {
+          setIgModalOpen(false);
+          openApprove();
+        }}
+        onReject={() => {
+          setIgModalOpen(false);
+          openReject();
+        }}
       />
 
       {/* Toast */}

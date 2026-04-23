@@ -66,15 +66,19 @@ function ModalContent({
 
   async function handleSubmit() {
     if (!caption.trim() || loading) return;
+    console.log("[SendToApprovalModal] handleSubmit iniciado");
     setLoading(true);
     setErrorMsg(null);
 
     try {
+      console.log("[SendToApprovalModal] chamando API send-to-approval…");
       const res = await fetch(`/api/creatives/${conversationId}/send-to-approval`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messageId, caption: caption.trim(), plataformas }),
       });
+
+      console.log("[SendToApprovalModal] resposta status:", res.status);
 
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -83,14 +87,22 @@ function ModalContent({
 
       const data = (await res.json()) as { post?: { id: string }; approval?: unknown };
       const postId = data.post?.id ?? "";
+
+      // IMPORTANTE: setSuccess(true) deve ser chamado ANTES de onSuccess e setTimeout
+      console.log("[SendToApprovalModal] setSuccess(true) — tela de sucesso deve aparecer agora");
       setSuccess(true);
+
+      // Notifica parent (parent NÃO deve fechar o modal aqui)
       onSuccess(postId);
-      // Auto-fecha após 4 segundos
+
+      // Auto-fecha após 4 segundos — tempo suficiente pra user ver a tela de sucesso
       setTimeout(() => {
+        console.log("[SendToApprovalModal] auto-fechando modal após 4s");
         onClose();
       }, 4000);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erro desconhecido";
+      console.error("[SendToApprovalModal] erro no envio:", msg);
       setErrorMsg(`Erro ao enviar: ${msg}`);
     } finally {
       setLoading(false);

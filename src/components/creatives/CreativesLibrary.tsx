@@ -11,6 +11,7 @@ import {
   Pencil,
   Trash2,
   Library,
+  Layers,
 } from "lucide-react";
 import type { ConversationSummary } from "@/hooks/useCreativeChat";
 
@@ -174,6 +175,14 @@ function CreativeCard({
       ) : (
         <div className="w-full h-full bg-gradient-to-br from-[#0d1025] via-[#111530] to-[#0a0d1f] flex items-center justify-center">
           <ImageIcon className="w-8 h-8 text-white/15" />
+        </div>
+      )}
+
+      {/* Badge de slides para carrosséis */}
+      {conv.slidesCount && conv.slidesCount > 1 && (
+        <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-md bg-black/70 backdrop-blur-sm text-white text-[10px] font-semibold z-10">
+          <Layers className="w-3 h-3" />
+          <span>{conv.slidesCount} slides</span>
         </div>
       )}
 

@@ -108,7 +108,9 @@ function CriativosPageInner({ empresaId }: { empresaId: string }) {
             (hook.currentPngUrl ? [hook.currentPngUrl] : [])
           }
           defaultCaption={defaultCaption}
-          onSuccess={() => setApprovalModalOpen(false)}
+          onSuccess={() => {
+            // NÃO fechar aqui — o modal exibe tela de sucesso por 4s e fecha sozinho via onClose
+          }}
         />
       )}
     </div>

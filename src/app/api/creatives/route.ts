@@ -60,12 +60,17 @@ export async function GET(req: NextRequest) {
         ? lastWithImage!.png_urls![0]
         : null);
 
+    const slidesCount = Array.isArray(lastWithImage?.png_urls)
+      ? lastWithImage!.png_urls!.length
+      : (lastWithImage?.png_url ? 1 : 0);
+
     return {
       id: conv.id,
       title: conv.title,
       created_at: conv.created_at,
       updated_at: conv.updated_at,
       thumb_url: toPublicUrl(thumbUrl),
+      slides_count: slidesCount,
     };
   });
 
