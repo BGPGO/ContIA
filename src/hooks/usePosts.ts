@@ -86,5 +86,42 @@ export function usePosts(empresaId: string | undefined) {
     [configured]
   );
 
-  return { posts, loading, createPost, updatePost, deletePost, refreshPosts: fetchPosts };
+  const cancelPostSchedule = useCallback(async (postId: string): Promise<void> => {
+    if (!empresaId) throw new Error("Empresa não selecionada");
+
+    // 1. Buscar o jobId do agendamento
+    const statusRes = await fetch(`/api/posts/schedule/status?postId=${encodeURIComponent(postId)}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!statusRes.ok) {
+      const errData = await statusRes.json().catch(() => ({})) as { error?: string };
+      throw new Error(errData.error || "Falha ao buscar agendamento");
+    }
+
+    const statusData = await statusRes.json() as { schedule?: { jobId?: string } | null };
+    const jobId = statusData.schedule?.jobId;
+
+    if (!jobId) {
+      throw new Error("Este post não tem agendamento ativo");
+    }
+
+    // 2. Cancelar via DELETE
+    const cancelRes = await fetch("/api/posts/schedule", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jobId }),
+    });
+
+    if (!cancelRes.ok) {
+      const errData = await cancelRes.json().catch(() => ({})) as { error?: string };
+      throw new Error(errData.error || "Falha ao cancelar agendamento");
+    }
+
+    // 3. Refresh da lista de posts pra refletir mudança de status
+    await fetchPosts();
+  }, [empresaId, fetchPosts]);
+
+  return { posts, loading, createPost, updatePost, deletePost, cancelPostSchedule, refreshPosts: fetchPosts };
 }
