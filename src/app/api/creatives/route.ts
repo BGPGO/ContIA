@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
       ? (conv.creative_messages as RawMessage[])
       : [];
 
-    const firstWithImage = messages
+    const lastWithImage = messages
       .filter(
         (m) =>
           m.role === "assistant" &&
@@ -51,13 +51,13 @@ export async function GET(req: NextRequest) {
       )
       .sort(
         (a, b) =>
-          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       )[0];
 
     const thumbUrl: string | null =
-      firstWithImage?.png_url ??
-      (Array.isArray(firstWithImage?.png_urls) && firstWithImage!.png_urls!.length > 0
-        ? firstWithImage!.png_urls![0]
+      lastWithImage?.png_url ??
+      (Array.isArray(lastWithImage?.png_urls) && lastWithImage!.png_urls!.length > 0
+        ? lastWithImage!.png_urls![0]
         : null);
 
     return {

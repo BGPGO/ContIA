@@ -2,6 +2,7 @@ export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { toPublicUrl } from "@/lib/creatives/storage";
 
 // POST /api/creatives/[id]/send-to-approval
 // Cria um post em pendente_aprovacao a partir de uma mensagem de criativo
@@ -106,16 +107,22 @@ export async function POST(
       );
     }
 
-    // Validar que a mensagem tem PNG gerado
-    const pngUrls: string[] = Array.isArray(message.png_urls) && message.png_urls.length > 0
+    // Validar que a mensagem tem PNG gerado e converter para URLs públicas
+    const rawPngUrls: string[] = Array.isArray(message.png_urls) && message.png_urls.length > 0
       ? (message.png_urls as string[])
       : message.png_url
       ? [message.png_url as string]
       : [];
 
-    if (pngUrls.length === 0) {
+    const publicPngUrls = rawPngUrls
+      .map((u) => toPublicUrl(u))
+      .filter((u): u is string => Boolean(u));
+
+    const publicMainUrl = toPublicUrl(rawPngUrls[0] ?? null);
+
+    if (publicPngUrls.length === 0 || !publicMainUrl) {
       return NextResponse.json(
-        { error: "Mensagem sem PNG gerado. Gere o criativo antes de enviar para aprovação." },
+        { error: "Esta mensagem não tem imagem renderizada pra enviar pra aprovação." },
         { status: 422 }
       );
     }
@@ -134,8 +141,8 @@ export async function POST(
         empresa_id: conversation.empresa_id,
         titulo: conversation.title || "Criativo sem título",
         conteudo: caption.trim(),
-        midia_url: pngUrls[0],
-        midia_urls: pngUrls,
+        midia_url: publicMainUrl,
+        midia_urls: publicPngUrls,
         plataformas: plataformas ?? ["instagram"],
         status: "pendente_aprovacao",
         approval_required: true,

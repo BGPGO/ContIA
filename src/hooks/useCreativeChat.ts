@@ -364,12 +364,26 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
         setMessages(mapped);
         setConversationId(id);
 
-        // Restaura último html/png do último assistant com conteúdo visual
-        const lastAssistant = [...mapped].reverse().find((m) => m.role === "assistant");
-        if (lastAssistant) {
-          setCurrentHtml(lastAssistant.html ?? null);
-          setCurrentPngUrl(lastAssistant.pngUrl ?? null);
-          setCurrentPngUrls(lastAssistant.pngUrls ?? null);
+        // Restaura último html/png da última assistant com conteúdo visual (html, png_url ou png_urls)
+        const messagesDesc = [...mapped].reverse();
+        const lastAssistantWithContent = messagesDesc.find(
+          (m) =>
+            m.role === "assistant" &&
+            (
+              Boolean(m.html) ||
+              Boolean(m.pngUrl) ||
+              (Array.isArray(m.pngUrls) && m.pngUrls.length > 0)
+            )
+        );
+
+        if (lastAssistantWithContent) {
+          setCurrentHtml(lastAssistantWithContent.html ?? null);
+          setCurrentPngUrl(lastAssistantWithContent.pngUrl ?? null);
+          setCurrentPngUrls(
+            Array.isArray(lastAssistantWithContent.pngUrls) && lastAssistantWithContent.pngUrls.length > 0
+              ? lastAssistantWithContent.pngUrls
+              : (lastAssistantWithContent.pngUrl ? [lastAssistantWithContent.pngUrl] : null)
+          );
         } else {
           setCurrentHtml(null);
           setCurrentPngUrl(null);

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
-import { X, Send, Loader2, AlertCircle } from "lucide-react";
+import Link from "next/link";
+import { X, Send, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 
 // ═══════════════════════════════════════════════════════════════════════
 // TYPES
@@ -35,17 +36,27 @@ const PLATAFORMAS = [
 // ═══════════════════════════════════════════════════════════════════════
 
 function ModalContent({
+  open,
   onClose,
   conversationId,
   messageId,
   pngUrls,
   defaultCaption,
   onSuccess,
-}: Omit<SendToApprovalModalProps, "open">) {
+}: Omit<SendToApprovalModalProps, "open"> & { open: boolean }) {
   const [caption, setCaption] = useState(defaultCaption);
   const [plataformas, setPlataformas] = useState<string[]>(["instagram"]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  // Reseta estado de sucesso sempre que o modal abre
+  useEffect(() => {
+    if (open) {
+      setSuccess(false);
+      setErrorMsg(null);
+    }
+  }, [open]);
 
   function togglePlataforma(id: string) {
     setPlataformas((prev) =>
@@ -72,14 +83,69 @@ function ModalContent({
 
       const data = (await res.json()) as { post?: { id: string }; approval?: unknown };
       const postId = data.post?.id ?? "";
+      setSuccess(true);
       onSuccess(postId);
-      onClose();
+      // Auto-fecha após 4 segundos
+      setTimeout(() => {
+        onClose();
+      }, 4000);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erro desconhecido";
       setErrorMsg(`Erro ao enviar: ${msg}`);
     } finally {
       setLoading(false);
     }
+  }
+
+  // Tela de sucesso
+  if (success) {
+    return (
+      <div
+        className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
+        {/* Backdrop */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        />
+
+        {/* Card de sucesso */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 16 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 16 }}
+          transition={{ type: "spring", damping: 30, stiffness: 300 }}
+          className="relative z-10 w-full max-w-md bg-[#0d1025] border border-white/10 rounded-2xl p-8 shadow-2xl flex flex-col items-center text-center gap-4"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <CheckCircle2 className="w-16 h-16 text-emerald-400" />
+          <h2 className="text-xl font-semibold text-white">Enviado pra aprovação!</h2>
+          <p className="text-sm text-white/60 leading-relaxed">
+            Seu criativo foi enviado e tá aguardando revisão.
+          </p>
+          <div className="flex items-center gap-3 mt-2 w-full">
+            <Link
+              href="/aprovacao"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#4ecdc4] to-[#6c5ce7] text-black font-semibold text-sm hover:opacity-90 transition-all"
+            >
+              Ver aprovações →
+            </Link>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl text-sm font-medium text-white/60 hover:text-white/90 hover:bg-white/8 transition-all border border-white/10"
+            >
+              Fechar
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
   }
 
   // Limitar preview: mostrar até 3 thumbs + badge se houver mais
@@ -273,6 +339,7 @@ export function SendToApprovalModal(props: SendToApprovalModalProps) {
     <AnimatePresence>
       {props.open && (
         <ModalContent
+          open={props.open}
           onClose={props.onClose}
           conversationId={props.conversationId}
           messageId={props.messageId}
