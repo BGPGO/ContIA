@@ -11,6 +11,9 @@ import {
   MessageSquare,
   Palette,
   Image as ImageIcon,
+  CreditCard,
+  ExternalLink,
+  AlertTriangle,
 } from "lucide-react";
 import type { CreativeMessage, StreamingPhase } from "@/hooks/useCreativeChat";
 import type { MessageAttachment } from "@/lib/creatives/history";
@@ -109,6 +112,135 @@ function extractProse(content: string): {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// ERROS ESPECIAIS (créditos, rate limit)
+// ═══════════════════════════════════════════════════════════════════════
+
+type SpecialErrorType = "credit_exhausted" | "rate_limited" | "overloaded";
+
+/**
+ * Detecta erros conhecidos da Anthropic API no content da mensagem assistant
+ * pra renderizar card amigável em vez de stacktrace cru.
+ */
+function detectSpecialError(content: string): SpecialErrorType | null {
+  const c = content.toLowerCase();
+  if (
+    c.includes("credit balance is too low") ||
+    c.includes("créditos") ||
+    c.includes("plans & billing") ||
+    c.includes("insufficient credit")
+  ) {
+    return "credit_exhausted";
+  }
+  if (
+    c.includes("rate_limit") ||
+    c.includes("rate limit") ||
+    c.includes("too many requests") ||
+    c.includes("429")
+  ) {
+    return "rate_limited";
+  }
+  if (
+    c.includes("overloaded") ||
+    c.includes("api is temporarily") ||
+    c.includes("529")
+  ) {
+    return "overloaded";
+  }
+  return null;
+}
+
+const ERROR_CONFIG: Record<
+  SpecialErrorType,
+  {
+    icon: React.ReactNode;
+    title: string;
+    description: string;
+    action?: { label: string; href: string };
+    palette: { border: string; bg: string; iconColor: string; accent: string };
+  }
+> = {
+  credit_exhausted: {
+    icon: <CreditCard className="w-8 h-8" />,
+    title: "Créditos esgotados",
+    description:
+      "O saldo de créditos da Anthropic chegou a zero. Pra continuar gerando criativos, adicione créditos no painel da Anthropic — leva menos de 1 minuto.",
+    action: {
+      label: "Adicionar créditos na Anthropic",
+      href: "https://console.anthropic.com/settings/billing",
+    },
+    palette: {
+      border: "border-amber-500/30",
+      bg: "from-amber-500/10 via-amber-500/5 to-transparent",
+      iconColor: "text-amber-400",
+      accent: "bg-amber-500 hover:bg-amber-600 text-black",
+    },
+  },
+  rate_limited: {
+    icon: <AlertTriangle className="w-8 h-8" />,
+    title: "Muitos pedidos ao mesmo tempo",
+    description:
+      "A API da Anthropic limitou temporariamente os pedidos. Espera uns segundos e manda de novo.",
+    palette: {
+      border: "border-sky-500/30",
+      bg: "from-sky-500/10 via-sky-500/5 to-transparent",
+      iconColor: "text-sky-400",
+      accent: "bg-sky-500 hover:bg-sky-600 text-black",
+    },
+  },
+  overloaded: {
+    icon: <AlertTriangle className="w-8 h-8" />,
+    title: "API sobrecarregada",
+    description:
+      "A Anthropic está com pico de demanda agora. Tenta de novo em um minuto — costuma passar rápido.",
+    palette: {
+      border: "border-violet-500/30",
+      bg: "from-violet-500/10 via-violet-500/5 to-transparent",
+      iconColor: "text-violet-400",
+      accent: "bg-violet-500 hover:bg-violet-600 text-white",
+    },
+  },
+};
+
+function SpecialErrorCard({ type }: { type: SpecialErrorType }) {
+  const config = ERROR_CONFIG[type];
+  return (
+    <div className="max-w-[90%] w-full">
+      <div
+        className={`relative overflow-hidden rounded-2xl border ${config.palette.border} bg-gradient-to-br ${config.palette.bg} px-5 py-4`}
+      >
+        <div className="flex items-start gap-4">
+          <div
+            className={`shrink-0 ${config.palette.iconColor} mt-0.5`}
+            aria-hidden
+          >
+            {config.icon}
+          </div>
+          <div className="flex-1 min-w-0 space-y-2">
+            <h3 className="text-[15px] font-semibold text-white leading-tight">
+              {config.title}
+            </h3>
+            <p className="text-[13px] text-white/70 leading-relaxed">
+              {config.description}
+            </p>
+            {config.action && (
+              <a
+                href={config.action.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`inline-flex items-center gap-1.5 mt-1 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${config.palette.accent}`}
+              >
+                {config.action.label}
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // MESSAGE BUBBLE
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -154,6 +286,21 @@ function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
   // Assistant message
   const { prose, hasCode, code } = extractProse(message.content);
   const cost = typeof message.cost === "number" ? message.cost : 0;
+
+  // Detecta erros especiais (créditos, rate limit, etc) pra renderizar card bonito
+  const specialError = detectSpecialError(message.content);
+  if (specialError) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: "easeOut" }}
+        className="flex justify-start"
+      >
+        <SpecialErrorCard type={specialError} />
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
