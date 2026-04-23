@@ -132,7 +132,6 @@ export async function POST(
       .from("posts")
       .insert({
         empresa_id: conversation.empresa_id,
-        user_id: user.id,
         titulo: conversation.title || "Criativo sem título",
         conteudo: caption.trim(),
         midia_url: pngUrls[0],

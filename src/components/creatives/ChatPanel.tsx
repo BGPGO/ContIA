@@ -1,6 +1,6 @@
 "use client";
 
-import { Palette } from "lucide-react";
+import { Library, Palette } from "lucide-react";
 import { CreativeChatInterface } from "./CreativeChatInterface";
 import type { QuickAction, QuickActionConfig } from "@/types/copy-studio";
 import type { CreativeMessage, ModelKey, StreamingPhase, TokenTotals } from "@/hooks/useCreativeChat";
@@ -25,6 +25,7 @@ interface ChatPanelProps {
   pendingAttachments: MessageAttachment[];
   onAddAttachment: (file: File) => void;
   onRemoveAttachment: (url: string) => void;
+  onOpenLibrary?: () => void;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -77,6 +78,7 @@ export function ChatPanel({
   pendingAttachments,
   onAddAttachment,
   onRemoveAttachment,
+  onOpenLibrary,
 }: ChatPanelProps) {
   // Handler de quick action: recebe o QuickAction id, mas usa o prompt mapeado
   const handleQuickAction = (actionId: QuickAction) => {
@@ -90,7 +92,18 @@ export function ChatPanel({
     <div className="flex flex-col h-full min-h-0">
       {/* Header */}
       <div className="shrink-0 px-4 py-3 border-b border-white/10 flex items-center justify-between gap-4">
-        <div>
+        <div className="flex items-center gap-3">
+          {onOpenLibrary && (
+            <button
+              type="button"
+              onClick={onOpenLibrary}
+              title="Abrir biblioteca de criativos"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white text-xs font-medium transition-all cursor-pointer"
+            >
+              <Library className="w-3.5 h-3.5" />
+              <span>Biblioteca</span>
+            </button>
+          )}
           <h1 className="text-lg font-serif text-white leading-tight">Criativos IA</h1>
         </div>
 

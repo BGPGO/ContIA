@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Library } from "lucide-react";
 import { useEmpresa } from "@/hooks/useEmpresa";
 import { useCreativeChat } from "@/hooks/useCreativeChat";
 import { ChatPanel } from "@/components/creatives/ChatPanel";
@@ -51,17 +50,6 @@ function CriativosPageInner({ empresaId }: { empresaId: string }) {
 
   return (
     <div className="flex h-full w-full relative">
-      {/* Botão Biblioteca — canto superior esquerdo */}
-      <button
-        type="button"
-        onClick={() => setLibraryOpen(true)}
-        className="absolute top-3 left-3 z-10 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white text-xs font-medium transition-all"
-        title="Abrir biblioteca de criativos"
-      >
-        <Library className="w-4 h-4" />
-        <span>Biblioteca</span>
-      </button>
-
       {/* Chat */}
       <div className="flex-[3] min-w-0 border-r border-white/10 relative">
         <ChatPanel
@@ -79,6 +67,7 @@ function CriativosPageInner({ empresaId }: { empresaId: string }) {
           pendingAttachments={hook.pendingAttachments}
           onAddAttachment={hook.addAttachment}
           onRemoveAttachment={hook.removeAttachment}
+          onOpenLibrary={() => setLibraryOpen(true)}
         />
       </div>
 

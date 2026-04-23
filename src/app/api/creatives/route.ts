@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/rbac";
+import { toPublicUrl } from "@/lib/creatives/storage";
 
 /* ── GET: Lista conversations da empresa ── */
 export async function GET(req: NextRequest) {
@@ -64,7 +65,7 @@ export async function GET(req: NextRequest) {
       title: conv.title,
       created_at: conv.created_at,
       updated_at: conv.updated_at,
-      thumb_url: thumbUrl,
+      thumb_url: toPublicUrl(thumbUrl),
     };
   });
 

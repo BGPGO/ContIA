@@ -1,7 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-const SIGNED_URL_EXPIRY_SECONDS = 3600; // 1h
-
 export async function uploadPng(
   supabase: SupabaseClient,
   bucket: string,
@@ -16,13 +14,28 @@ export async function uploadPng(
     });
   if (uploadErr) throw new Error(`Falha no upload: ${uploadErr.message}`);
 
-  const { data, error: signErr } = await supabase.storage
-    .from(bucket)
-    .createSignedUrl(path, SIGNED_URL_EXPIRY_SECONDS);
-  if (signErr || !data?.signedUrl) {
-    throw new Error(
-      `Falha ao gerar signed URL: ${signErr?.message || "sem URL"}`
-    );
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+  if (!data?.publicUrl) {
+    throw new Error("Falha ao gerar URL pública");
   }
-  return data.signedUrl;
+  return data.publicUrl;
+}
+
+/**
+ * Converte signed URL do Supabase pra public URL.
+ * Se a URL já é pública, retorna como está.
+ * Retorna null para entradas nulas/undefined.
+ *
+ * Formato signed: https://{ref}.supabase.co/storage/v1/object/sign/{bucket}/{path}?token=...
+ * Formato public: https://{ref}.supabase.co/storage/v1/object/public/{bucket}/{path}
+ */
+export function toPublicUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (url.includes("/object/public/")) return url;
+  if (url.includes("/object/sign/")) {
+    // Remove query string e troca /sign/ por /public/
+    const [base] = url.split("?");
+    return base.replace("/object/sign/", "/object/public/");
+  }
+  return url;
 }

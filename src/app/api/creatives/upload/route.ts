@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/rbac";
 
 const BUCKET = "creatives";
-const SIGNED_URL_TTL = 60 * 60 * 24 * 7; // 7 dias
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_MIMES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const EXT_MAP: Record<string, string> = {
@@ -61,20 +60,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { data: signed, error: signErr } = await supabase.storage
-      .from(BUCKET)
-      .createSignedUrl(path, SIGNED_URL_TTL);
-
-    if (signErr || !signed?.signedUrl) {
-      console.error("[creatives/upload] signed url error:", signErr?.message);
+    const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
+    if (!pub?.publicUrl) {
       return NextResponse.json(
-        { error: `Falha ao gerar URL: ${signErr?.message ?? "desconhecido"}` },
+        { error: "Falha ao gerar URL pública" },
         { status: 500 }
       );
     }
 
     return NextResponse.json({
-      url: signed.signedUrl,
+      url: pub.publicUrl,
       mediaType,
       name: file.name,
     });

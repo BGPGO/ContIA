@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/rbac";
+import { toPublicUrl } from "@/lib/creatives/storage";
 
 /* ── GET: Detalhes de conversation + messages ── */
 export async function GET(
@@ -43,7 +44,15 @@ export async function GET(
     return NextResponse.json({ error: msgErr.message }, { status: 500 });
   }
 
-  return NextResponse.json({ conversation: conv, messages: messages ?? [] });
+  const normalizedMessages = (messages ?? []).map((m) => ({
+    ...m,
+    png_url: toPublicUrl(m.png_url),
+    png_urls: Array.isArray(m.png_urls)
+      ? m.png_urls.map((u: string) => toPublicUrl(u)).filter((u): u is string => Boolean(u))
+      : [],
+  }));
+
+  return NextResponse.json({ conversation: conv, messages: normalizedMessages });
 }
 
 /* ── DELETE: Apaga conversa por ID ── */
