@@ -26,6 +26,7 @@ function toPost(row: Record<string, unknown>): Post {
     titulo: row.titulo as string,
     conteudo: row.conteudo as string,
     midia_url: (row.midia_url as string) ?? null,
+    midia_urls: Array.isArray(row.midia_urls) ? (row.midia_urls as string[]) : [],
     plataformas: (row.plataformas as string[]) ?? [],
     status: row.status as Post["status"],
     agendado_para: (row.agendado_para as string) ?? null,
