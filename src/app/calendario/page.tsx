@@ -154,6 +154,10 @@ export default function CalendarioPage() {
     }
   }
 
+  async function handleDeletePost(postId: string): Promise<void> {
+    await postsHook.deletePost(postId);
+  }
+
   function clearFilters() {
     setActivePlatforms(new Set(ALL_PLATFORMS));
     setActiveStatuses(new Set<Post["status"]>(["publicado", "agendado", "rascunho", "erro"]));
@@ -376,6 +380,7 @@ export default function CalendarioPage() {
                       currentMonth={currentMonth}
                       posts={dayPosts}
                       onCancelSchedule={handleCancelSchedule}
+                      onDeletePost={handleDeletePost}
                     />
                   </motion.div>
                 );
@@ -449,6 +454,7 @@ export default function CalendarioPage() {
         date={selectedDate ?? new Date()}
         posts={selectedDayPosts}
         onCancelSchedule={handleCancelSchedule}
+        onDeletePost={handleDeletePost}
       />
     </div>
   );

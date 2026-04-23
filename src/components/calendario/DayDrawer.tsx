@@ -4,7 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { X, PlusCircle, Loader2, Calendar } from "lucide-react";
+import { X, PlusCircle, Loader2, Calendar, Trash2 } from "lucide-react";
 import { Post } from "@/types";
 import { cn, getPlataformaCor, getPlataformaLabel } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -61,6 +61,7 @@ export interface DayDrawerProps {
   date: Date;
   posts: Post[];
   onCancelSchedule: (postId: string) => Promise<void>;
+  onDeletePost?: (postId: string) => Promise<void>;
   onEditPost?: (postId: string) => void;
 }
 
@@ -69,13 +70,16 @@ export interface DayDrawerProps {
 function DrawerPostCard({
   post,
   onCancelSchedule,
+  onDeletePost,
   onEditPost,
 }: {
   post: Post;
   onCancelSchedule: (postId: string) => Promise<void>;
+  onDeletePost?: (postId: string) => Promise<void>;
   onEditPost?: (postId: string) => void;
 }) {
   const [canceling, setCanceling] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const color = getPlataformaCor(post.plataformas[0]);
   const statusConf = STATUS_CONFIG[post.status];
   const date = getPostDate(post);
@@ -89,6 +93,23 @@ function DrawerPostCard({
       setCanceling(false);
     }
   }
+
+  async function handleDelete() {
+    if (!onDeletePost) return;
+    if (!window.confirm("Excluir este post? Essa ação não pode ser desfeita.")) return;
+    setDeleting(true);
+    try {
+      await onDeletePost(post.id);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  // Posts em status agendado não devem ser deletados direto (precisam cancelar agendamento primeiro)
+  const canDelete =
+    onDeletePost &&
+    post.status !== "agendado" &&
+    post.status !== "publicado";
 
   return (
     <div
@@ -182,6 +203,27 @@ function DrawerPostCard({
               )}
             </button>
           )}
+
+          {canDelete && (
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              title="Excluir post"
+              className="text-[11px] px-2.5 py-1 rounded-lg border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 transition-colors disabled:opacity-50 flex items-center gap-1.5 ml-auto"
+            >
+              {deleting ? (
+                <>
+                  <Loader2 size={11} className="animate-spin" />
+                  Excluindo…
+                </>
+              ) : (
+                <>
+                  <Trash2 size={11} />
+                  Excluir
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -196,6 +238,7 @@ export function DayDrawer({
   date,
   posts,
   onCancelSchedule,
+  onDeletePost,
   onEditPost,
 }: DayDrawerProps) {
   const router = useRouter();
@@ -232,6 +275,7 @@ export function DayDrawer({
               posts={posts}
               onClose={onClose}
               onCancelSchedule={onCancelSchedule}
+              onDeletePost={onDeletePost}
               onEditPost={onEditPost}
               onCreatePost={() => router.push("/criacao")}
             />
@@ -255,6 +299,7 @@ export function DayDrawer({
               posts={posts}
               onClose={onClose}
               onCancelSchedule={onCancelSchedule}
+              onDeletePost={onDeletePost}
               onEditPost={onEditPost}
               onCreatePost={() => router.push("/criacao")}
             />
@@ -272,6 +317,7 @@ function DrawerContent({
   posts,
   onClose,
   onCancelSchedule,
+  onDeletePost,
   onEditPost,
   onCreatePost,
 }: {
@@ -279,6 +325,7 @@ function DrawerContent({
   posts: Post[];
   onClose: () => void;
   onCancelSchedule: (postId: string) => Promise<void>;
+  onDeletePost?: (postId: string) => Promise<void>;
   onEditPost?: (postId: string) => void;
   onCreatePost: () => void;
 }) {
@@ -322,6 +369,7 @@ function DrawerContent({
               key={post.id}
               post={post}
               onCancelSchedule={onCancelSchedule}
+              onDeletePost={onDeletePost}
               onEditPost={onEditPost}
             />
           ))

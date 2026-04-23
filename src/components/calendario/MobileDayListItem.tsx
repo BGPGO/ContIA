@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { format, isSameMonth, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Loader2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
 import { Post } from "@/types";
 import { cn, getPlataformaCor } from "@/lib/utils";
 
@@ -30,6 +30,7 @@ interface MobileDayListItemProps {
   currentMonth: Date;
   posts: Post[];
   onCancelSchedule?: (postId: string) => Promise<void>;
+  onDeletePost?: (postId: string) => Promise<void>;
 }
 
 export function MobileDayListItem({
@@ -37,10 +38,12 @@ export function MobileDayListItem({
   currentMonth,
   posts,
   onCancelSchedule,
+  onDeletePost,
 }: MobileDayListItemProps) {
   const inMonth = isSameMonth(day, currentMonth);
   const today = isToday(day);
   const [cancelingId, setCancelingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   if (!inMonth || posts.length === 0) return null;
 
@@ -52,6 +55,17 @@ export function MobileDayListItem({
       await onCancelSchedule(postId);
     } finally {
       setCancelingId(null);
+    }
+  }
+
+  async function handleDelete(postId: string) {
+    if (!onDeletePost) return;
+    if (!window.confirm("Excluir este post? Essa ação não pode ser desfeita.")) return;
+    setDeletingId(postId);
+    try {
+      await onDeletePost(postId);
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -128,6 +142,23 @@ export function MobileDayListItem({
                     )}
                   </button>
                 )}
+
+                {onDeletePost &&
+                  post.status !== "agendado" &&
+                  post.status !== "publicado" && (
+                    <button
+                      onClick={() => handleDelete(post.id)}
+                      disabled={deletingId === post.id}
+                      title="Excluir"
+                      className="text-[10px] px-2 py-0.5 rounded border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 transition-colors disabled:opacity-50 flex items-center gap-1"
+                    >
+                      {deletingId === post.id ? (
+                        <Loader2 size={9} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={10} />
+                      )}
+                    </button>
+                  )}
               </div>
             </div>
           );
