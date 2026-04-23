@@ -62,15 +62,29 @@ export async function POST(
       );
     }
 
-    // Verificar que o usuário é membro da empresa
-    const { data: membership } = await supabase
-      .from("empresa_members")
-      .select("id")
-      .eq("empresa_id", conversation.empresa_id)
-      .eq("user_id", user.id)
+    // Verificar que o usuário é dono ou membro da empresa
+    // O modelo legacy usa empresas.user_id para o dono original;
+    // membros adicionados via RBAC ficam em empresa_members.
+    const { data: empresa } = await supabase
+      .from("empresas")
+      .select("user_id")
+      .eq("id", conversation.empresa_id)
       .maybeSingle();
 
-    if (!membership) {
+    const isOwner = empresa?.user_id === user.id;
+
+    let isMember = false;
+    if (!isOwner) {
+      const { data: member } = await supabase
+        .from("empresa_members")
+        .select("role")
+        .eq("empresa_id", conversation.empresa_id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      isMember = Boolean(member);
+    }
+
+    if (!isOwner && !isMember) {
       return NextResponse.json(
         { error: "Sem permissão para acessar esta empresa." },
         { status: 403 }

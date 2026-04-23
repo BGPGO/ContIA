@@ -1,3 +1,6 @@
+// @deprecated — substituído por CreativesLibrary (modal fullscreen com grid visual).
+// Este arquivo está morto e será removido após validação final.
+// NÃO importar em novos componentes.
 "use client";
 
 import { useState, useRef, useEffect } from "react";

@@ -302,6 +302,7 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
           title: string;
           created_at: string;
           updated_at: string;
+          thumb_url?: string | null;
         }>;
       };
       const mapped: ConversationSummary[] = (data.conversations ?? [])
@@ -310,7 +311,7 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
           title: c.title,
           createdAt: c.created_at,
           updatedAt: c.updated_at,
-          thumbUrl: null,
+          thumbUrl: c.thumb_url ?? null,
         }))
         .sort(
           (a, b) =>
@@ -524,10 +525,14 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
       setIsStreaming(true);
       setStreamingText("");
       setStreamingPhase("thinking");
-      setCurrentHtml(null);
-      setCurrentPngUrl(null);
-      setCurrentPngUrls(null);
       setError(null);
+
+      // Em nova conversa zera o preview; em iterações preserva até nova resposta com HTML chegar
+      if (wasNewConversation) {
+        setCurrentHtml(null);
+        setCurrentPngUrl(null);
+        setCurrentPngUrls(null);
+      }
 
       // Adiciona mensagem do usuário ao state imediatamente
       const userMessage: CreativeMessage = {
