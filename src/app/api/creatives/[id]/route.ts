@@ -45,3 +45,69 @@ export async function GET(
 
   return NextResponse.json({ conversation: conv, messages: messages ?? [] });
 }
+
+/* ── DELETE: Apaga conversa por ID ── */
+export async function DELETE(
+  req: NextRequest,
+  ctx: { params: Promise<{ id: string }> }
+) {
+  const { id } = await ctx.params;
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  }
+
+  // RLS já garante ownership — só member da empresa consegue deletar
+  const { error } = await supabase
+    .from("creative_conversations")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error("[creatives/[id]] DELETE error:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
+}
+
+/* ── PATCH: Renomeia título da conversa ── */
+export async function PATCH(
+  req: NextRequest,
+  ctx: { params: Promise<{ id: string }> }
+) {
+  const { id } = await ctx.params;
+  const body = await req.json().catch(() => ({}));
+  const title = typeof body.title === "string" ? body.title.slice(0, 200) : null;
+
+  if (!title || !title.trim()) {
+    return NextResponse.json({ error: "title obrigatório" }, { status: 400 });
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  }
+
+  const { data, error } = await supabase
+    .from("creative_conversations")
+    .update({ title: title.trim() })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error("[creatives/[id]] PATCH error:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ conversation: data });
+}

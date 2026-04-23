@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import type { MessageAttachment } from "@/lib/creatives/history";
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -43,6 +43,18 @@ export interface CreativeMessage {
 }
 
 export type ModelKey = "sonnet" | "opus";
+
+// ── Conversation library types ──────────────────────────────────────────────
+
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  updatedAt: string;
+  createdAt: string;
+  // thumb omitida: GET /api/creatives retorna apenas summary (sem messages),
+  // buscar thumb exigiria N+1 requests — skip intencional.
+  thumbUrl?: string | null;
+}
 
 export interface UseCreativeChatOpts {
   empresaId: string;
@@ -169,6 +181,14 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
   removeAttachment: (url: string) => void;
   totalCostUsd: number;
   totalTokens: TokenTotals;
+  // ── Biblioteca de conversas ──
+  conversations: ConversationSummary[];
+  loadingConversations: boolean;
+  loadConversations: () => Promise<void>;
+  loadConversation: (id: string) => Promise<void>;
+  createNewConversation: () => void;
+  deleteConversation: (id: string) => Promise<void>;
+  renameConversation: (id: string, title: string) => Promise<void>;
 } {
   const [messages, setMessages] = useState<CreativeMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -190,6 +210,10 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
   });
 
   const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
+
+  // ── Biblioteca de conversas ──
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [loadingConversations, setLoadingConversations] = useState(false);
 
   const sendingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -260,6 +284,193 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
     setPendingAttachments((prev) => prev.filter((a) => a.url !== url));
   }, []);
 
+  // ── Biblioteca de conversas ──────────────────────────────────────────────
+
+  /** Carrega lista de conversas da empresa (sort por updatedAt desc) */
+  const loadConversations = useCallback(async () => {
+    if (!empresaId) return;
+    setLoadingConversations(true);
+    try {
+      const res = await fetch(`/api/creatives?empresaId=${empresaId}`);
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error || `Erro ${res.status} ao carregar conversas`);
+      }
+      const data = (await res.json()) as {
+        conversations: Array<{
+          id: string;
+          title: string;
+          created_at: string;
+          updated_at: string;
+        }>;
+      };
+      const mapped: ConversationSummary[] = (data.conversations ?? [])
+        .map((c) => ({
+          id: c.id,
+          title: c.title,
+          createdAt: c.created_at,
+          updatedAt: c.updated_at,
+          thumbUrl: null,
+        }))
+        .sort(
+          (a, b) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        );
+      setConversations(mapped);
+    } catch (err) {
+      console.error("[CreativeChat] loadConversations:", err);
+    } finally {
+      setLoadingConversations(false);
+    }
+  }, [empresaId]);
+
+  /** Carrega uma conversa existente pelo id, populando messages e html/png */
+  const loadConversation = useCallback(
+    async (id: string) => {
+      if (!empresaId) return;
+      try {
+        const res = await fetch(`/api/creatives/${id}?empresaId=${empresaId}`);
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(data.error || `Erro ${res.status} ao carregar conversa`);
+        }
+        const data = (await res.json()) as {
+          conversation: { id: string; title: string; created_at: string; updated_at: string };
+          messages: Array<{
+            id: string;
+            role: "user" | "assistant";
+            content: string;
+            html?: string | null;
+            png_url?: string | null;
+            png_urls?: string[] | null;
+            attachments?: MessageAttachment[] | null;
+            created_at?: string;
+          }>;
+        };
+
+        const mapped: CreativeMessage[] = (data.messages ?? []).map((m) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          html: m.html ?? null,
+          pngUrl: m.png_url ?? null,
+          pngUrls: m.png_urls ?? null,
+          attachments: m.attachments ?? null,
+          createdAt: m.created_at,
+        }));
+
+        messagesRef.current = mapped;
+        setMessages(mapped);
+        setConversationId(id);
+
+        // Restaura último html/png do último assistant com conteúdo visual
+        const lastAssistant = [...mapped].reverse().find((m) => m.role === "assistant");
+        if (lastAssistant) {
+          setCurrentHtml(lastAssistant.html ?? null);
+          setCurrentPngUrl(lastAssistant.pngUrl ?? null);
+          setCurrentPngUrls(lastAssistant.pngUrls ?? null);
+        } else {
+          setCurrentHtml(null);
+          setCurrentPngUrl(null);
+          setCurrentPngUrls(null);
+        }
+
+        // Reseta estado de streaming
+        setStreamingText("");
+        setIsStreaming(false);
+        setError(null);
+        setStreamingPhase("idle");
+        setPendingAttachments([]);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Falha ao carregar conversa";
+        console.error("[CreativeChat] loadConversation:", msg);
+        setError(msg);
+      }
+    },
+    [empresaId]
+  );
+
+  /** Reseta para uma nova conversa vazia, sem salvar no backend */
+  const createNewConversation = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    messagesRef.current = [];
+    setMessages([]);
+    setConversationId(null);
+    setCurrentHtml(null);
+    setCurrentPngUrl(null);
+    setCurrentPngUrls(null);
+    setStreamingText("");
+    setIsStreaming(false);
+    setError(null);
+    setStreamingPhase("idle");
+    setPendingAttachments([]);
+    setTotalCostUsd(0);
+    setTotalTokens({ input: 0, output: 0, cacheWrite: 0, cacheRead: 0 });
+    sendingRef.current = false;
+  }, []);
+
+  /** Deleta uma conversa por id. Se for a ativa, cria nova conversa vazia. */
+  const deleteConversation = useCallback(
+    async (id: string) => {
+      const res = await fetch(`/api/creatives/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error || `Erro ${res.status} ao deletar conversa`);
+      }
+      setConversations((prev) => prev.filter((c) => c.id !== id));
+      // Se deletou a conversa ativa, abre nova
+      setConversationId((current) => {
+        if (current === id) {
+          // side-effect seguro: reseta tudo via createNewConversation
+          // mas não podemos chamar um callback dentro de setState — fazemos inline
+          messagesRef.current = [];
+          setMessages([]);
+          setCurrentHtml(null);
+          setCurrentPngUrl(null);
+          setCurrentPngUrls(null);
+          setStreamingText("");
+          setIsStreaming(false);
+          setError(null);
+          setStreamingPhase("idle");
+          setPendingAttachments([]);
+          setTotalCostUsd(0);
+          setTotalTokens({ input: 0, output: 0, cacheWrite: 0, cacheRead: 0 });
+          sendingRef.current = false;
+          return null;
+        }
+        return current;
+      });
+    },
+    []
+  );
+
+  /** Renomeia uma conversa. Atualiza state local sem refetch. */
+  const renameConversation = useCallback(async (id: string, title: string) => {
+    const res = await fetch(`/api/creatives/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title }),
+    });
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(data.error || `Erro ${res.status} ao renomear conversa`);
+    }
+    setConversations((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, title } : c))
+    );
+  }, []);
+
+  // ── Efeito: carrega lista ao montar / trocar empresa ──
+  useEffect(() => {
+    if (empresaId) {
+      loadConversations().catch((err) =>
+        console.error("[CreativeChat] loadConversations (effect):", err)
+      );
+    }
+  }, [empresaId, loadConversations]);
+
   // ── Render HTML to PNG ──
   const renderHtml = useCallback(
     async (messageId: string, html: string) => {
@@ -305,6 +516,9 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
   const sendMessage = useCallback(
     async (text: string) => {
       if (!text.trim() || sendingRef.current || !empresaId) return;
+
+      // Guarda se é nova conversa pra inserir localmente na lista ao final
+      const wasNewConversation = !conversationId;
 
       sendingRef.current = true;
       setIsStreaming(true);
@@ -358,6 +572,7 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
         let accumulatedText = "";
         let receivedHtml: string | null = null;
         let receivedMessageId: string | null = null;
+        let receivedConversationId: string | null = null;
         let receivedUsage: MessageUsage | null = null;
         let buffer = "";
 
@@ -410,6 +625,7 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
                   receivedMessageId = payload.messageId ?? null;
                   receivedUsage = payload.usage ?? null;
                   if (payload.conversationId) {
+                    receivedConversationId = payload.conversationId;
                     setConversationId(payload.conversationId);
                   }
                 } catch {
@@ -461,6 +677,19 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
             cacheWrite: prev.cacheWrite + (receivedUsage?.cache_creation_input_tokens ?? 0),
             cacheRead: prev.cacheRead + (receivedUsage?.cache_read_input_tokens ?? 0),
           }));
+        }
+
+        // Se criou nova conversa: inserir localmente no topo da lista (sem refetch)
+        if (wasNewConversation && receivedConversationId) {
+          const now = new Date().toISOString();
+          const newEntry: ConversationSummary = {
+            id: receivedConversationId,
+            title: text.trim().slice(0, 60),
+            createdAt: now,
+            updatedAt: now,
+            thumbUrl: null,
+          };
+          setConversations((prev) => [newEntry, ...prev]);
         }
 
         // Renderiza PNG se recebeu HTML
@@ -542,5 +771,13 @@ export function useCreativeChat({ empresaId }: UseCreativeChatOpts): {
     removeAttachment,
     totalCostUsd,
     totalTokens,
+    // ── Biblioteca de conversas ──
+    conversations,
+    loadingConversations,
+    loadConversations,
+    loadConversation,
+    createNewConversation,
+    deleteConversation,
+    renameConversation,
   };
 }

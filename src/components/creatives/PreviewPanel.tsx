@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { AlertCircle, Sparkles, ChevronLeft, ChevronRight, Download, FileArchive } from "lucide-react";
+import { AlertCircle, Sparkles, ChevronLeft, ChevronRight, Download, FileArchive, Send } from "lucide-react";
 import JSZip from "jszip";
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -14,6 +14,7 @@ interface PreviewPanelProps {
   currentPngUrls?: string[] | null;
   isStreaming: boolean;
   error: string | null;
+  onSendToApproval?: () => void;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -59,6 +60,7 @@ export function PreviewPanel({
   currentPngUrls,
   isStreaming,
   error,
+  onSendToApproval,
 }: PreviewPanelProps) {
   const [activeSlide, setActiveSlide] = useState(0);
 
@@ -165,8 +167,8 @@ export function PreviewPanel({
           <NavControls />
         </div>
 
-        {/* Barra inferior: download */}
-        <div className="shrink-0 px-4 py-3 border-t border-white/10 flex items-center justify-end gap-2">
+        {/* Barra inferior: download + aprovação */}
+        <div className="shrink-0 px-4 py-3 border-t border-white/10 flex items-center justify-end gap-2 flex-wrap">
           {isCarousel && (
             <button
               onClick={downloadZip}
@@ -186,6 +188,16 @@ export function PreviewPanel({
             <Download size={14} />
             {isCarousel ? "Baixar slide atual" : "Baixar PNG"}
           </a>
+          {onSendToApproval && (
+            <button
+              type="button"
+              onClick={onSendToApproval}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-[#4ecdc4] to-[#6c5ce7] text-black font-semibold text-sm hover:opacity-90 transition-all cursor-pointer"
+            >
+              <Send size={14} />
+              Enviar pra aprovação
+            </button>
+          )}
         </div>
 
         {/* Erro parcial (PNG entregue, mas com aviso) */}
