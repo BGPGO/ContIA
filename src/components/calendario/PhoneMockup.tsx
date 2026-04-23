@@ -73,18 +73,8 @@ function FeedCell({ post }: { post: FeedPost }) {
         </div>
       )}
 
-      {/* Scheduled overlay */}
-      {post.isScheduled && (
-        <div className="absolute inset-0 bg-black/35 flex flex-col items-center justify-center gap-1 backdrop-blur-[1px]">
-          <Clock size={14} className="text-white drop-shadow" />
-          <span className="text-[10px] font-medium text-white drop-shadow tracking-wide">
-            {post.date}
-          </span>
-        </div>
-      )}
-
       {/* Hover caption preview */}
-      {post.caption && !post.isScheduled && (
+      {post.caption && (
         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-end p-1.5">
           <p className="text-[9px] text-white leading-tight line-clamp-3">
             {post.caption}

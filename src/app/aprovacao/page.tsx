@@ -1,10 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
+import { CheckCircle, AlertCircle, RefreshCw, Eye, EyeOff } from "lucide-react";
 import { useApprovals } from "@/hooks/useApprovals";
 import { useEmpresa } from "@/hooks/useEmpresa";
 import { PostApprovalCard } from "@/components/aprovacao/PostApprovalCard";
+import { PhoneMockup } from "@/components/calendario/PhoneMockup";
+import type { FeedPost } from "@/hooks/useInstagramFeedPreview";
 
 // ── Loading skeleton ──────────────────────────────────────────────────────────
 
@@ -41,6 +44,21 @@ function ApprovalSkeleton() {
 export default function AprovacaoPage() {
   const { empresa } = useEmpresa();
   const { items, loading, error, refetch, approve, reject } = useApprovals();
+  const [feedVisible, setFeedVisible] = useState(true);
+
+  // Constrói FeedPost[] a partir dos posts pendentes de aprovação
+  const feedPostsFromPending: FeedPost[] = items
+    .slice(0, 9)
+    .map(({ post }) => ({
+      id: post.id,
+      thumbnail: post.midia_url ?? "",
+      isScheduled: false,
+      isPublished: false,
+      isFromAPI: false,
+      date: "",
+      caption: post.conteudo?.slice(0, 80) ?? post.titulo,
+    }))
+    .filter((p) => p.thumbnail !== "");
 
   // No empresa selected guard
   if (!empresa) {
@@ -146,25 +164,89 @@ export default function AprovacaoPage() {
         </motion.div>
       )}
 
-      {/* ── Cards grid ── */}
-      {/* 1 coluna por padrão, 2 em md, 3 em xl — cards são mais altos com hero image */}
+      {/* ── Layout principal: cards + feed preview ── */}
       {!loading && !error && items.length > 0 && (
-        <AnimatePresence mode="popLayout">
-          <motion.div
-            layout
-            className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
-          >
-            {items.map(({ post, approval }) => (
-              <PostApprovalCard
-                key={approval.id}
-                post={post}
-                approval={approval}
-                onApprove={approve}
-                onReject={reject}
-              />
-            ))}
-          </motion.div>
-        </AnimatePresence>
+        <div className="flex flex-col xl:flex-row gap-6 items-start">
+
+          {/* Esquerda: grid de cards */}
+          <div className="flex-1 min-w-0">
+            <AnimatePresence mode="popLayout">
+              <motion.div
+                layout
+                className="grid grid-cols-1 md:grid-cols-2 gap-4"
+              >
+                {items.map(({ post, approval }) => (
+                  <PostApprovalCard
+                    key={approval.id}
+                    post={post}
+                    approval={approval}
+                    onApprove={approve}
+                    onReject={reject}
+                  />
+                ))}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
+          {/* Direita: simulação do feed Instagram */}
+          <aside className="xl:w-[420px] shrink-0 xl:sticky xl:top-4 self-start">
+            {/* Cabeçalho da seção feed */}
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-white/80">
+                  Simulação do feed
+                </h3>
+                <span className="text-[11px] text-white/40">
+                  como ficaria se aprovados
+                </span>
+              </div>
+              <button
+                onClick={() => setFeedVisible((v) => !v)}
+                className="flex items-center gap-1.5 text-[11px] text-white/40 hover:text-white/70 transition-colors px-2 py-1 rounded-lg hover:bg-white/5"
+                title={feedVisible ? "Esconder simulação" : "Mostrar simulação"}
+              >
+                {feedVisible ? (
+                  <>
+                    <EyeOff className="w-3.5 h-3.5" />
+                    Esconder
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-3.5 h-3.5" />
+                    Mostrar
+                  </>
+                )}
+              </button>
+            </div>
+
+            {feedVisible && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+                className="overflow-hidden"
+              >
+                <PhoneMockup
+                  feedPosts={feedPostsFromPending}
+                  profilePic={empresa?.logo_url ?? null}
+                  username={
+                    empresa?.instagram_handle ?? empresa?.nome ?? "empresa"
+                  }
+                  followersCount={0}
+                  postsCount={feedPostsFromPending.length}
+                  loading={false}
+                />
+
+                {feedPostsFromPending.length === 0 && (
+                  <p className="text-center text-[11px] text-white/30 mt-3">
+                    Nenhum post com imagem para pré-visualizar.
+                  </p>
+                )}
+              </motion.div>
+            )}
+          </aside>
+        </div>
       )}
     </div>
   );
