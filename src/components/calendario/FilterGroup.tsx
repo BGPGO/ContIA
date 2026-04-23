@@ -19,11 +19,11 @@ interface FilterGroupProps {
 
 export function FilterGroup({ label, options, selected, onChange }: FilterGroupProps) {
   return (
-    <div className="flex items-center gap-3 min-h-[28px]">
-      <span className="text-[10px] font-medium text-white/40 uppercase tracking-wider w-24 shrink-0">
+    <div className="flex items-center gap-2 min-h-[24px]">
+      <span className="text-[9px] font-medium text-white/35 uppercase tracking-wider w-20 shrink-0">
         {label}
       </span>
-      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-1">
+      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar flex-1">
         {options.map((opt) => {
           const isActive = selected.has(opt.value);
           return (
@@ -32,7 +32,7 @@ export function FilterGroup({ label, options, selected, onChange }: FilterGroupP
               whileTap={{ scale: 0.92 }}
               onClick={() => onChange(opt.value)}
               className={cn(
-                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all duration-150 shrink-0 whitespace-nowrap",
+                "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border transition-all duration-150 shrink-0 whitespace-nowrap",
                 isActive
                   ? "text-black border-transparent"
                   : "bg-white/5 border-white/10 text-white/60 hover:bg-white/10 hover:text-white/80"

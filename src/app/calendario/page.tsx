@@ -77,9 +77,6 @@ export default function CalendarioPage() {
   const [activePlatforms, setActivePlatforms] = useState<Set<string>>(
     () => new Set(ALL_PLATFORMS)
   );
-  const [activeTematicas, setActiveTematicas] = useState<Set<string>>(
-    () => new Set()
-  );
   const [activeStatuses, setActiveStatuses] = useState<Set<Post["status"]>>(
     () => new Set<Post["status"]>(["publicado", "agendado", "rascunho", "erro"])
   );
@@ -90,27 +87,15 @@ export default function CalendarioPage() {
 
   const feedPreview = useInstagramFeedPreview(empresa?.id);
 
-  // derived: all unique tematicas
-  const allTematicas = useMemo(
-    () => Array.from(new Set(allPosts.map((p) => p.tematica))).sort(),
-    [allPosts]
-  );
-
-  const effectiveActiveTematicas = useMemo(
-    () => (activeTematicas.size === 0 ? new Set(allTematicas) : activeTematicas),
-    [activeTematicas, allTematicas]
-  );
-
   // derived: filtered posts
   const filteredPosts = useMemo(
     () =>
       allPosts.filter(
         (p) =>
           p.plataformas.some((pl) => activePlatforms.has(pl)) &&
-          effectiveActiveTematicas.has(p.tematica) &&
           activeStatuses.has(p.status)
       ),
-    [allPosts, activePlatforms, effectiveActiveTematicas, activeStatuses]
+    [allPosts, activePlatforms, activeStatuses]
   );
 
   // derived: calendar days grid
@@ -149,20 +134,6 @@ export default function CalendarioPage() {
     });
   }
 
-  function toggleTematica(t: string) {
-    setActiveTematicas((prev) => {
-      const next = new Set(prev);
-      if (prev.size === 0) {
-        const full = new Set(allTematicas);
-        full.delete(t);
-        return full;
-      }
-      next.has(t) ? next.delete(t) : next.add(t);
-      if (next.size === allTematicas.length) return new Set();
-      return next;
-    });
-  }
-
   function toggleStatus(s: string) {
     setActiveStatuses((prev) => {
       const next = new Set(prev) as Set<Post["status"]>;
@@ -185,13 +156,11 @@ export default function CalendarioPage() {
 
   function clearFilters() {
     setActivePlatforms(new Set(ALL_PLATFORMS));
-    setActiveTematicas(new Set());
     setActiveStatuses(new Set<Post["status"]>(["publicado", "agendado", "rascunho", "erro"]));
   }
 
   const hasActiveFilters =
     activePlatforms.size < ALL_PLATFORMS.length ||
-    activeTematicas.size > 0 ||
     activeStatuses.size < 3;
 
   if (!empresa) {
@@ -211,21 +180,16 @@ export default function CalendarioPage() {
     color: getPlataformaCor(p),
   }));
 
-  const tematicaOptions: FilterOption[] = allTematicas.map((t) => ({
-    value: t,
-    label: t,
-  }));
-
   const countPublicado = filteredPosts.filter((p) => p.status === "publicado").length;
   const countAgendado = filteredPosts.filter((p) => p.status === "agendado").length;
   const countRascunho = filteredPosts.filter((p) => p.status === "rascunho").length;
 
   return (
-    <div className="space-y-3 sm:space-y-4 p-2 sm:p-4 max-w-7xl mx-auto">
+    <div className="space-y-2 sm:space-y-3 p-2 sm:p-4 max-w-7xl mx-auto">
 
       {/* ── header ──────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-base sm:text-xl font-semibold text-white tracking-tight">
+      <div className="flex items-center justify-between py-0.5">
+        <h1 className="text-sm sm:text-base font-semibold text-white tracking-tight">
           Calendário
         </h1>
         <div className="flex items-center gap-1">
@@ -277,7 +241,7 @@ export default function CalendarioPage() {
       </div>
 
       {/* ── filters ─────────────────────────────────────────────────────── */}
-      <div className="bg-bg-card border border-border rounded-xl px-4 py-3 space-y-2">
+      <div className="bg-bg-card border border-border rounded-xl px-3 py-2 space-y-1.5">
         <FilterGroup
           label="Plataformas"
           options={platformOptions}
@@ -291,19 +255,8 @@ export default function CalendarioPage() {
           selected={activeStatuses as Set<string>}
           onChange={toggleStatus}
         />
-        {tematicaOptions.length > 0 && (
-          <>
-            <div className="h-px bg-white/5" />
-            <FilterGroup
-              label="Temáticas"
-              options={tematicaOptions}
-              selected={effectiveActiveTematicas}
-              onChange={toggleTematica}
-            />
-          </>
-        )}
         {hasActiveFilters && (
-          <div className="flex justify-end pt-1">
+          <div className="flex justify-end pt-0.5">
             <button
               onClick={clearFilters}
               className="inline-flex items-center gap-1 text-[10px] text-white/30 hover:text-white/60 transition-colors"
@@ -376,16 +329,18 @@ export default function CalendarioPage() {
               animate={{ opacity: 1, x: 0, width: "auto" }}
               exit={{ opacity: 0, x: 40, width: 0 }}
               transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-              className="shrink-0 min-w-[400px] flex items-start justify-center pt-4 overflow-hidden"
+              className="shrink-0 min-w-[380px] flex items-start justify-center overflow-hidden"
             >
-              <PhoneMockup
-                feedPosts={feedPreview.feedPosts}
-                profilePic={feedPreview.profilePic}
-                username={feedPreview.username}
-                followersCount={feedPreview.followersCount}
-                postsCount={feedPreview.postsCount}
-                loading={feedPreview.loading}
-              />
+              <div className="sticky top-4 self-start pt-2">
+                <PhoneMockup
+                  feedPosts={feedPreview.feedPosts}
+                  profilePic={feedPreview.profilePic}
+                  username={feedPreview.username}
+                  followersCount={feedPreview.followersCount}
+                  postsCount={feedPreview.postsCount}
+                  loading={feedPreview.loading}
+                />
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
