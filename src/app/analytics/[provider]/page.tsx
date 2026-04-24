@@ -258,9 +258,8 @@ function ProviderAnalyticsContent() {
                   transition={{ delay: 0.4, duration: 0.4 }}
                 >
                   <BreakdownPie
-                    items={data.breakdown}
+                    data={data.breakdown}
                     title="Breakdown por Formato"
-                    height={280}
                   />
                 </motion.div>
               )}
@@ -282,13 +281,30 @@ function ProviderAnalyticsContent() {
             <>
               {/* Engagement Breakdown + Save Rate side by side */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <EngagementBreakdown data={igAdvanced.engagementBreakdown} />
-                <SaveRateCard data={igAdvanced.saveRateAnalysis} />
+                <EngagementBreakdown
+                  likes={igAdvanced.engagementBreakdown.avgLikes}
+                  comments={igAdvanced.engagementBreakdown.avgComments}
+                  saves={igAdvanced.engagementBreakdown.avgSaves}
+                  shares={igAdvanced.engagementBreakdown.avgShares}
+                  title="Quebra do engajamento (média por post)"
+                />
+                <SaveRateCard
+                  saveRate={igAdvanced.saveRateAnalysis.avgSaveRate / 100}
+                />
               </div>
 
               {/* Format Performance Cards */}
               {igAdvanced.formatPerformance.length > 0 && (
-                <FormatPerformanceCards data={igAdvanced.formatPerformance} />
+                <FormatPerformanceCards
+                  formats={igAdvanced.formatPerformance.map((f) => ({
+                    type: f.format.toLowerCase(),
+                    label: f.label,
+                    count: f.count,
+                    avgEngagement: f.avgEngagement / 100,
+                    avgReach: f.avgReach,
+                    bestPostId: f.bestPost?.permalink,
+                  }))}
+                />
               )}
 
               {/* Top Posts Grid */}
@@ -348,7 +364,22 @@ function ProviderAnalyticsContent() {
               <h3 className="text-[14px] font-semibold text-text-primary">
                 Posts no Periodo
               </h3>
-              <PostsTable posts={data.posts} />
+              <PostsTable
+                posts={data.posts.map((p) => ({
+                  id: p.id,
+                  thumbnail: p.thumbnail_url ?? undefined,
+                  caption: p.caption ?? p.title ?? "",
+                  provider: provider,
+                  publishedAt: p.published_at ?? new Date().toISOString(),
+                  metrics: {
+                    likes: p.metrics.likes ?? p.metrics.like_count ?? 0,
+                    comments: p.metrics.comments ?? p.metrics.comments_count ?? 0,
+                    saves: p.metrics.saves ?? 0,
+                    shares: p.metrics.shares ?? p.metrics.share_count ?? 0,
+                    reach: p.metrics.reach ?? 0,
+                  },
+                }))}
+              />
             </motion.div>
           )}
 

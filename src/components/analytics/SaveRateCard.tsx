@@ -1,102 +1,95 @@
 "use client";
 
-import { motion } from "motion/react";
-import { Bookmark, TrendingUp, ExternalLink } from "lucide-react";
-import type { InstagramSaveRateAnalysis } from "@/types/analytics";
+import { Bookmark, TrendingUp, TrendingDown, Info } from "lucide-react";
 
-interface SaveRateCardProps {
-  data: InstagramSaveRateAnalysis;
+export interface SaveRateCardProps {
+  saveRate: number;
+  previous?: number;
+  benchmark?: number;
+  tooltip?: string;
 }
 
-export function SaveRateCard({ data }: SaveRateCardProps) {
+function formatPct(value: number): string {
+  return (value * 100).toFixed(2) + "%";
+}
+
+export function SaveRateCard({
+  saveRate,
+  previous,
+  benchmark,
+  tooltip = "Taxa de salvamentos por alcance — quanto maior, mais seu conteúdo é visto como referência.",
+}: SaveRateCardProps) {
+  const savePct = saveRate * 100;
+
+  const delta =
+    previous != null ? saveRate - previous : null;
+  const deltaPositive = delta != null && delta >= 0;
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.4, duration: 0.4 }}
-      className="bg-bg-card border border-border rounded-xl p-4 sm:p-5"
-    >
+    <div className="bg-bg-card border border-border rounded-xl p-4 sm:p-5">
+      {/* Header */}
       <div className="flex items-center gap-2 mb-4">
-        <div className="w-8 h-8 rounded-lg bg-[#fbbf24]/10 flex items-center justify-center">
-          <Bookmark size={16} className="text-[#fbbf24]" />
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#eab30820" }}>
+          <Bookmark size={16} style={{ color: "#eab308" }} />
         </div>
-        <div>
+        <div className="flex-1 min-w-0">
           <h3 className="text-[14px] font-semibold text-text-primary">
-            Save Rate Analysis
+            Save Rate
           </h3>
           <p className="text-[11px] text-text-muted">
-            Saves / Alcance -- indicador de qualidade para o algoritmo
+            Saves / Alcance
           </p>
+        </div>
+        {/* Tooltip icon */}
+        <div className="group relative">
+          <Info size={14} className="text-text-muted cursor-help" />
+          <div className="absolute right-0 top-5 z-10 w-56 p-2.5 rounded-lg bg-bg-card border border-border shadow-lg text-[11px] text-text-secondary leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+            {tooltip}
+          </div>
         </div>
       </div>
 
       {/* Main metric */}
-      <div className="flex items-baseline gap-2 mb-4">
+      <div className="flex items-baseline gap-3 mb-3">
         <span className="text-3xl font-bold text-text-primary tabular-nums">
-          {data.avgSaveRate.toFixed(2)}%
+          {savePct.toFixed(2)}%
         </span>
-        <span className="text-[12px] text-text-muted">save rate medio</span>
-        {data.avgSaveRate > 2 && (
-          <span className="flex items-center gap-1 text-[11px] text-success">
-            <TrendingUp size={11} />
-            Excelente
-          </span>
-        )}
-        {data.avgSaveRate > 1 && data.avgSaveRate <= 2 && (
-          <span className="flex items-center gap-1 text-[11px] text-accent">
-            <TrendingUp size={11} />
-            Bom
+
+        {delta != null && (
+          <span
+            className="flex items-center gap-0.5 text-[12px] font-medium tabular-nums"
+            style={{ color: deltaPositive ? "#22c55e" : "#ef4444" }}
+          >
+            {deltaPositive ? (
+              <TrendingUp size={13} />
+            ) : (
+              <TrendingDown size={13} />
+            )}
+            {deltaPositive ? "+" : ""}
+            {formatPct(delta)}
+            <span className="text-text-muted font-normal ml-1 text-[11px]">vs período anterior</span>
           </span>
         )}
       </div>
 
-      {/* Best save rate posts */}
-      {data.bestSaveRatePosts.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-[11px] text-text-muted font-medium uppercase tracking-wider">
-            Posts com melhor save rate
-          </p>
-          {data.bestSaveRatePosts.map((post, i) => (
-            <div
-              key={i}
-              className="flex items-center gap-3 p-2 rounded-lg bg-bg-elevated/50 hover:bg-bg-elevated transition-colors"
-            >
-              <div className="w-9 h-9 rounded-md bg-bg-card overflow-hidden shrink-0">
-                {post.thumbnail ? (
-                  <img
-                    src={post.thumbnail}
-                    alt=""
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Bookmark size={12} className="text-text-muted" />
-                  </div>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[11px] text-text-secondary truncate">
-                  {post.caption || "Sem legenda"}
-                </p>
-              </div>
-              <span className="text-[12px] font-semibold text-[#fbbf24] tabular-nums shrink-0">
-                {post.saveRate.toFixed(2)}%
-              </span>
-              {post.permalink && (
-                <a
-                  href={post.permalink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-1 rounded hover:bg-bg-card transition-colors shrink-0"
-                >
-                  <ExternalLink size={11} className="text-text-muted" />
-                </a>
-              )}
-            </div>
-          ))}
+      {/* Benchmark */}
+      {benchmark != null && (
+        <div className="flex items-center gap-2 mt-2">
+          <div className="h-px flex-1 bg-border" />
+          <span className="text-[11px] text-text-muted whitespace-nowrap">
+            Benchmark do nicho:{" "}
+            <span className="text-text-secondary font-medium">
+              {formatPct(benchmark)}
+            </span>
+          </span>
+          <div className="h-px flex-1 bg-border" />
         </div>
       )}
-    </motion.div>
+
+      {/* Explanatory text */}
+      <p className="mt-3 text-[11px] text-text-muted leading-relaxed">
+        {tooltip}
+      </p>
+    </div>
   );
 }

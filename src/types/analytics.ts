@@ -46,11 +46,29 @@ export interface TimeSeriesDataPoint {
   [key: string]: string | number | null;
 }
 
+export interface ContentPerformanceKPI {
+  label: string;
+  value: number | string;
+  raw: number;
+  delta: number | null;
+  deltaPercent: number | null;
+  trend: "up" | "down" | "flat" | "unknown";
+}
+
+export interface ContentPerformanceSummary {
+  provider: "content";
+  label: string;
+  kpis: ContentPerformanceKPI[];
+}
+
 export interface AnalyticsOverviewData {
   kpis: AnalyticsKPI[];
   providers: ProviderSummary[];
   timeSeries: TimeSeriesDataPoint[];
   recentPosts: RecentPost[];
+  contentPerformance: ContentPerformanceSummary;
+  syncStatus: "ok" | "pending" | "error";
+  lastSyncedAt: string | null;
 }
 
 /* ── Provider deep dive ────────────────────────────────────────── */

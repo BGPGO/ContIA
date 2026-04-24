@@ -15,7 +15,6 @@ import type {
 import {
   fetchInstagramLive,
   persistInstagramSnapshot,
-  toOverviewKPIs,
   toRecentPosts,
 } from "@/lib/analytics/instagram-fetcher";
 
@@ -69,7 +68,7 @@ export async function GET(req: NextRequest) {
   const prevStartISO = prevStart.toISOString().split("T")[0];
   const prevEndISO = prevEnd.toISOString().split("T")[0];
 
-  const [connectionsRes, snapshotsCurrentRes, snapshotsPrevRes, contentRes, empresaRes] =
+  const [connectionsRes, snapshotsCurrentRes, snapshotsPrevRes, contentRes, contentPrevRes, empresaRes] =
     await Promise.all([
       admin
         .from("social_connections")
@@ -99,6 +98,13 @@ export async function GET(req: NextRequest) {
         .order("published_at", { ascending: false })
         .limit(200),
       admin
+        .from("content_items")
+        .select("id, metrics, published_at")
+        .eq("empresa_id", empresaId)
+        .gte("published_at", prevStartISO)
+        .lte("published_at", prevEndISO)
+        .limit(200),
+      admin
         .from("empresas")
         .select("redes_sociais")
         .eq("id", empresaId)
@@ -109,6 +115,7 @@ export async function GET(req: NextRequest) {
   let currentSnapshots = snapshotsCurrentRes.data ?? [];
   const prevSnapshots = snapshotsPrevRes.data ?? [];
   let contentItems = contentRes.data ?? [];
+  const prevContentItems = contentPrevRes.data ?? [];
   const empresa = empresaRes.data as { redes_sociais: Record<string, unknown> } | null;
 
   // ── FALLBACK: se social_connections nao tem instagram mas legado tem ──
@@ -205,85 +212,130 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // ── LIVE FETCH: se Instagram conectado mas snapshots/content vazios, buscar ao vivo ──
+  // ── LIVE BOOTSTRAP: se Instagram conectado e sem snapshot recente (últimas 24h), buscar ao vivo e persistir ──
   const igConnection = connections.find((c) => c.provider === "instagram");
+
+  // Verifica se já há snapshot recente (< 24h) para o Instagram
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const igHasRecentSnapshot = currentSnapshots.some(
+    (s) => s.provider === "instagram" && s.created_at >= twentyFourHoursAgo
+  );
   const igHasSnapshots = currentSnapshots.some((s) => s.provider === "instagram");
   const igHasContent = contentItems.some((c) => c.provider === "instagram");
-  let igLiveKPIs: { followers: number; reach: number; engRate: number; postsCount: number } | null = null;
 
-  if (igConnection && (!igHasSnapshots || !igHasContent)) {
+  let syncStatus: "ok" | "pending" | "error" = "ok";
+  let lastSyncedAt: string | null = null;
+
+  // Definir lastSyncedAt a partir do snapshot mais recente já existente
+  if (igHasSnapshots) {
+    const latestSnap = currentSnapshots
+      .filter((s) => s.provider === "instagram")
+      .sort((a, b) => (b.created_at as string).localeCompare(a.created_at as string))[0];
+    if (latestSnap) lastSyncedAt = latestSnap.created_at as string;
+  }
+
+  // Disparar live fetch se: há conexão ativa E (sem snapshot recente OU sem conteúdo)
+  if (igConnection && (!igHasRecentSnapshot || !igHasContent)) {
     try {
-      // Fetch access_token from social_connections (full record)
+      // Buscar access_token do registro completo
       const { data: igConn } = await admin
         .from("social_connections")
         .select("access_token, provider_user_id")
         .eq("id", igConnection.id)
         .single();
 
-      // Also check legacy
+      // Fallback para legado
       const accessToken = igConn?.access_token ?? legacyIg?.access_token;
       const providerUserId = igConn?.provider_user_id ?? legacyIg?.provider_user_id;
 
       if (accessToken && providerUserId) {
-        const liveData = await fetchInstagramLive(accessToken, providerUserId, 30);
-        igLiveKPIs = toOverviewKPIs(liveData);
-
-        // Persistir snapshot em background
-        persistInstagramSnapshot(empresaId, igConnection.id, liveData).catch((err) =>
-          console.error("[overview] Falha ao persistir snapshot:", err)
+        // Timeout de 8s: se a API do Instagram estiver lenta, retorna com "pending"
+        const TIMEOUT_MS = 8_000;
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("timeout")), TIMEOUT_MS)
         );
 
-        // Inject live data as synthetic snapshots if missing
-        if (!igHasSnapshots) {
-          currentSnapshots = [
-            ...currentSnapshots,
-            {
-              id: `live-ig-snap-${Date.now()}`,
-              empresa_id: empresaId,
-              connection_id: igConnection.id,
-              provider: "instagram",
-              snapshot_date: periodEnd,
-              metrics: {
-                followers_count: liveData.kpis.followers,
-                reach: liveData.kpis.reach,
-                impressions: liveData.kpis.impressions,
-              },
-              created_at: new Date().toISOString(),
-            },
-          ];
+        let liveData: Awaited<ReturnType<typeof fetchInstagramLive>> | null = null;
+
+        try {
+          liveData = await Promise.race([
+            fetchInstagramLive(accessToken, providerUserId, 30),
+            timeoutPromise,
+          ]);
+        } catch (raceErr) {
+          if (raceErr instanceof Error && raceErr.message === "timeout") {
+            console.warn("[overview] Instagram live fetch timeout (>8s) — respondendo com dados antigos");
+            syncStatus = "pending";
+          } else {
+            throw raceErr; // propaga para o catch externo
+          }
         }
 
-        // Inject live media as content items if missing
-        if (!igHasContent) {
-          const livePosts = toRecentPosts(liveData);
-          const syntheticContent = livePosts
-            .filter((p) => {
-              // Only include posts within the requested period
-              if (!p.published_at) return true;
-              return p.published_at >= periodStart && p.published_at <= periodEnd + "T23:59:59";
-            })
-            .map((p) => ({
-              id: p.id,
-              empresa_id: empresaId,
-              connection_id: igConnection.id,
-              provider: "instagram",
-              provider_content_id: p.id,
-              content_type: p.content_type,
-              title: p.title,
-              caption: p.caption,
-              url: p.url,
-              thumbnail_url: p.thumbnail_url,
-              published_at: p.published_at,
-              metrics: p.metrics,
-              raw: {},
-              synced_at: new Date().toISOString(),
-            }));
-          contentItems = [...contentItems, ...syntheticContent];
+        if (liveData) {
+          // Aguardar persistência (await) antes de retornar — garante que próxima visita já encontra snapshot
+          try {
+            await persistInstagramSnapshot(empresaId, igConnection.id, liveData);
+            lastSyncedAt = new Date().toISOString();
+            syncStatus = "ok";
+          } catch (persistErr) {
+            console.error("[overview] Falha ao persistir snapshot:", persistErr);
+            // Dados ao vivo disponíveis, mas persistência falhou — não travar a resposta
+            syncStatus = "error";
+            lastSyncedAt = null;
+          }
+
+          // Injetar dados ao vivo como snapshots sintéticos se ainda não há snapshot no período
+          if (!igHasSnapshots) {
+            currentSnapshots = [
+              ...currentSnapshots,
+              {
+                id: `live-ig-snap-${Date.now()}`,
+                empresa_id: empresaId,
+                connection_id: igConnection.id,
+                provider: "instagram",
+                snapshot_date: periodEnd,
+                metrics: {
+                  followers_count: liveData.kpis.followers,
+                  reach: liveData.kpis.reach,
+                  impressions: liveData.kpis.impressions,
+                },
+                created_at: new Date().toISOString(),
+              },
+            ];
+          }
+
+          // Injetar posts ao vivo como content items se ainda não há conteúdo no período
+          if (!igHasContent) {
+            const livePosts = toRecentPosts(liveData);
+            const syntheticContent = livePosts
+              .filter((p) => {
+                if (!p.published_at) return true;
+                return p.published_at >= periodStart && p.published_at <= periodEnd + "T23:59:59";
+              })
+              .map((p) => ({
+                id: p.id,
+                empresa_id: empresaId,
+                connection_id: igConnection.id,
+                provider: "instagram",
+                provider_content_id: p.id,
+                content_type: p.content_type,
+                title: p.title,
+                caption: p.caption,
+                url: p.url,
+                thumbnail_url: p.thumbnail_url,
+                published_at: p.published_at,
+                metrics: p.metrics,
+                raw: {},
+                synced_at: new Date().toISOString(),
+              }));
+            contentItems = [...contentItems, ...syntheticContent];
+          }
         }
       }
     } catch (err) {
       console.error("[overview] Instagram live fetch failed:", err instanceof Error ? err.message : err);
-      // Continue with whatever data we have — don't crash the endpoint
+      syncStatus = "error";
+      // Continua com os dados disponíveis — não derruba o endpoint
     }
   }
 
@@ -421,10 +473,7 @@ export async function GET(req: NextRequest) {
           ? Math.round(((provEng / provContent.length / followers) * 100) * 100) / 100
           : 0;
 
-      if (pk === "crm") {
-        provKpis.push({ label: "Leads", value: "0", raw: 0 });
-        provKpis.push({ label: "Conversao", value: "0%", raw: 0 });
-      } else if (pk === "ga4") {
+      if (pk === "ga4") {
         provKpis.push({ label: "Sessoes", value: "0", raw: 0 });
         provKpis.push({ label: "Usuarios", value: "0", raw: 0 });
       } else if (pk === "google_ads" || pk === "meta_ads") {
@@ -503,11 +552,119 @@ export async function GET(req: NextRequest) {
     };
   });
 
+  // --- Content Performance (agregado de content_items) ---
+  function aggregateContentMetrics(items: { metrics: unknown }[]): {
+    postsCount: number;
+    totalEngagement: number;
+    totalReach: number;
+    saveRate: number | null;
+    engagementRate: number | null;
+  } {
+    let totalEngagement = 0;
+    let totalReach = 0;
+    let saveRateSum = 0;
+    let saveRateCount = 0;
+    let engRateSum = 0;
+    let engRateCount = 0;
+
+    for (const item of items) {
+      const m = item.metrics as Record<string, number>;
+      const likes = m.likes ?? m.like_count ?? 0;
+      const comments = m.comments ?? m.comments_count ?? 0;
+      const saves = m.saves ?? 0;
+      const shares = m.shares ?? m.share_count ?? 0;
+      const reach = m.reach ?? 0;
+      const eng = likes + comments + saves + shares;
+
+      totalEngagement += eng;
+      totalReach += reach;
+
+      if (reach > 0) {
+        saveRateSum += saves / reach;
+        saveRateCount += 1;
+        engRateSum += eng / reach;
+        engRateCount += 1;
+      }
+    }
+
+    return {
+      postsCount: items.length,
+      totalEngagement,
+      totalReach,
+      saveRate: saveRateCount > 0 ? saveRateSum / saveRateCount : null,
+      engagementRate: engRateCount > 0 ? engRateSum / engRateCount : null,
+    };
+  }
+
+  const currContent = aggregateContentMetrics(contentItems);
+  const prevContent = aggregateContentMetrics(prevContentItems);
+
+  const postsD = computeDelta(currContent.postsCount, prevContent.postsCount);
+  const engD = computeDelta(currContent.totalEngagement, prevContent.totalEngagement);
+  const reachContentD = computeDelta(currContent.totalReach, prevContent.totalReach);
+  const saveRateD = computeDelta(
+    currContent.saveRate !== null ? Math.round(currContent.saveRate * 10000) / 10000 : null,
+    prevContent.saveRate !== null ? Math.round(prevContent.saveRate * 10000) / 10000 : null
+  );
+  const engRateD = computeDelta(
+    currContent.engagementRate !== null ? Math.round(currContent.engagementRate * 10000) / 10000 : null,
+    prevContent.engagementRate !== null ? Math.round(prevContent.engagementRate * 10000) / 10000 : null
+  );
+
+  const saveRatePct =
+    currContent.saveRate !== null
+      ? `${(currContent.saveRate * 100).toFixed(1)}%`
+      : "—";
+  const engRatePct =
+    currContent.engagementRate !== null
+      ? `${(currContent.engagementRate * 100).toFixed(1)}%`
+      : "—";
+
+  const contentPerformance = {
+    provider: "content" as const,
+    label: "Performance de Conteúdo",
+    kpis: [
+      {
+        label: "Posts publicados",
+        value: currContent.postsCount,
+        raw: currContent.postsCount,
+        ...postsD,
+      },
+      {
+        label: "Engajamento",
+        value: currContent.totalEngagement,
+        raw: currContent.totalEngagement,
+        ...engD,
+      },
+      {
+        label: "Alcance",
+        value: currContent.totalReach,
+        raw: currContent.totalReach,
+        ...reachContentD,
+      },
+      {
+        label: "Save rate",
+        value: saveRatePct,
+        raw: currContent.saveRate ?? 0,
+        ...saveRateD,
+      },
+      {
+        label: "Taxa de engajamento",
+        value: engRatePct,
+        raw: currContent.engagementRate ?? 0,
+        ...engRateD,
+      },
+    ],
+  };
+
   return NextResponse.json({
     kpis,
     providers,
     timeSeries,
     recentPosts,
+    contentPerformance,
+    syncStatus,
+    lastSyncedAt,
   });
 }
 
