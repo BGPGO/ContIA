@@ -77,6 +77,27 @@ export function TimeSeriesChart({
 }: TimeSeriesChartProps) {
   const [activeMetric, setActiveMetric] = useState("followers");
 
+  // Detecta quais métricas têm ao menos um ponto com valor não-null nos dados
+  const availableMetrics = useMemo(() => {
+    const available = new Set<string>();
+    for (const point of data) {
+      for (const opt of METRIC_OPTIONS) {
+        if (available.has(opt.key)) continue;
+        // No modo multi-provider, verificar todas as chaves de provider
+        if (singleProvider) {
+          const v = point[opt.key];
+          if (v !== null && v !== undefined) available.add(opt.key);
+        } else {
+          for (const p of providers) {
+            const v = point[`${p}_${opt.key}`];
+            if (v !== null && v !== undefined) available.add(opt.key);
+          }
+        }
+      }
+    }
+    return available;
+  }, [data, providers, singleProvider]);
+
   // Build line keys: either one per provider or metrics for a single provider
   const lines = useMemo(() => {
     if (singleProvider) {
@@ -102,21 +123,29 @@ export function TimeSeriesChart({
           Evolucao temporal
         </h3>
         <div className="flex items-center gap-1" role="tablist" aria-label="Selecionar metrica">
-          {METRIC_OPTIONS.map((m) => (
-            <button
-              key={m.key}
-              role="tab"
-              aria-selected={activeMetric === m.key}
-              onClick={() => setActiveMetric(m.key)}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all duration-200 ${
-                activeMetric === m.key
-                  ? "bg-accent text-bg-primary"
-                  : "text-text-muted hover:text-text-secondary hover:bg-bg-elevated"
-              }`}
-            >
-              {m.label}
-            </button>
-          ))}
+          {METRIC_OPTIONS.map((m) => {
+            const isUnavailable = data.length > 0 && !availableMetrics.has(m.key);
+            return (
+              <button
+                key={m.key}
+                role="tab"
+                aria-selected={activeMetric === m.key}
+                aria-disabled={isUnavailable}
+                disabled={isUnavailable}
+                title={isUnavailable ? "Indisponível para essa conta" : undefined}
+                onClick={() => !isUnavailable && setActiveMetric(m.key)}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all duration-200 ${
+                  isUnavailable
+                    ? "text-text-muted/40 cursor-not-allowed opacity-50"
+                    : activeMetric === m.key
+                    ? "bg-accent text-bg-primary"
+                    : "text-text-muted hover:text-text-secondary hover:bg-bg-elevated"
+                }`}
+              >
+                {m.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 

@@ -28,11 +28,11 @@ const ICON_MAP: Record<string, LucideIcon> = {
 
 interface KPICardProps {
   label: string;
-  value: number;
-  previousValue: number;
-  delta: number;
-  deltaPercent: number;
-  trend: "up" | "down" | "flat";
+  value: number | null;
+  previousValue: number | null;
+  delta: number | null;
+  deltaPercent: number | null;
+  trend: "up" | "down" | "flat" | "unknown";
   icon: string;
   animationDelay?: number;
 }
@@ -40,7 +40,7 @@ interface KPICardProps {
 export function KPICard({
   label,
   value,
-  previousValue,
+  previousValue: _previousValue,
   delta,
   deltaPercent,
   trend,
@@ -48,6 +48,7 @@ export function KPICard({
   animationDelay = 0,
 }: KPICardProps) {
   const Icon = ICON_MAP[icon] ?? TrendingUp;
+  const isUnavailable = value === null;
 
   return (
     <motion.div
@@ -60,10 +61,20 @@ export function KPICard({
         <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center">
           <Icon size={18} className="text-accent" />
         </div>
-        <MetricDelta delta={delta} deltaPercent={deltaPercent} trend={trend} />
+        {isUnavailable ? (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-bg-elevated text-text-muted text-[11px] font-medium">
+            Indisponível
+          </span>
+        ) : (
+          <MetricDelta
+            delta={delta ?? 0}
+            deltaPercent={deltaPercent ?? 0}
+            trend={trend === "unknown" ? "flat" : trend}
+          />
+        )}
       </div>
-      <p className="text-2xl sm:text-3xl font-bold text-text-primary tracking-tight">
-        {formatNumber(value)}
+      <p className={`text-2xl sm:text-3xl font-bold tracking-tight ${isUnavailable ? "text-text-muted" : "text-text-primary"}`}>
+        {isUnavailable ? "—" : formatNumber(value)}
       </p>
       <p className="text-[12px] text-text-muted mt-1">{label}</p>
     </motion.div>

@@ -19,7 +19,7 @@ export interface KPI {
 
 export interface TimeSeriesPoint {
   date: string;
-  [providerOrMetric: string]: string | number;
+  [providerOrMetric: string]: string | number | null;
 }
 
 export interface TopContentItem {

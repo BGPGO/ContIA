@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import type { Connection, ProviderKey } from "@/types/providers";
 import { useEmpresa } from "./useEmpresa";
 
@@ -10,6 +10,8 @@ interface UseConnectionsReturn {
   isConnected: (provider: ProviderKey) => boolean;
   getConnections: (provider: ProviderKey) => Connection[];
   refresh: () => void;
+  /** Data de criação da conexão ativa mais antiga (null se não há conexões ativas) */
+  earliestConnectionDate: Date | null;
 }
 
 const EMPTY_CONNECTIONS = {} as Record<ProviderKey, Connection[]>;
@@ -95,11 +97,24 @@ export function useConnections(): UseConnectionsReturn {
     [connections]
   );
 
+  /** Data de criação mais antiga entre todas as conexões ativas */
+  const earliestConnectionDate = useMemo((): Date | null => {
+    const allActive = Object.values(connections)
+      .flat()
+      .filter((c) => c.is_active && c.created_at);
+
+    if (allActive.length === 0) return null;
+
+    const timestamps = allActive.map((c) => new Date(c.created_at).getTime());
+    return new Date(Math.min(...timestamps));
+  }, [connections]);
+
   return {
     connections,
     loading,
     isConnected,
     getConnections,
     refresh: fetchConnections,
+    earliestConnectionDate,
   };
 }

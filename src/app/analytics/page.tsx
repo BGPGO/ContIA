@@ -15,6 +15,7 @@ import { useConnections } from "@/hooks/useConnections";
 import { PROVIDER_DISPLAY_ORDER } from "@/lib/drivers/metadata";
 import { KPICard } from "@/components/insights/KPICard";
 import { TimeSeriesChart } from "@/components/insights/TimeSeriesChart";
+import { FollowersDeltaChart } from "@/components/insights/FollowersDeltaChart";
 import { ContentRow } from "@/components/insights/ContentRow";
 import { EmptyState } from "@/components/insights/EmptyState";
 import { PeriodSelector } from "@/components/insights/PeriodSelector";
@@ -170,6 +171,42 @@ function AnalyticsContent() {
               />
             </motion.div>
           )}
+
+          {/* Followers delta charts — one per connected provider with follower data */}
+          {data.timeSeries.length > 0 &&
+            connectedProviders
+              .filter((provider) =>
+                data.timeSeries.some(
+                  (pt) => typeof pt[`${provider}_followers`] === "number"
+                )
+              )
+              .map((provider, i) => {
+                const series = data.timeSeries
+                  .filter((pt) => typeof pt[`${provider}_followers`] === "number")
+                  .map((pt) => ({
+                    date: pt.date as string,
+                    followers: pt[`${provider}_followers`] as number,
+                  }));
+
+                return (
+                  <motion.div
+                    key={`delta-${provider}`}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.45 + i * 0.05, duration: 0.4 }}
+                  >
+                    <FollowersDeltaChart
+                      data={series}
+                      provider={
+                        connectedProviders.length > 1
+                          ? provider.charAt(0).toUpperCase() + provider.slice(1)
+                          : undefined
+                      }
+                      height={240}
+                    />
+                  </motion.div>
+                );
+              })}
 
           {/* Recent posts */}
           {data.recentPosts.length > 0 && (

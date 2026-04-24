@@ -316,7 +316,13 @@ export async function GET(req: NextRequest) {
     return total;
   }
 
-  function computeDelta(current: number, previous: number) {
+  function computeDelta(
+    current: number | null,
+    previous: number | null
+  ): { delta: number | null; deltaPercent: number | null; trend: "up" | "down" | "flat" | "unknown" } {
+    if (current === null || previous === null) {
+      return { delta: null, deltaPercent: null, trend: "unknown" };
+    }
     const delta = current - previous;
     const deltaPercent =
       previous > 0 ? Math.round(((delta / previous) * 100) * 10) / 10 : current > 0 ? 100 : 0;
@@ -448,18 +454,28 @@ export async function GET(req: NextRequest) {
   });
 
   // --- Time Series ---
-  const dateMap = new Map<string, Record<string, number>>();
+  // Usamos Record<string, number | null> para preservar null de impressions
+  const dateMap = new Map<string, Record<string, number | null>>();
   for (const s of currentSnapshots) {
     const date = s.snapshot_date as string;
     if (!dateMap.has(date)) dateMap.set(date, {});
     const entry = dateMap.get(date)!;
-    const m = s.metrics as Record<string, number>;
+    const m = s.metrics as Record<string, number | null>;
     const p = s.provider as string;
 
     entry[`${p}_followers`] = (entry[`${p}_followers`] ?? 0) + (m.followers_count ?? 0);
     entry[`${p}_reach`] = (entry[`${p}_reach`] ?? 0) + (m.reach ?? 0);
-    entry[`${p}_impressions`] = (entry[`${p}_impressions`] ?? 0) + (m.impressions ?? 0);
     entry[`${p}_engagement`] = (entry[`${p}_engagement`] ?? 0) + (m.engagement_rate ?? 0);
+
+    // Impressions: null significa indisponível — NÃO somar como 0
+    const impressionsRaw = m.impressions;
+    if (impressionsRaw !== null && impressionsRaw !== undefined) {
+      entry[`${p}_impressions`] = (entry[`${p}_impressions`] ?? 0) + impressionsRaw;
+    } else if (!(`${p}_impressions` in entry)) {
+      // Marca como null apenas se ainda não temos nenhum dado
+      entry[`${p}_impressions`] = null;
+    }
+    // Se já temos um número acumulado, mantemos (não sobrescreve com null)
   }
 
   const timeSeries: TimeSeriesDataPoint[] = Array.from(dateMap.entries())

@@ -10,11 +10,12 @@ import type { ProviderKey, ContentType } from "./providers";
 export interface AnalyticsKPI {
   key: string;
   label: string;
-  value: number;
-  previousValue: number;
-  delta: number;
-  deltaPercent: number;
-  trend: "up" | "down" | "flat";
+  /** null quando a métrica é indisponível para o tipo de conta (ex: impressões em conta pessoal) */
+  value: number | null;
+  previousValue: number | null;
+  delta: number | null;
+  deltaPercent: number | null;
+  trend: "up" | "down" | "flat" | "unknown";
   icon: string;
   suffix?: string;
 }
@@ -42,7 +43,7 @@ export interface RecentPost {
 
 export interface TimeSeriesDataPoint {
   date: string;
-  [key: string]: string | number;
+  [key: string]: string | number | null;
 }
 
 export interface AnalyticsOverviewData {

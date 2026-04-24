@@ -5,7 +5,7 @@ import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 interface MetricDeltaProps {
   delta: number;
   deltaPercent: number;
-  trend: "up" | "down" | "flat";
+  trend: "up" | "down" | "flat" | "unknown";
   size?: "sm" | "md";
   showIcon?: boolean;
 }
@@ -19,6 +19,7 @@ export function MetricDelta({
 }: MetricDeltaProps) {
   const isPositive = trend === "up";
   const isNegative = trend === "down";
+  // "unknown" é tratado como flat
 
   const colorClass = isPositive
     ? "text-success"

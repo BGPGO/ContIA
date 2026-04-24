@@ -13,6 +13,9 @@ import {
   getMediaInsights,
 } from "@/lib/instagram";
 import type { IGMedia, IGInsight, IGProfile } from "@/lib/instagram";
+
+/* ── Instagram Graph API (Facebook) base URL para insights de conta ── */
+const FB_GRAPH_URL = "https://graph.facebook.com/v21.0";
 import { getAdminSupabase } from "@/lib/supabase/admin";
 import type { ProviderKey } from "@/types/providers";
 import type {
@@ -36,7 +39,8 @@ export interface InstagramLiveKPIs {
   engagement: number;
   engagementRate: number;
   posts: number;
-  impressions: number;
+  /** null = conta não suporta insights de impressões (Instagram Login API sem permissão de Business/Creator) */
+  impressions: number | null;
   totalLikes: number;
   totalComments: number;
   totalSaves: number;
@@ -53,17 +57,95 @@ export interface InstagramLiveData {
 
 /* ── Main fetcher ── */
 
+/**
+ * Detecta o tipo de conta Instagram via Facebook Graph API.
+ * Retorna "BUSINESS" | "CREATOR" | "PERSONAL" | null (se falhar).
+ * Apenas contas BUSINESS e CREATOR têm acesso a insights de impressões.
+ */
+async function detectAccountType(
+  igUserId: string,
+  accessToken: string
+): Promise<"BUSINESS" | "CREATOR" | "PERSONAL" | null> {
+  try {
+    const url = new URL(`${FB_GRAPH_URL}/${igUserId}`);
+    url.searchParams.set("fields", "account_type");
+    url.searchParams.set("access_token", accessToken);
+
+    const res = await fetch(url.toString());
+    if (!res.ok) return null;
+
+    const data = (await res.json()) as { account_type?: string; error?: unknown };
+    if (data.error) return null;
+
+    const t = data.account_type;
+    if (t === "BUSINESS" || t === "CREATOR" || t === "PERSONAL") return t;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Busca total de impressões via endpoint de insights da conta.
+ * Só funciona para contas BUSINESS ou CREATOR.
+ * Retorna null em caso de erro ou falta de permissão.
+ */
+async function fetchAccountImpressions(
+  igUserId: string,
+  accessToken: string
+): Promise<number | null> {
+  try {
+    // Período: últimos 28 dias (máximo suportado sem período customizado)
+    const until = Math.floor(Date.now() / 1000);
+    const since = until - 28 * 24 * 60 * 60;
+
+    const url = new URL(`${FB_GRAPH_URL}/${igUserId}/insights`);
+    url.searchParams.set("metric", "impressions");
+    url.searchParams.set("period", "day");
+    url.searchParams.set("since", String(since));
+    url.searchParams.set("until", String(until));
+    url.searchParams.set("access_token", accessToken);
+
+    const res = await fetch(url.toString());
+
+    if (!res.ok) {
+      console.warn(`[IG impressions] HTTP ${res.status} — conta pode não suportar insights`);
+      return null;
+    }
+
+    const data = (await res.json()) as {
+      data?: Array<{ name: string; values: Array<{ value: number }> }>;
+      error?: { code: number; message: string };
+    };
+
+    if (data.error) {
+      console.warn(`[IG impressions] Erro API ${data.error.code}: ${data.error.message}`);
+      return null;
+    }
+
+    const impressionsMetric = data.data?.find((d) => d.name === "impressions");
+    if (!impressionsMetric) return null;
+
+    const total = impressionsMetric.values.reduce((s, v) => s + (v.value ?? 0), 0);
+    return total;
+  } catch (err) {
+    console.warn("[IG impressions] Exceção ao buscar impressões:", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
 export async function fetchInstagramLive(
   accessToken: string,
   providerUserId: string,
   mediaLimit = 30
 ): Promise<InstagramLiveData> {
-  // Fetch profile + media + insights in parallel
+  // Fetch profile + media + account type em paralelo
   let insightsResult: IGInsight[] = [];
 
-  const [profile, media] = await Promise.all([
+  const [profile, media, accountType] = await Promise.all([
     getProfile(providerUserId, accessToken),
     getMedia(providerUserId, accessToken, mediaLimit),
+    detectAccountType(providerUserId, accessToken),
   ]);
 
   // Insights can fail (requires 100+ followers, etc.)
@@ -125,13 +207,20 @@ export async function fetchInstagramLive(
         ) / 100
       : 0;
 
+  // Buscar impressões apenas para contas Business ou Creator
+  let impressionsValue: number | null = null;
+  if (accountType === "BUSINESS" || accountType === "CREATOR") {
+    impressionsValue = await fetchAccountImpressions(providerUserId, accessToken);
+  }
+  // accountType === "PERSONAL" ou null: mantém null (indisponível)
+
   const kpis: InstagramLiveKPIs = {
     followers: profile.followers_count,
     reach: totalReach,
     engagement: totalLikes + totalComments + totalSaves + totalShares,
     engagementRate,
     posts: media.length,
-    impressions: 0, // Not reliably available from Instagram Login API
+    impressions: impressionsValue,
     totalLikes,
     totalComments,
     totalSaves,
@@ -214,6 +303,30 @@ export function toProviderKPIs(data: InstagramLiveData): AnalyticsKPI[] {
   const totalReach = postsWithReach.reduce((s, m) => s + (mediaInsightsMap.get(m.id)?.reach ?? 0), 0);
   const avgReach = postsWithReach.length > 0 ? Math.round(totalReach / postsWithReach.length) : 0;
 
+  // Impressions: preserva null se conta não suporta (Personal)
+  const impressionsKPI: AnalyticsKPI =
+    kpis.impressions === null
+      ? {
+          key: "impressions",
+          label: "Impressoes",
+          value: null,
+          previousValue: null,
+          delta: null,
+          deltaPercent: null,
+          trend: "unknown",
+          icon: "trending",
+        }
+      : {
+          key: "impressions",
+          label: "Impressoes",
+          value: kpis.impressions,
+          previousValue: 0,
+          delta: 0,
+          deltaPercent: 0,
+          trend: "flat",
+          icon: "trending",
+        };
+
   return [
     {
       key: "followers",
@@ -246,6 +359,7 @@ export function toProviderKPIs(data: InstagramLiveData): AnalyticsKPI[] {
       trend: "flat",
       icon: "eye",
     },
+    impressionsKPI,
     {
       key: "posts",
       label: "Posts no Periodo",
@@ -358,7 +472,8 @@ export function toProviderTimeSeries(data: InstagramLiveData): TimeSeriesDataPoi
       date,
       followers: data.kpis.followers,
       reach: 0,
-      impressions: 0,
+      // null preservado se conta não suporta impressões
+      ...(data.kpis.impressions !== null ? { impressions: data.kpis.impressions } : {}),
       engagement: metrics.likes + metrics.comments,
       sessions: 0,
       users: 0,
@@ -576,9 +691,8 @@ export async function persistInstagramSnapshot(
         follows_count: liveData.profile.follows_count,
         media_count: liveData.profile.media_count,
         ...(liveData.kpis.reach > 0 ? { reach: liveData.kpis.reach } : {}),
-        ...(liveData.kpis.impressions > 0
-          ? { impressions: liveData.kpis.impressions }
-          : {}),
+        // null = indisponível para esse tipo de conta; preservar null no JSONB (não converter para 0)
+        impressions: liveData.kpis.impressions,
       },
     },
     { onConflict: "connection_id,snapshot_date" }

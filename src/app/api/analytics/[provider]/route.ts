@@ -187,12 +187,13 @@ export async function GET(
       // Time series = historico + ponto live de hoje
       const today = new Date().toISOString().split("T")[0];
       const historicalTimeSeries: TimeSeriesDataPoint[] = (historicalSnapshots ?? []).map((s) => {
-        const m = s.metrics as Record<string, number>;
+        const m = s.metrics as Record<string, number | null>;
         return {
           date: s.snapshot_date as string,
           followers: m.followers_count ?? 0,
           reach: m.reach ?? 0,
-          impressions: m.impressions ?? 0,
+          // null = conta não suporta impressões; preservar null em vez de coagir para 0
+          impressions: "impressions" in m ? m.impressions : null,
           engagement: 0,
           sessions: 0,
           users: 0,
@@ -302,6 +303,19 @@ export async function GET(
     return (latest.metrics as Record<string, number>)[key] ?? 0;
   }
 
+  /**
+   * Versão null-aware: retorna null se a chave está explicitamente marcada
+   * como null (indisponível) no último snapshot. Usado para métricas como
+   * "impressions" que podem ser indisponíveis em contas personal do Instagram.
+   */
+  function latestMetricNullable(snaps: typeof snapshots, key: string): number | null {
+    if (snaps.length === 0) return null;
+    const latest = snaps[snaps.length - 1];
+    const m = latest.metrics as Record<string, number | null>;
+    if (!(key in m)) return null;
+    return m[key];
+  }
+
   function computeDelta(current: number, previous: number) {
     const delta = current - previous;
     const deltaPercent =
@@ -313,6 +327,16 @@ export async function GET(
     const trend: "up" | "down" | "flat" =
       delta > 0 ? "up" : delta < 0 ? "down" : "flat";
     return { delta, deltaPercent, trend };
+  }
+
+  function computeDeltaNullable(
+    current: number | null,
+    previous: number | null
+  ): { delta: number | null; deltaPercent: number | null; trend: "up" | "down" | "flat" | "unknown" } {
+    if (current === null || previous === null) {
+      return { delta: null, deltaPercent: null, trend: "unknown" };
+    }
+    return computeDelta(current, previous);
   }
 
   // --- Build KPIs based on provider ---
@@ -346,14 +370,15 @@ export async function GET(
       icon: "eye",
     });
 
-    const impressions = latestMetric(snapshots, "impressions");
-    const prevImpressions = latestMetric(prevSnapshots, "impressions");
+    // Impressions: preserva null para contas que não suportam (ex: Instagram Personal)
+    const impressions = latestMetricNullable(snapshots, "impressions");
+    const prevImpressions = latestMetricNullable(prevSnapshots, "impressions");
     kpis.push({
       key: "impressions",
       label: "Impressoes",
       value: impressions,
       previousValue: prevImpressions,
-      ...computeDelta(impressions, prevImpressions),
+      ...computeDeltaNullable(impressions, prevImpressions),
       icon: "trending",
     });
 
@@ -463,12 +488,13 @@ export async function GET(
 
   // --- Time series ---
   const timeSeries: TimeSeriesDataPoint[] = snapshots.map((s) => {
-    const m = s.metrics as Record<string, number>;
+    const m = s.metrics as Record<string, number | null>;
     return {
       date: s.snapshot_date as string,
       followers: m.followers_count ?? 0,
       reach: m.reach ?? 0,
-      impressions: m.impressions ?? 0,
+      // null = conta não suporta impressões; preservar null em vez de coagir para 0
+      impressions: "impressions" in m ? m.impressions : null,
       engagement: m.engagement_rate ?? 0,
       sessions: m.sessions ?? 0,
       users: m.users ?? 0,

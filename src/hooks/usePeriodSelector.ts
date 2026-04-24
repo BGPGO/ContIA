@@ -17,6 +17,8 @@ export interface UsePeriodSelectorReturn {
   setPreset: (p: PeriodPreset) => void;
   setCustomRange: (start: Date, end: Date) => void;
   label: string;
+  /** Indica se o preset ativo é válido dado o earliestConnectionDate */
+  isPresetValid: (p: PeriodPreset, earliestConnectionDate: Date | null) => boolean;
 }
 
 function daysAgo(days: number): Date {
@@ -38,6 +40,25 @@ function computeRange(preset: PeriodPreset, customStart?: Date, customEnd?: Date
   }
   const days = preset === "7d" ? 7 : preset === "30d" ? 30 : 90;
   return { start: daysAgo(days), end: today() };
+}
+
+/** Retorna true se o preset cobre algum período a partir de earliestConnectionDate */
+function presetIsValid(preset: PeriodPreset, earliestConnectionDate: Date | null): boolean {
+  if (!earliestConnectionDate || preset === "custom") return true;
+  const days = preset === "7d" ? 7 : preset === "30d" ? 30 : 90;
+  const periodStart = daysAgo(days);
+  // Preset válido se a data de início do período NÃO é anterior à data de conexão
+  // (ou seja: há dados reais disponíveis naquele intervalo)
+  return periodStart >= earliestConnectionDate;
+}
+
+/** Encontra o maior preset válido. Se nenhum couber, retorna "custom" */
+function findBestValidPreset(earliestConnectionDate: Date | null): PeriodPreset {
+  const ordered: PeriodPreset[] = ["7d", "30d", "90d"];
+  for (const p of ordered) {
+    if (presetIsValid(p, earliestConnectionDate)) return p;
+  }
+  return "custom";
 }
 
 function computePreviousRange(range: PeriodRange): PeriodRange {
@@ -104,5 +125,11 @@ export function usePeriodSelector(): UsePeriodSelectorReturn {
     return PRESETS_LABELS[preset];
   }, [preset, customStart, customEnd]);
 
-  return { preset, range, previousRange, setPreset, setCustomRange, label };
+  const isPresetValid = useCallback(
+    (p: PeriodPreset, earliestConnectionDate: Date | null): boolean =>
+      presetIsValid(p, earliestConnectionDate),
+    []
+  );
+
+  return { preset, range, previousRange, setPreset, setCustomRange, label, isPresetValid };
 }
