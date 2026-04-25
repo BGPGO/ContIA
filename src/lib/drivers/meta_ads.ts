@@ -79,6 +79,39 @@ interface Campaign {
   effective_status: string
 }
 
+/* ── Helpers de action stats ─────────────────────────────────────────────── */
+
+/**
+ * Soma os valores (em moeda) de actions cujo action_type contém uma das chaves.
+ * Usado pra extrair conversion_value de `action_values` da Graph API.
+ */
+function sumActionValues(
+  actions: Array<{ action_type: string; value: string }> | undefined,
+  matchKeys: string[]
+): number {
+  if (!actions || actions.length === 0) return 0
+  return actions
+    .filter((a) => matchKeys.some((k) => a.action_type.includes(k)))
+    .reduce((sum, a) => sum + (parseFloat(a.value) || 0), 0)
+}
+
+/**
+ * Média ponderada simples de purchase_roas: pega o maior valor entre actions
+ * cujo type contém uma das chaves. Meta retorna ROAS por tipo de conversão.
+ */
+function avgActionValues(
+  actions: Array<{ action_type: string; value: string }> | undefined,
+  matchKeys: string[]
+): number {
+  if (!actions || actions.length === 0) return 0
+  const values = actions
+    .filter((a) => matchKeys.some((k) => a.action_type.includes(k)))
+    .map((a) => parseFloat(a.value) || 0)
+    .filter((v) => v > 0)
+  if (values.length === 0) return 0
+  return values.reduce((s, v) => s + v, 0) / values.length
+}
+
 /* ── HTTP helper ─────────────────────────────────────────────────────────── */
 
 async function fbFetch<T>(
@@ -479,6 +512,7 @@ export const metaAdsDriver: ConnectionDriver = {
       `act_${connection.provider_user_id}`
     const today = new Date().toISOString().split('T')[0]
 
+    type ActionStat = { action_type: string; value: string }
     let insightsData: {
       data: Array<{
         spend?: string
@@ -487,6 +521,8 @@ export const metaAdsDriver: ConnectionDriver = {
         ctr?: string
         cpc?: string
         conversions?: string
+        action_values?: ActionStat[]
+        purchase_roas?: ActionStat[]
         conversion_rate_ranking?: string
       }>
     } = { data: [] }
@@ -494,7 +530,8 @@ export const metaAdsDriver: ConnectionDriver = {
     try {
       insightsData = await fbFetch<typeof insightsData>(`/${accountId}/insights`, {
         access_token: token,
-        fields: 'spend,impressions,clicks,ctr,cpc,conversions,conversion_rate_ranking',
+        fields:
+          'spend,impressions,clicks,ctr,cpc,conversions,action_values,purchase_roas,conversion_rate_ranking',
         level: 'account',
         date_preset: 'today',
       })
@@ -503,6 +540,8 @@ export const metaAdsDriver: ConnectionDriver = {
     }
 
     const raw = insightsData.data?.[0] ?? {}
+    const conversionValue = sumActionValues(raw.action_values, ['purchase', 'lead', 'complete_registration'])
+    const roas = avgActionValues(raw.purchase_roas, ['purchase'])
     const metrics: Record<string, number> = {
       spend: parseFloat(raw.spend ?? '0') || 0,
       impressions: parseInt(raw.impressions ?? '0', 10) || 0,
@@ -510,6 +549,8 @@ export const metaAdsDriver: ConnectionDriver = {
       ctr: parseFloat(raw.ctr ?? '0') || 0,
       cpc: parseFloat(raw.cpc ?? '0') || 0,
       conversions: parseFloat(raw.conversions ?? '0') || 0,
+      conversion_value: conversionValue,
+      roas: roas,
     }
 
     const supabase = getAdminSupabase()
@@ -582,6 +623,7 @@ export const metaAdsDriver: ConnectionDriver = {
 
     for (const campaignId of campaignIds) {
       try {
+        type ActionStat = { action_type: string; value: string }
         const insightRes = await fbFetch<{
           data: Array<{
             spend?: string
@@ -592,14 +634,19 @@ export const metaAdsDriver: ConnectionDriver = {
             conversions?: string
             reach?: string
             frequency?: string
+            action_values?: ActionStat[]
+            purchase_roas?: ActionStat[]
           }>
         }>(`/${campaignId}/insights`, {
           access_token: token,
-          fields: 'spend,impressions,clicks,ctr,cpc,conversions,reach,frequency',
+          fields:
+            'spend,impressions,clicks,ctr,cpc,conversions,reach,frequency,action_values,purchase_roas',
           date_preset: 'lifetime',
         })
 
         const raw = insightRes.data?.[0] ?? {}
+        const conversionValue = sumActionValues(raw.action_values, ['purchase', 'lead', 'complete_registration'])
+        const roas = avgActionValues(raw.purchase_roas, ['purchase'])
         const rawInsights: Record<string, number> = {
           spend: parseFloat(raw.spend ?? '0') || 0,
           impressions: parseInt(raw.impressions ?? '0', 10) || 0,
@@ -609,6 +656,8 @@ export const metaAdsDriver: ConnectionDriver = {
           conversions: parseFloat(raw.conversions ?? '0') || 0,
           reach: parseInt(raw.reach ?? '0', 10) || 0,
           frequency: parseFloat(raw.frequency ?? '0') || 0,
+          conversion_value: conversionValue,
+          roas: roas,
         }
 
         if (Object.values(rawInsights).every((v) => v === 0)) continue

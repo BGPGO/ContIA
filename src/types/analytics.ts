@@ -87,6 +87,12 @@ export interface ProviderAnalyticsData {
   topPages: TopPageItem[] | null;
   campaigns: CampaignRow[] | null;
   insightsSummary: InsightsSummary | null;
+  /** Bloco avançado disponível só para provider="instagram" */
+  instagramAdvanced?: InstagramAdvancedAnalytics;
+  /** Bloco avançado disponível só para provider="meta_ads" */
+  metaAdsAdvanced?: MetaAdsAdvanced;
+  /** Bloco avançado disponível só para provider="facebook" */
+  facebookAdvanced?: FacebookAdvanced;
 }
 
 export interface ProviderPost {
@@ -203,8 +209,68 @@ export interface InstagramAdvancedAnalytics {
   captionAnalysis: InstagramCaptionAnalysis;
 }
 
-export interface ProviderAnalyticsDataWithInstagram extends ProviderAnalyticsData {
-  instagramAdvanced?: InstagramAdvancedAnalytics;
+/** @deprecated Use ProviderAnalyticsData diretamente — instagramAdvanced é campo opcional. Mantido como alias por backwards-compat. */
+export type ProviderAnalyticsDataWithInstagram = ProviderAnalyticsData;
+
+/* ── Meta Ads Advanced Analytics ──────────────────────────────── */
+
+export interface AdCampaignSummary {
+  campaignId: string;
+  name: string;
+  status: "ACTIVE" | "PAUSED" | "DELETED" | "ARCHIVED" | string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  ctr: number; // 0..1
+  cpc: number; // R$ por clique
+  cpm: number; // R$ por mil impressões
+  conversions: number;
+  costPerConversion: number | null;
+  roas: number | null; // valor de conversão / spend
+  reach: number;
+  frequency: number;
+  startDate: string | null;
+  endDate: string | null;
+}
+
+export interface MetaAdsAdvanced {
+  totalSpend: number;
+  totalImpressions: number;
+  totalClicks: number;
+  avgCTR: number; // weighted by impressions
+  avgCPC: number; // weighted by clicks
+  avgCPM: number; // weighted by impressions
+  totalConversions: number;
+  totalConversionValue: number;
+  avgROAS: number | null;
+  campaigns: AdCampaignSummary[]; // top 10 do período por spend
+  spendByDay: Array<{ date: string; spend: number; conversions: number }>;
+  topPerformingCampaign: AdCampaignSummary | null; // maior ROAS, pelo menos 5 conversões
+  worstPerformingCampaign: AdCampaignSummary | null; // menor ROAS, pelo menos 100 R$ spend
+}
+
+/* ── Facebook Advanced Analytics ──────────────────────────────── */
+
+export interface FacebookAdvanced {
+  totalLikes: number;
+  totalReactions: number;
+  totalComments: number;
+  totalShares: number;
+  pageImpressions: number;
+  pageEngagedUsers: number;
+  pageFans: number;
+  pageNewFans: number;
+  postsByType: Record<string, number>;
+  topPosts: Array<{
+    id: string;
+    message: string;
+    permalink: string | null;
+    publishedAt: string;
+    reactions: number;
+    comments: number;
+    shares: number;
+    reach: number;
+  }>;
 }
 
 /* ── Strategic Insights ────────────────────────────────────────── */

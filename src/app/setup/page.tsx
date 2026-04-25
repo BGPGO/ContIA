@@ -18,6 +18,7 @@ import {
   Copy,
   Check,
   RefreshCw,
+  ShieldCheck,
 } from "lucide-react";
 import { useSetupProgress } from "@/hooks/useSetupProgress";
 import { SetupCard } from "@/components/setup/SetupCard";
@@ -34,6 +35,7 @@ const CARD_IDS = [
   "coolify-crm-env",
   "google-ads-token",
   "instagram-testers",
+  "coolify-cron-refresh-tokens",
 ] as const;
 
 type CardId = (typeof CARD_IDS)[number];
@@ -763,6 +765,78 @@ APP_URL=https://contia.bertuzzipatrimonial.com.br`}
                     value={getNotes(id)}
                     onChange={(v) => setNotes(id, v)}
                   />
+                </SetupCard>
+              );
+
+            /* ────────────────────────────────────────────── */
+            case "coolify-cron-refresh-tokens":
+              return (
+                <SetupCard
+                  key={id}
+                  id={id}
+                  icon={ShieldCheck}
+                  title="Coolify: cron de refresh de tokens Meta"
+                  reason="Tokens do Meta (IG/FB/Ads) duram 60 dias. Sem este cron, conexões expiram silenciosamente e o Analytics zera."
+                  estimatedTime="3 min"
+                  done={isDone(id)}
+                  onToggleDone={() => toggleDone(id)}
+                >
+                  <Section title="O que faz" />
+                  <p className="text-[12px] text-text-muted">
+                    O endpoint <code className="text-accent">/api/cron/refresh-tokens</code>{" "}
+                    busca conexões Meta com tokens prestes a expirar (&lt;14 dias) e renova
+                    via Graph API. Se o token já expirou ou foi revogado, marca a conexão como
+                    inativa e registra <code className="text-text-secondary">last_error</code>.
+                  </p>
+
+                  <Section title="Adicionar agendamento no Coolify" />
+                  <Step n={1}>
+                    Abra{" "}
+                    <ExtLink href="http://187.77.238.125:8000/project/frrqapqbem8i13ncaifx9xzo/u5gr1pwn7x320gb92ej1kb4s">
+                      Coolify &gt; ContIA
+                    </ExtLink>{" "}
+                    e vá na aba <strong className="text-text-primary">Scheduled Tasks</strong>.
+                  </Step>
+                  <Step n={2}>
+                    Clique <strong className="text-text-primary">+ Add</strong> e preencha:
+                  </Step>
+                  <CodeBlock
+                    code={`Name: refresh-meta-tokens
+Command: curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://contia.bertuzzipatrimonial.com.br/api/cron/refresh-tokens
+Frequency: 0 5 * * 1,3,5`}
+                  />
+                  <Step n={3}>
+                    Salve. O comando vai rodar toda <strong className="text-text-primary">segunda, quarta e sexta às 5h BRT</strong>.
+                  </Step>
+
+                  <Section title="Garantir CRON_SECRET no env" />
+                  <Step n={4}>
+                    Verifique que <code className="text-accent">CRON_SECRET</code> existe nas
+                    Environment Variables do ContIA (mesma do cron de sync-snapshots).
+                    Se não existir:
+                  </Step>
+                  <GenerateKeyButton
+                    onGenerated={(key) => setNotes(id, key)}
+                  />
+                  <Callout>
+                    O CRON_SECRET é compartilhado por todos os crons. Se já tem um
+                    funcionando para sync-snapshots, reutiliza — não precisa gerar novo.
+                  </Callout>
+
+                  <Section title="Validar manualmente (opcional)" />
+                  <Step n={5}>
+                    Você pode disparar uma vez agora pra confirmar que está OK. Cole no
+                    seu terminal substituindo <code className="text-accent">$CRON_SECRET</code>:
+                  </Step>
+                  <CodeBlock
+                    code={`curl -H "Authorization: Bearer SEU_CRON_SECRET_AQUI" https://contia.bertuzzipatrimonial.com.br/api/cron/refresh-tokens`}
+                  />
+                  <p className="text-[12px] text-text-muted">
+                    Resposta esperada:{" "}
+                    <code className="text-text-secondary">
+                      {"{ message: \"Refresh de tokens concluido\", refreshed: N, deactivated: N, ... }"}
+                    </code>
+                  </p>
                 </SetupCard>
               );
 

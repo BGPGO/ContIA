@@ -7,6 +7,7 @@ import { useEmpresa } from "@/hooks/useEmpresa";
 import { useAnalyticsOverview } from "@/hooks/useAnalyticsOverview";
 import { usePeriodSelector } from "@/hooks/usePeriodSelector";
 import { useConnections } from "@/hooks/useConnections";
+import { useMetaAdsSummary } from "@/hooks/useMetaAdsSummary";
 import { PROVIDER_DISPLAY_ORDER } from "@/lib/drivers/metadata";
 
 /* ── Componentes compartilhados ── */
@@ -21,6 +22,7 @@ import { ContentTypePerformance } from "@/components/insights/ContentTypePerform
 import { AnomalyBadge } from "@/components/insights/AnomalyBadge";
 
 /* ── Componentes analytics ── */
+import { AdsSummarySection } from "@/components/analytics/AdsSummarySection";
 import { ProviderSummaryRow } from "@/components/analytics/ProviderSummaryRow";
 import { BreakdownPie } from "@/components/analytics/BreakdownPie";
 import { PostsTable } from "@/components/analytics/PostsTable";
@@ -303,6 +305,13 @@ function AnalyticsContent() {
     range.end
   );
 
+  const hasMetaAds = isConnected("meta_ads");
+  const {
+    data: metaAdsData,
+    loading: metaAdsLoading,
+    error: metaAdsError,
+  } = useMetaAdsSummary(range.start, range.end, hasMetaAds);
+
   /* Estado local de anomalias (para dismiss) */
   const [dismissedAnomalies, setDismissedAnomalies] = useState<Set<string>>(
     new Set()
@@ -541,6 +550,22 @@ function AnalyticsContent() {
               </div>
             </div>
           </motion.div>
+
+          {/* ── SEÇÃO META ADS: INVESTIMENTO EM MÍDIA PAGA ── */}
+          {hasMetaAds && (
+            <motion.div {...sectionAnim(0.2)}>
+              <SectionHeader
+                title="Investimento em Mídia Paga"
+                subtitle="Resumo do que você está gastando em ads"
+              />
+              <AdsSummarySection
+                data={metaAdsData}
+                loading={metaAdsLoading}
+                error={metaAdsError}
+                hasMetaAdsConnection={hasMetaAds}
+              />
+            </motion.div>
+          )}
 
           {/* ── SEÇÃO 1: EVOLUÇÃO ── */}
           {data.timeSeries.length > 0 && (

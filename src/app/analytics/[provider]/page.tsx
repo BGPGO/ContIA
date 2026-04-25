@@ -13,6 +13,7 @@ import {
   Music2,
   Play,
   Share2,
+  DollarSign,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -38,16 +39,22 @@ import { PostsTable } from "@/components/analytics/PostsTable";
 import { SaveRateCard } from "@/components/analytics/SaveRateCard";
 import { EngagementBreakdown } from "@/components/analytics/EngagementBreakdown";
 import { FormatPerformanceCards } from "@/components/analytics/FormatPerformanceCards";
+import { SpendTimelineChart } from "@/components/analytics/SpendTimelineChart";
+import { CampaignsTable } from "@/components/analytics/CampaignsTable";
+import { AdsKPIHero } from "@/components/analytics/AdsKPIHero";
 
 /* ── Tipos ── */
 import type { ProviderKey } from "@/types/providers";
-import type { AnalyticsKPI, ProviderPost } from "@/types/analytics";
+import type { AnalyticsKPI, ProviderPost, AdCampaignSummary } from "@/types/analytics";
 import type { Anomaly } from "@/components/insights/AnomalyBadge";
 import type { HeatmapCell } from "@/components/insights/BestTimeHeatmap";
 import type { PostsTableRow } from "@/components/analytics/PostsTable";
 import type { FormatItem } from "@/components/analytics/FormatPerformanceCards";
 import type { ContentTypeData } from "@/components/insights/ContentTypePerformance";
 import type { BreakdownPieItem } from "@/components/analytics/BreakdownPie";
+
+/* ── Layout type ── */
+type LayoutType = "paid" | "social" | "default";
 
 /* ── Label mapeamento de tipo de conteúdo ── */
 const CONTENT_TYPE_LABELS: Record<string, string> = {
@@ -57,6 +64,7 @@ const CONTENT_TYPE_LABELS: Record<string, string> = {
   story: "Stories",
   video: "Videos",
   image: "Imagens",
+  photo: "Fotos",
 };
 
 function getContentTypeLabel(type: string): string {
@@ -76,8 +84,27 @@ function getProviderIcon(provider: string): LucideIcon {
       return Play;
     case "tiktok":
       return Music2;
+    case "meta_ads":
+    case "google_ads":
+      return DollarSign;
     default:
       return Globe;
+  }
+}
+
+/* ── Título do provider ── */
+function getProviderTitle(provider: string, meta: { displayName: string } | undefined): string {
+  switch (provider) {
+    case "meta_ads":
+      return "Analytics — Meta Ads";
+    case "google_ads":
+      return "Analytics — Google Ads";
+    case "facebook":
+      return "Analytics — Facebook";
+    case "instagram":
+      return "Analytics — Instagram";
+    default:
+      return meta ? `Analytics — ${meta.displayName}` : "Analytics";
   }
 }
 
@@ -318,6 +345,81 @@ function computePostsTableRows(posts: ProviderPost[], provider: string): PostsTa
   });
 }
 
+/* ── Campaign highlight card ── */
+
+function CampaignHighlightCard({
+  campaign,
+  variant,
+}: {
+  campaign: AdCampaignSummary;
+  variant: "top" | "worst";
+}) {
+  const isTop = variant === "top";
+  const borderClass = isTop ? "border-success/30" : "border-danger/30";
+  const badgeClass = isTop
+    ? "bg-success/15 text-success"
+    : "bg-danger/15 text-danger";
+  const badgeLabel = isTop ? "Melhor ROAS" : "Pior ROAS";
+
+  return (
+    <div
+      className={`bg-bg-card border ${borderClass} rounded-xl p-4 flex flex-col gap-2`}
+    >
+      <div className="flex items-center justify-between">
+        <span
+          className={`text-[10px] font-semibold px-2 py-0.5 rounded ${badgeClass}`}
+        >
+          {badgeLabel}
+        </span>
+        <span className="text-[10px] text-text-muted">{campaign.status}</span>
+      </div>
+      <p
+        className="text-[13px] font-semibold text-text-primary truncate"
+        title={campaign.name}
+      >
+        {campaign.name}
+      </p>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-1">
+        <div>
+          <p className="text-[10px] text-text-muted">Gasto</p>
+          <p className="text-[12px] font-semibold text-text-primary tabular-nums">
+            {new Intl.NumberFormat("pt-BR", {
+              style: "currency",
+              currency: "BRL",
+            }).format(campaign.spend)}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] text-text-muted">ROAS</p>
+          <p
+            className={`text-[12px] font-semibold tabular-nums ${
+              campaign.roas !== null && campaign.roas >= 2
+                ? "text-success"
+                : campaign.roas !== null && campaign.roas >= 1
+                ? "text-warning"
+                : "text-danger"
+            }`}
+          >
+            {campaign.roas !== null ? `${campaign.roas.toFixed(2)}×` : "—"}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] text-text-muted">Conv.</p>
+          <p className="text-[12px] font-semibold text-text-primary tabular-nums">
+            {campaign.conversions.toLocaleString("pt-BR")}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] text-text-muted">CTR</p>
+          <p className="text-[12px] font-semibold text-text-primary tabular-nums">
+            {(campaign.ctr * 100).toFixed(2)}%
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Main content ── */
 
 function ProviderAnalyticsContent() {
@@ -339,11 +441,21 @@ function ProviderAnalyticsContent() {
     setDismissedAnomalies((prev) => new Set([...prev, metric]));
   }, []);
 
-  /* Ícone do provider */
-  const ProviderIcon: LucideIcon = meta ? getProviderIcon(provider) : Globe;
+  /* Ícone e título do provider */
+  const ProviderIcon: LucideIcon = getProviderIcon(provider);
+  const pageTitle = getProviderTitle(provider, meta);
 
-  /* Título dinâmico */
-  const pageTitle = meta ? `Analytics — ${meta.displayName}` : "Analytics";
+  /* Layout type */
+  const layoutType = useMemo<LayoutType>(() => {
+    if (provider === "meta_ads" || provider === "google_ads") return "paid";
+    if (
+      provider === "instagram" ||
+      provider === "facebook" ||
+      provider === "linkedin"
+    )
+      return "social";
+    return "default";
+  }, [provider]);
 
   /* ── Cálculos memoizados ── */
   const posts = data?.posts ?? [];
@@ -358,14 +470,12 @@ function ProviderAnalyticsContent() {
   const engagementTotals = useMemo(() => computeEngagementTotals(posts), [posts]);
 
   const formatItems = useMemo(() => {
-    /* Se há instagramAdvanced com formatPerformance, usar ele (já agregado) */
     const igFP = data?.instagramAdvanced?.formatPerformance;
     if (igFP && igFP.length > 0) {
       return igFP.map((f) => ({
         type: f.format.toLowerCase(),
         label: f.label,
         count: f.count,
-        /* avgEngagement já vem em 0..100 na API — normalizar para 0..1 */
         avgEngagement: f.avgEngagement > 1 ? f.avgEngagement / 100 : f.avgEngagement,
         avgReach: f.avgReach,
         bestPostId: f.bestPost?.permalink,
@@ -383,11 +493,9 @@ function ProviderAnalyticsContent() {
     [posts, provider]
   );
 
-  /* SaveRate — preferir igAdvanced, senão calcular dos posts */
   const saveRate = useMemo(() => {
     const igSR = data?.instagramAdvanced?.saveRateAnalysis?.avgSaveRate;
     if (igSR != null) return igSR > 1 ? igSR / 100 : igSR;
-    /* Calcular dos posts: sum(saves)/sum(reach) */
     let totalSaves = 0;
     let totalReach = 0;
     for (const p of posts) {
@@ -398,7 +506,6 @@ function ProviderAnalyticsContent() {
     return totalReach > 0 ? totalSaves / totalReach : 0;
   }, [data?.instagramAdvanced?.saveRateAnalysis?.avgSaveRate, posts]);
 
-  /* EngagementBreakdown — preferir igAdvanced se disponível */
   const engBreakdown = useMemo(() => {
     const ig = data?.instagramAdvanced?.engagementBreakdown;
     if (ig) {
@@ -412,7 +519,6 @@ function ProviderAnalyticsContent() {
     return engagementTotals;
   }, [data?.instagramAdvanced?.engagementBreakdown, engagementTotals]);
 
-  /* Série de seguidores para FollowersDeltaChart */
   const followersSeries = useMemo(() => {
     if (!data?.timeSeries?.length) return [];
     return data.timeSeries
@@ -425,6 +531,27 @@ function ProviderAnalyticsContent() {
         followers: (pt[`${provider}_followers`] ?? pt["followers"]) as number,
       }));
   }, [data?.timeSeries, provider]);
+
+  /* ── Paid layout memos ── */
+  const adsCampaigns = useMemo<AdCampaignSummary[]>(
+    () => data?.metaAdsAdvanced?.campaigns ?? [],
+    [data?.metaAdsAdvanced?.campaigns]
+  );
+
+  const spendData = useMemo(
+    () => data?.metaAdsAdvanced?.spendByDay ?? [],
+    [data?.metaAdsAdvanced?.spendByDay]
+  );
+
+  const topPerf = useMemo(
+    () => data?.metaAdsAdvanced?.topPerformingCampaign ?? null,
+    [data?.metaAdsAdvanced?.topPerformingCampaign]
+  );
+
+  const worstPerf = useMemo(
+    () => data?.metaAdsAdvanced?.worstPerformingCampaign ?? null,
+    [data?.metaAdsAdvanced?.worstPerformingCampaign]
+  );
 
   /* ── Guards ── */
   if (!meta) {
@@ -472,9 +599,16 @@ function ProviderAnalyticsContent() {
             </div>
 
             <div>
-              <h1 className="text-lg sm:text-xl font-bold text-text-primary tracking-tight">
-                {pageTitle}
-              </h1>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-lg sm:text-xl font-bold text-text-primary tracking-tight">
+                  {pageTitle}
+                </h1>
+                {layoutType === "paid" && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-yellow-500/15 text-yellow-400 border border-yellow-500/30">
+                    Midia Paga
+                  </span>
+                )}
+              </div>
               <p className="text-[13px] text-text-secondary">
                 {label ? `Periodo: ${label}` : "Analytics detalhado"}
               </p>
@@ -500,8 +634,6 @@ function ProviderAnalyticsContent() {
             />
           </div>
         </div>
-
-        {/* SyncStatusBadge: removido até backend popular syncStatus/lastSyncedAt no response */}
       </motion.div>
 
       {/* ── LOADING ── */}
@@ -544,10 +676,10 @@ function ProviderAnalyticsContent() {
         />
       )}
 
-      {/* ── DASHBOARD ── */}
-      {data && data.connected && (
+      {/* ── DASHBOARD — LAYOUT PAGO ── */}
+      {data && data.connected && layoutType === "paid" && (
         <>
-          {/* ── SEÇÃO 1: ANOMALIAS (condicional) ── */}
+          {/* SEÇÃO 1: ANOMALIAS */}
           <AnimatePresence>
             {anomalies.length > 0 && (
               <motion.div {...sectionAnim(0)}>
@@ -556,7 +688,103 @@ function ProviderAnalyticsContent() {
             )}
           </AnimatePresence>
 
-          {/* ── SEÇÃO 2: INSIGHTS ESTRATÉGICOS ── */}
+          {/* SEÇÃO 2: ADS KPI HERO */}
+          {data.metaAdsAdvanced && (
+            <motion.div {...sectionAnim(0.05)}>
+              <SectionHeader
+                title="Metricas de Midia Paga"
+                subtitle="Investimento, retorno e eficiencia das campanhas"
+              />
+              <AdsKPIHero
+                totalSpend={data.metaAdsAdvanced.totalSpend}
+                avgROAS={data.metaAdsAdvanced.avgROAS}
+                totalConversions={data.metaAdsAdvanced.totalConversions}
+                avgCPC={data.metaAdsAdvanced.avgCPC}
+              />
+            </motion.div>
+          )}
+
+          {/* SEÇÃO 3: INSIGHTS ESTRATÉGICOS */}
+          <motion.div {...sectionAnim(0.1)}>
+            <SectionHeader
+              title="Insights Estrategicos"
+              subtitle="O que esses numeros dizem sobre suas campanhas"
+            />
+            <StrategicInsightsCard
+              insights={data.insightsSummary?.insights ?? []}
+              title="Inteligencia de Campanhas"
+              subtitle="Analise automatica baseada nos dados do periodo selecionado"
+              emptyMessage="Aguardando dados suficientes para gerar insights. Expanda o periodo ou aguarde mais dados de campanhas."
+            />
+          </motion.div>
+
+          {/* SEÇÃO 4: EVOLUÇÃO DE SPEND */}
+          <motion.div {...sectionAnim(0.15)} className="space-y-4">
+            <SectionHeader
+              title="Evolucao de Gasto"
+              subtitle="Distribuicao de investimento e conversoes ao longo do periodo"
+            />
+
+            <SpendTimelineChart
+              data={spendData}
+              title="Gasto por dia"
+            />
+
+            {data.timeSeries.length > 0 && (
+              <TimeSeriesChart
+                data={data.timeSeries}
+                providers={[provider]}
+                singleProvider={provider}
+                height={280}
+              />
+            )}
+          </motion.div>
+
+          {/* SEÇÃO 5: CAMPANHAS */}
+          <motion.div {...sectionAnim(0.2)} className="space-y-4">
+            <SectionHeader
+              title="Campanhas"
+              subtitle="Desempenho detalhado de cada campanha no periodo"
+            />
+
+            <CampaignsTable campaigns={adsCampaigns} pageSize={10} />
+
+            {/* Top / Worst highlights */}
+            {(topPerf || worstPerf) && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {topPerf && (
+                  <CampaignHighlightCard campaign={topPerf} variant="top" />
+                )}
+                {worstPerf && (
+                  <CampaignHighlightCard campaign={worstPerf} variant="worst" />
+                )}
+              </div>
+            )}
+          </motion.div>
+
+          {/* Empty fallback quando não há metaAdsAdvanced */}
+          {!data.metaAdsAdvanced && data.kpis.length === 0 && (
+            <EmptyState
+              title="Sem dados de campanhas"
+              description="Nenhum dado de midia paga encontrado para o periodo selecionado. Tente expandir o intervalo de datas."
+            />
+          )}
+        </>
+      )}
+
+      {/* ── DASHBOARD — LAYOUT SOCIAL (Instagram / Facebook / LinkedIn) ── */}
+      {data && data.connected && layoutType === "social" && (
+        <>
+          {/* SEÇÃO 1: ANOMALIAS (condicional) */}
+          <AnimatePresence>
+            {anomalies.length > 0 && (
+              <motion.div {...sectionAnim(0)}>
+                <AnomalyBadge anomalies={anomalies} onDismiss={handleDismissAnomaly} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* SEÇÃO 2: INSIGHTS ESTRATÉGICOS */}
           <motion.div {...sectionAnim(0.05)}>
             <SectionHeader
               title="Insights Estrategicos"
@@ -570,7 +798,7 @@ function ProviderAnalyticsContent() {
             />
           </motion.div>
 
-          {/* ── SEÇÃO 3: HERO KPIs ── */}
+          {/* SEÇÃO 3: HERO KPIs */}
           {data.kpis.length > 0 && (
             <motion.div
               {...sectionAnim(0.1)}
@@ -592,7 +820,7 @@ function ProviderAnalyticsContent() {
             </motion.div>
           )}
 
-          {/* ── SEÇÃO 4: EVOLUÇÃO ── */}
+          {/* SEÇÃO 4: EVOLUÇÃO */}
           {data.timeSeries.length > 0 && (
             <motion.div {...sectionAnim(0.15)} className="space-y-4">
               <SectionHeader
@@ -600,7 +828,6 @@ function ProviderAnalyticsContent() {
                 subtitle="Crescimento de seguidores, alcance e engajamento ao longo do periodo"
               />
 
-              {/* TimeSeriesChart — full width, métricas toggláveis */}
               <TimeSeriesChart
                 data={data.timeSeries}
                 providers={[provider]}
@@ -608,7 +835,6 @@ function ProviderAnalyticsContent() {
                 height={320}
               />
 
-              {/* FollowersDeltaChart — variação diária */}
               {followersSeries.length >= 2 && (
                 <motion.div {...sectionAnim(0.2)}>
                   <FollowersDeltaChart
@@ -621,14 +847,13 @@ function ProviderAnalyticsContent() {
             </motion.div>
           )}
 
-          {/* ── SEÇÃO 5: PERFORMANCE DE CONTEÚDO ── */}
+          {/* SEÇÃO 5: PERFORMANCE DE CONTEÚDO */}
           <motion.div {...sectionAnim(0.25)} className="space-y-4">
             <SectionHeader
               title="Performance de Conteudo"
               subtitle="Taxa de salvamentos, distribuicao de engajamento e formatos com melhor resultado"
             />
 
-            {/* Row: SaveRateCard | EngagementBreakdown | BreakdownPie */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <SaveRateCard saveRate={saveRate} benchmark={0.02} />
               <EngagementBreakdown
@@ -644,19 +869,17 @@ function ProviderAnalyticsContent() {
               />
               <BreakdownPie
                 title="Distribuicao por tipo"
-                subtitle="Reels, posts, carrosseis e stories"
+                subtitle="Posts, fotos, videos e carrosseis"
                 data={breakdownPieData.length > 0 ? breakdownPieData : []}
                 centerLabel={posts.length > 0 ? `${posts.length} posts` : undefined}
                 emptyMessage="Nenhum post no periodo"
               />
             </div>
 
-            {/* FormatPerformanceCards */}
             {formatItems.length > 0 && (
               <FormatPerformanceCards formats={formatItems} />
             )}
 
-            {/* ContentTypePerformance — Radar chart */}
             {contentTypeData.length > 0 && (
               <ContentTypePerformance
                 data={contentTypeData}
@@ -666,7 +889,7 @@ function ProviderAnalyticsContent() {
             )}
           </motion.div>
 
-          {/* ── SEÇÃO 6: MELHOR MOMENTO ── */}
+          {/* SEÇÃO 6: MELHOR MOMENTO */}
           <motion.div {...sectionAnim(0.3)}>
             <SectionHeader
               title="Melhor Momento"
@@ -679,7 +902,7 @@ function ProviderAnalyticsContent() {
             />
           </motion.div>
 
-          {/* ── SEÇÃO 7: HASHTAGS ── */}
+          {/* SEÇÃO 7: HASHTAGS (condicional) */}
           {data.topHashtags && data.topHashtags.length > 0 && (
             <motion.div
               {...sectionAnim(0.35)}
@@ -707,7 +930,7 @@ function ProviderAnalyticsContent() {
             </motion.div>
           )}
 
-          {/* ── SEÇÃO 8: TOP POSTS ── */}
+          {/* SEÇÃO 8: TOP POSTS */}
           {postsTableRows.length > 0 ? (
             <motion.div {...sectionAnim(0.4)}>
               <SectionHeader
@@ -733,7 +956,88 @@ function ProviderAnalyticsContent() {
             )
           )}
 
-          {/* Empty state global — sem KPIs, posts e timeSeries */}
+          {/* Empty state global */}
+          {data.kpis.length === 0 &&
+            posts.length === 0 &&
+            data.timeSeries.length === 0 && (
+              <EmptyState
+                title="Sem dados no periodo"
+                description={`Nenhum dado encontrado para ${meta.displayName} no periodo selecionado. Tente expandir o intervalo de datas.`}
+              />
+            )}
+        </>
+      )}
+
+      {/* ── DASHBOARD — LAYOUT DEFAULT ── */}
+      {data && data.connected && layoutType === "default" && (
+        <>
+          {/* SEÇÃO 1: ANOMALIAS */}
+          <AnimatePresence>
+            {anomalies.length > 0 && (
+              <motion.div {...sectionAnim(0)}>
+                <AnomalyBadge anomalies={anomalies} onDismiss={handleDismissAnomaly} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* SEÇÃO 2: INSIGHTS */}
+          <motion.div {...sectionAnim(0.05)}>
+            <SectionHeader title="Insights Estrategicos" />
+            <StrategicInsightsCard
+              insights={data.insightsSummary?.insights ?? []}
+              title="Inteligencia da conta"
+              emptyMessage="Aguardando dados suficientes para gerar insights."
+            />
+          </motion.div>
+
+          {/* SEÇÃO 3: KPIs */}
+          {data.kpis.length > 0 && (
+            <motion.div
+              {...sectionAnim(0.1)}
+              className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4"
+            >
+              {data.kpis.map((kpi, i) => (
+                <KPICard
+                  key={kpi.key}
+                  label={kpi.label}
+                  value={kpi.value}
+                  previousValue={kpi.previousValue}
+                  delta={kpi.delta}
+                  deltaPercent={kpi.deltaPercent}
+                  trend={kpi.trend}
+                  icon={kpi.icon}
+                  animationDelay={i * 0.07}
+                />
+              ))}
+            </motion.div>
+          )}
+
+          {/* SEÇÃO 4: TIME SERIES */}
+          {data.timeSeries.length > 0 && (
+            <motion.div {...sectionAnim(0.15)}>
+              <SectionHeader title="Evolucao" />
+              <TimeSeriesChart
+                data={data.timeSeries}
+                providers={[provider]}
+                singleProvider={provider}
+                height={320}
+              />
+            </motion.div>
+          )}
+
+          {/* SEÇÃO 5: POSTS */}
+          {postsTableRows.length > 0 && (
+            <motion.div {...sectionAnim(0.2)}>
+              <SectionHeader title="Top Posts" />
+              <PostsTable
+                posts={postsTableRows}
+                limit={10}
+                emptyMessage="Nenhum post no periodo selecionado"
+              />
+            </motion.div>
+          )}
+
+          {/* Empty state global */}
           {data.kpis.length === 0 &&
             posts.length === 0 &&
             data.timeSeries.length === 0 && (

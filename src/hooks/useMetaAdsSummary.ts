@@ -2,10 +2,9 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useEmpresa } from "./useEmpresa";
-import type { ProviderKey } from "@/types/providers";
 import type { ProviderAnalyticsData } from "@/types/analytics";
 
-interface UseProviderAnalyticsReturn {
+interface UseMetaAdsSummaryReturn {
   data: ProviderAnalyticsData | null;
   loading: boolean;
   error: string | null;
@@ -15,11 +14,15 @@ interface UseProviderAnalyticsReturn {
 const CACHE_TTL = 60_000;
 const cache = new Map<string, { data: ProviderAnalyticsData; ts: number }>();
 
-export function useProviderAnalytics(
-  provider: ProviderKey,
+/**
+ * Busca o resumo de Meta Ads via endpoint deep-dive.
+ * Só faz fetch se `enabled` for true (i.e., a conexão meta_ads está ativa).
+ */
+export function useMetaAdsSummary(
   periodStart: Date,
-  periodEnd: Date
-): UseProviderAnalyticsReturn {
+  periodEnd: Date,
+  enabled: boolean
+): UseMetaAdsSummaryReturn {
   const { empresa } = useEmpresa();
   const [data, setData] = useState<ProviderAnalyticsData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -30,9 +33,13 @@ export function useProviderAnalytics(
   const endISO = periodEnd.toISOString().split("T")[0];
 
   const fetchData = useCallback(async () => {
-    if (!empresa?.id) return;
+    if (!empresa?.id || !enabled) {
+      setData(null);
+      setLoading(false);
+      return;
+    }
 
-    const cacheKey = `${empresa.id}_${provider}_${startISO}_${endISO}`;
+    const cacheKey = `meta_ads_${empresa.id}_${startISO}_${endISO}`;
     const cached = cache.get(cacheKey);
     if (cached && Date.now() - cached.ts < CACHE_TTL) {
       setData(cached.data);
@@ -47,10 +54,8 @@ export function useProviderAnalytics(
     setError(null);
 
     try {
-      const res = await fetch(
-        `/api/analytics/${provider}?empresa_id=${encodeURIComponent(empresa.id)}&period_start=${startISO}&period_end=${endISO}`,
-        { signal: controller.signal }
-      );
+      const url = `/api/analytics/meta_ads?empresa_id=${encodeURIComponent(empresa.id)}&period_start=${startISO}&period_end=${endISO}`;
+      const res = await fetch(url, { signal: controller.signal });
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({ error: "Erro desconhecido" }));
@@ -62,16 +67,26 @@ export function useProviderAnalytics(
       setData(json);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
-      setError(err instanceof Error ? err.message : "Erro ao carregar analytics");
+      setError(err instanceof Error ? err.message : "Erro ao carregar Meta Ads");
     } finally {
       setLoading(false);
     }
-  }, [empresa?.id, provider, startISO, endISO]);
+  }, [empresa?.id, startISO, endISO, enabled]);
 
   useEffect(() => {
+    if (!enabled) {
+      setData(null);
+      setError(null);
+      setLoading(false);
+      return () => {
+        abortRef.current?.abort();
+      };
+    }
     fetchData();
-    return () => abortRef.current?.abort();
-  }, [fetchData]);
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, [fetchData, enabled]);
 
   return { data, loading, error, refresh: fetchData };
 }

@@ -12,6 +12,9 @@ import type {
   HashtagStat,
   InsightsSummary,
   StrategicInsight,
+  MetaAdsAdvanced,
+  AdCampaignSummary,
+  FacebookAdvanced,
 } from "@/types/analytics";
 import {
   fetchInstagramLive,
@@ -342,6 +345,133 @@ function computeInsightsSummary(input: InsightsInput): InsightsSummary {
     engagementTrend,
     avgPostingFrequency,
     topCTAs,
+    insights: cappedInsights,
+  };
+}
+
+function computeAdsInsightsSummary(
+  metaAds: MetaAdsAdvanced,
+  kpis: AnalyticsKPI[]
+): InsightsSummary {
+  const insights: StrategicInsight[] = [];
+
+  // 1. Top campaign ROAS vs média
+  if (metaAds.topPerformingCampaign && metaAds.avgROAS !== null && metaAds.avgROAS > 0) {
+    const topRoas = metaAds.topPerformingCampaign.roas ?? 0;
+    const ratio = metaAds.avgROAS > 0 ? topRoas / metaAds.avgROAS : 0;
+    if (ratio >= 1.5) {
+      insights.push({
+        id: "ads_top_campaign_roas",
+        category: "content",
+        severity: "positive",
+        title: `${metaAds.topPerformingCampaign.name} tem ROAS ${ratio.toFixed(1)}× maior que a média`,
+        description: `ROAS desta campanha é ${topRoas.toFixed(2)} contra média de ${metaAds.avgROAS.toFixed(2)}. Considere escalar o orçamento.`,
+        metric: `ROAS ${topRoas.toFixed(2)}×`,
+        actionable: "Aumentar orçamento desta campanha em 20–30%.",
+      });
+    }
+  }
+
+  // 2. CPC subiu vs período anterior
+  const cpcKpi = kpis.find((k) => k.key === "cpc");
+  if (cpcKpi && cpcKpi.deltaPercent !== null && cpcKpi.deltaPercent > 25) {
+    insights.push({
+      id: "ads_cpc_up",
+      category: "anomaly",
+      severity: "warning",
+      title: `CPC subiu ${cpcKpi.deltaPercent.toFixed(1)}% no período`,
+      description: `Custo por clique aumentou de R$${(cpcKpi.previousValue ?? 0).toFixed(2)} para R$${(cpcKpi.value ?? 0).toFixed(2)}. Possível saturação de audiência ou aumento de leilão.`,
+      metric: `+${cpcKpi.deltaPercent.toFixed(1)}%`,
+      actionable: "Revisar segmentação e criativos — testar novos públicos.",
+    });
+  }
+
+  // 3. Conversões caíram com spend igual ou maior
+  const convKpi = kpis.find((k) => k.key === "conversions");
+  const spendKpi = kpis.find((k) => k.key === "spend");
+  if (
+    convKpi &&
+    spendKpi &&
+    convKpi.deltaPercent !== null &&
+    spendKpi.deltaPercent !== null &&
+    convKpi.deltaPercent < -15 &&
+    spendKpi.deltaPercent >= -5
+  ) {
+    insights.push({
+      id: "ads_conv_drop",
+      category: "anomaly",
+      severity: "critical",
+      title: "Conversões caíram apesar do investimento estável",
+      description: `Conversões reduziram ${Math.abs(convKpi.deltaPercent).toFixed(1)}% enquanto o gasto manteve-se. Possível fadiga criativa ou problema na landing page.`,
+      metric: `${convKpi.deltaPercent.toFixed(1)}%`,
+      actionable: "Verificar landing page, testar novos criativos e revisar copy.",
+    });
+  }
+
+  // 4. Campanhas com 0 conversões e gasto relevante
+  const zeroCampanhas = metaAds.campaigns.filter(
+    (c) => c.conversions === 0 && c.spend >= 50
+  );
+  if (zeroCampanhas.length > 0) {
+    const nomes = zeroCampanhas
+      .slice(0, 2)
+      .map((c) => c.name)
+      .join(", ");
+    const totalWaste = zeroCampanhas.reduce((s, c) => s + c.spend, 0);
+    insights.push({
+      id: "ads_zero_conv",
+      category: "anomaly",
+      severity: "warning",
+      title: `${zeroCampanhas.length} campanha(s) com R$${totalWaste.toFixed(0)} sem conversão`,
+      description: `${nomes}${zeroCampanhas.length > 2 ? " e outras" : ""} têm gasto significativo mas nenhuma conversão registrada.`,
+      metric: `R$${totalWaste.toFixed(0)} desperdiçado`,
+      actionable: "Pausar ou revisar criativos e segmentação dessas campanhas.",
+    });
+  }
+
+  // 5. ROAS médio < 1 — investimento sem retorno
+  if (metaAds.avgROAS !== null && metaAds.totalConversionValue > 0 && metaAds.avgROAS < 1) {
+    insights.push({
+      id: "ads_roas_negative",
+      category: "anomaly",
+      severity: "critical",
+      title: "ROAS médio abaixo de 1 — investimento sem retorno",
+      description: `Para cada R$1 investido, R$${metaAds.avgROAS.toFixed(2)} retornam em valor de conversão. Urgente revisar estratégia de anúncios.`,
+      metric: `ROAS ${metaAds.avgROAS.toFixed(2)}×`,
+      actionable: "Revisar público-alvo, ofertas e funil de conversão imediatamente.",
+    });
+  }
+
+  // 6. KPI anomalies (delta > 30%)
+  for (const kpi of kpis) {
+    if (kpi.deltaPercent === null) continue;
+    if (Math.abs(kpi.deltaPercent) > 30 && !["cpc"].includes(kpi.key)) {
+      insights.push({
+        id: `ads_kpi_${kpi.key}`,
+        category: "anomaly",
+        severity: kpi.deltaPercent < 0 ? "critical" : "positive",
+        title: kpi.deltaPercent < 0
+          ? `Queda expressiva em ${kpi.label}`
+          : `Alta expressiva em ${kpi.label}`,
+        description: kpi.deltaPercent < 0
+          ? `${kpi.label} caiu ${Math.abs(kpi.deltaPercent).toFixed(1)}% em relação ao período anterior.`
+          : `${kpi.label} cresceu ${kpi.deltaPercent.toFixed(1)}% em relação ao período anterior.`,
+        metric: `${kpi.deltaPercent > 0 ? "+" : ""}${kpi.deltaPercent.toFixed(1)}%`,
+      });
+    }
+  }
+
+  insights.sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 99) - (SEVERITY_ORDER[b.severity] ?? 99));
+  const cappedInsights = insights.slice(0, 6);
+
+  return {
+    bestPostingDay: null,
+    bestPostingHour: null,
+    formatWinner: null,
+    growthRate: null,
+    engagementTrend: null,
+    avgPostingFrequency: null,
+    topCTAs: [],
     insights: cappedInsights,
   };
 }
@@ -887,6 +1017,415 @@ export async function GET(
       .map(([tag, count]) => ({ tag, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 15);
+  }
+
+  // ── Meta Ads Advanced ──────────────────────────────────────────────────
+  if (provider === "meta_ads") {
+    // Aggregate per-campaign metrics from content_items (content_type = 'ad_campaign')
+    const campaignItems = contentItems.filter(
+      (item) => (item.content_type as string) === "ad_campaign"
+    );
+
+    // Group by provider_content_id (campaign ID)
+    const campaignMap = new Map<string, {
+      id: string;
+      name: string;
+      status: string;
+      spend: number;
+      impressions: number;
+      clicks: number;
+      conversions: number;
+      conversionValue: number;
+      reach: number;
+      frequency: number;
+      startDate: string | null;
+      endDate: string | null;
+    }>();
+
+    for (const item of campaignItems) {
+      const cid = (item.provider_content_id as string) ?? (item.id as string);
+      const m = item.metrics as Record<string, number>;
+      const rawData = item.raw as Record<string, unknown> | null;
+      const existing = campaignMap.get(cid);
+
+      if (existing) {
+        existing.spend += m.spend ?? 0;
+        existing.impressions += m.impressions ?? 0;
+        existing.clicks += m.clicks ?? 0;
+        existing.conversions += m.conversions ?? 0;
+        existing.conversionValue += m.conversion_value ?? 0;
+        existing.reach += m.reach ?? 0;
+        existing.frequency = m.frequency ?? existing.frequency;
+      } else {
+        campaignMap.set(cid, {
+          id: cid,
+          name: (item.title as string) ?? cid,
+          status: (rawData?.effective_status as string | undefined) ?? (rawData?.status as string | undefined) ?? "UNKNOWN",
+          spend: m.spend ?? 0,
+          impressions: m.impressions ?? 0,
+          clicks: m.clicks ?? 0,
+          conversions: m.conversions ?? 0,
+          conversionValue: m.conversion_value ?? 0,
+          reach: m.reach ?? 0,
+          frequency: m.frequency ?? 0,
+          startDate: (rawData?.created_time as string | undefined) ?? (item.published_at as string | null),
+          endDate: null,
+        });
+      }
+    }
+
+    const allCampaigns: AdCampaignSummary[] = Array.from(campaignMap.values()).map((c) => {
+      const ctr = c.impressions > 0 ? c.clicks / c.impressions : 0;
+      const cpc = c.clicks > 0 ? c.spend / c.clicks : 0;
+      const cpm = c.impressions > 0 ? (c.spend / c.impressions) * 1000 : 0;
+      const costPerConversion = c.conversions > 0 ? c.spend / c.conversions : null;
+      const roas = c.conversionValue > 0 && c.spend > 0 ? c.conversionValue / c.spend : null;
+
+      return {
+        campaignId: c.id,
+        name: c.name,
+        status: c.status,
+        spend: c.spend,
+        impressions: c.impressions,
+        clicks: c.clicks,
+        ctr,
+        cpc,
+        cpm,
+        conversions: c.conversions,
+        costPerConversion,
+        roas,
+        reach: c.reach,
+        frequency: c.frequency,
+        startDate: c.startDate,
+        endDate: c.endDate,
+      };
+    });
+
+    // Sort by spend desc, top 10
+    const topCampaigns = [...allCampaigns]
+      .sort((a, b) => b.spend - a.spend)
+      .slice(0, 10);
+
+    // Totals
+    const totalSpend = allCampaigns.reduce((s, c) => s + c.spend, 0);
+    const totalImpressions = allCampaigns.reduce((s, c) => s + c.impressions, 0);
+    const totalClicks = allCampaigns.reduce((s, c) => s + c.clicks, 0);
+    const totalConversions = allCampaigns.reduce((s, c) => s + c.conversions, 0);
+    const totalConversionValue = Array.from(campaignMap.values()).reduce((s, c) => s + c.conversionValue, 0);
+
+    const avgCTR = totalImpressions > 0 ? totalClicks / totalImpressions : 0;
+    const avgCPC = totalClicks > 0 ? totalSpend / totalClicks : 0;
+    const avgCPM = totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0;
+    const avgROAS = totalConversionValue > 0 && totalSpend > 0 ? totalConversionValue / totalSpend : null;
+
+    // spend by day from snapshots
+    const spendByDay = snapshots.map((s) => {
+      const m = s.metrics as Record<string, number>;
+      return {
+        date: s.snapshot_date as string,
+        spend: m.spend ?? 0,
+        conversions: m.conversions ?? 0,
+      };
+    });
+
+    // Top and worst performing campaigns
+    const campaignsWithRoas = allCampaigns.filter(
+      (c) => c.roas !== null && c.conversions >= 5
+    );
+    const topPerformingCampaign = campaignsWithRoas.length > 0
+      ? campaignsWithRoas.reduce((best, c) =>
+          (c.roas ?? 0) > (best.roas ?? 0) ? c : best
+        )
+      : null;
+
+    const campaignsWithSpend = allCampaigns.filter(
+      (c) => c.roas !== null && c.spend >= 100
+    );
+    const worstPerformingCampaign = campaignsWithSpend.length > 0
+      ? campaignsWithSpend.reduce((worst, c) =>
+          (c.roas ?? Infinity) < (worst.roas ?? Infinity) ? c : worst
+        )
+      : null;
+
+    const metaAdsAdvanced: MetaAdsAdvanced = {
+      totalSpend,
+      totalImpressions,
+      totalClicks,
+      avgCTR,
+      avgCPC,
+      avgCPM,
+      totalConversions,
+      totalConversionValue,
+      avgROAS,
+      campaigns: topCampaigns,
+      spendByDay,
+      topPerformingCampaign,
+      worstPerformingCampaign,
+    };
+
+    // Override KPIs with Meta Ads specific ones (with full delta)
+    const metaKpis: AnalyticsKPI[] = [];
+
+    const snapshotMetrics = (snaps: typeof snapshots, key: string): number => {
+      const sum = snaps.reduce((s, snap) => {
+        const m = snap.metrics as Record<string, number>;
+        return s + (m[key] ?? 0);
+      }, 0);
+      return sum;
+    };
+
+    // For spend/impressions/clicks/conversions: sum over period (cumulative metrics)
+    // For CTR/CPC: compute from totals (derived)
+    const prevTotalSpend = snapshotMetrics(prevSnapshots, "spend");
+    const prevTotalImpressions = snapshotMetrics(prevSnapshots, "impressions");
+    const prevTotalClicks = snapshotMetrics(prevSnapshots, "clicks");
+    const prevTotalConversions = snapshotMetrics(prevSnapshots, "conversions");
+    const prevAvgCTR = prevTotalImpressions > 0 ? prevTotalClicks / prevTotalImpressions : 0;
+    const prevAvgCPC = prevTotalClicks > 0 ? prevTotalSpend / prevTotalClicks : 0;
+    const prevConversionValue = snapshotMetrics(prevSnapshots, "conversion_value");
+    const prevROAS = prevConversionValue > 0 && prevTotalSpend > 0 ? prevConversionValue / prevTotalSpend : null;
+
+    metaKpis.push({
+      key: "spend",
+      label: "Investimento",
+      value: totalSpend,
+      previousValue: prevTotalSpend,
+      ...computeDelta(totalSpend, prevTotalSpend),
+      icon: "dollar",
+      suffix: "R$",
+    });
+    metaKpis.push({
+      key: "impressions",
+      label: "Impressões pagas",
+      value: totalImpressions,
+      previousValue: prevTotalImpressions,
+      ...computeDelta(totalImpressions, prevTotalImpressions),
+      icon: "eye",
+    });
+    metaKpis.push({
+      key: "clicks",
+      label: "Cliques",
+      value: totalClicks,
+      previousValue: prevTotalClicks,
+      ...computeDelta(totalClicks, prevTotalClicks),
+      icon: "click",
+    });
+    metaKpis.push({
+      key: "ctr",
+      label: "CTR",
+      value: Math.round(avgCTR * 10000) / 100,
+      previousValue: Math.round(prevAvgCTR * 10000) / 100,
+      ...computeDelta(avgCTR, prevAvgCTR),
+      icon: "trending",
+      suffix: "%",
+    });
+    metaKpis.push({
+      key: "cpc",
+      label: "CPC",
+      value: Math.round(avgCPC * 100) / 100,
+      previousValue: Math.round(prevAvgCPC * 100) / 100,
+      ...computeDelta(avgCPC, prevAvgCPC),
+      icon: "dollar",
+      suffix: "R$",
+    });
+    metaKpis.push({
+      key: "conversions",
+      label: "Conversões",
+      value: totalConversions,
+      previousValue: prevTotalConversions,
+      ...computeDelta(totalConversions, prevTotalConversions),
+      icon: "user_plus",
+    });
+    metaKpis.push({
+      key: "roas",
+      label: "ROAS",
+      value: avgROAS !== null ? Math.round(avgROAS * 100) / 100 : null,
+      previousValue: prevROAS !== null ? Math.round(prevROAS * 100) / 100 : null,
+      ...computeDeltaNullable(avgROAS, prevROAS),
+      icon: "trending",
+      suffix: "×",
+    });
+
+    return NextResponse.json({
+      provider,
+      connected: true,
+      kpis: metaKpis,
+      timeSeries,
+      posts,
+      breakdown,
+      heatmap: null,
+      funnelStages: null,
+      topHashtags: null,
+      trafficSources: null,
+      topPages: null,
+      campaigns: null,
+      metaAdsAdvanced,
+      insightsSummary: computeAdsInsightsSummary(metaAdsAdvanced, metaKpis),
+    });
+  }
+
+  // ── Facebook Advanced ───────────────────────────────────────────────────
+  if (provider === "facebook") {
+    // Page-level metrics from latest snapshot
+    const latestSnap = snapshots.length > 0 ? snapshots[snapshots.length - 1] : null;
+    const latestSnapMetrics = latestSnap
+      ? (latestSnap.metrics as Record<string, number>)
+      : {};
+
+    // Previous period latest snapshot
+    const prevLatestSnap = prevSnapshots.length > 0 ? prevSnapshots[prevSnapshots.length - 1] : null;
+    const prevSnapMetrics = prevLatestSnap
+      ? (prevLatestSnap.metrics as Record<string, number>)
+      : {};
+
+    const pageFans = latestSnapMetrics.page_fans ?? latestSnapMetrics.fan_count ?? latestSnapMetrics.followers_count ?? 0;
+    const prevPageFans = prevSnapMetrics.page_fans ?? prevSnapMetrics.fan_count ?? prevSnapMetrics.followers_count ?? 0;
+    const pageNewFans = Math.max(0, pageFans - prevPageFans);
+
+    const pageImpressions = latestSnapMetrics.page_impressions ?? 0;
+    const pageEngagedUsers = latestSnapMetrics.page_engaged_users ?? 0;
+
+    // Aggregate from content_items
+    let totalReactions = 0;
+    let totalComments = 0;
+    let totalShares = 0;
+    const typeCountsFb: Record<string, number> = {};
+
+    for (const item of contentItems) {
+      const m = item.metrics as Record<string, number>;
+      totalReactions += m.reactions ?? m.likes ?? m.like_count ?? 0;
+      totalComments += m.comments ?? m.comments_count ?? 0;
+      totalShares += m.shares ?? m.share_count ?? 0;
+      const ct = (item.content_type as string) ?? "post";
+      typeCountsFb[ct] = (typeCountsFb[ct] ?? 0) + 1;
+    }
+
+    // Top 5 posts by engagement
+    const sortedPosts = [...contentItems]
+      .map((item) => {
+        const m = item.metrics as Record<string, number>;
+        const reactions = m.reactions ?? m.likes ?? m.like_count ?? 0;
+        const comments = m.comments ?? m.comments_count ?? 0;
+        const shares = m.shares ?? m.share_count ?? 0;
+        const reach = m.reach ?? m.post_impressions ?? 0;
+        return { item, engagement: reactions + comments + shares, reactions, comments, shares, reach };
+      })
+      .sort((a, b) => b.engagement - a.engagement)
+      .slice(0, 5);
+
+    const fbTopPosts = sortedPosts.map(({ item, reactions, comments, shares, reach }) => ({
+      id: (item.id as string) ?? "",
+      message: (item.caption as string) ?? (item.title as string) ?? "",
+      permalink: (item.url as string | null),
+      publishedAt: (item.published_at as string) ?? "",
+      reactions,
+      comments,
+      shares,
+      reach,
+    }));
+
+    const facebookAdvanced: FacebookAdvanced = {
+      totalLikes: totalReactions, // reactions = likes on FB API
+      totalReactions,
+      totalComments,
+      totalShares,
+      pageImpressions,
+      pageEngagedUsers,
+      pageFans,
+      pageNewFans,
+      postsByType: typeCountsFb,
+      topPosts: fbTopPosts,
+    };
+
+    // Facebook-specific KPIs (override generic ones)
+    const fbKpis: AnalyticsKPI[] = [];
+
+    fbKpis.push({
+      key: "followers",
+      label: "Fãs da Página",
+      value: pageFans,
+      previousValue: prevPageFans,
+      ...computeDelta(pageFans, prevPageFans),
+      icon: "users",
+    });
+    fbKpis.push({
+      key: "page_impressions",
+      label: "Alcance da Página",
+      value: pageImpressions,
+      previousValue: prevSnapMetrics.page_impressions ?? 0,
+      ...computeDelta(pageImpressions, prevSnapMetrics.page_impressions ?? 0),
+      icon: "eye",
+    });
+    fbKpis.push({
+      key: "page_engaged_users",
+      label: "Usuários Engajados",
+      value: pageEngagedUsers,
+      previousValue: prevSnapMetrics.page_engaged_users ?? 0,
+      ...computeDelta(pageEngagedUsers, prevSnapMetrics.page_engaged_users ?? 0),
+      icon: "heart",
+    });
+    fbKpis.push({
+      key: "posts_count",
+      label: "Posts Publicados",
+      value: contentItems.length,
+      previousValue: 0,
+      delta: 0,
+      deltaPercent: 0,
+      trend: "flat",
+      icon: "file",
+    });
+    fbKpis.push({
+      key: "reactions",
+      label: "Reações",
+      value: totalReactions,
+      previousValue: 0,
+      delta: 0,
+      deltaPercent: 0,
+      trend: "flat",
+      icon: "heart",
+    });
+    fbKpis.push({
+      key: "comments",
+      label: "Comentários",
+      value: totalComments,
+      previousValue: 0,
+      delta: 0,
+      deltaPercent: 0,
+      trend: "flat",
+      icon: "message",
+    });
+    fbKpis.push({
+      key: "shares",
+      label: "Compartilhamentos",
+      value: totalShares,
+      previousValue: 0,
+      delta: 0,
+      deltaPercent: 0,
+      trend: "flat",
+      icon: "share",
+    });
+
+    return NextResponse.json({
+      provider,
+      connected: true,
+      kpis: fbKpis,
+      timeSeries,
+      posts,
+      breakdown,
+      heatmap,
+      funnelStages: null,
+      topHashtags,
+      trafficSources: null,
+      topPages: null,
+      campaigns: null,
+      facebookAdvanced,
+      insightsSummary: computeInsightsSummary({
+        posts,
+        kpis: fbKpis,
+        periodStart,
+        periodEnd,
+      }),
+    });
   }
 
   return NextResponse.json({
