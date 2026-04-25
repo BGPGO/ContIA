@@ -90,7 +90,7 @@ export default function ConexoesPage() {
         access_denied: "Voce cancelou a autorizacao. Tente novamente quando quiser.",
         no_ig_account:
           "Nenhuma conta Instagram Business/Creator encontrada. Verifique se sua conta e profissional e esta vinculada a uma pagina do Facebook.",
-        auth_failed: `Falha na autenticacao com o Instagram. ${params.get("detail") ?? "Tente novamente."}`,
+        auth_failed: `Falha na autenticacao. ${params.get("detail") ?? "Tente novamente."}`,
         db_error: "Erro ao salvar a conexao. Tente novamente.",
         missing_params: "Algo deu errado no retorno. Tente conectar novamente.",
         invalid_state: "Sessao expirada. Tente conectar novamente.",

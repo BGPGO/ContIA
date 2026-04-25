@@ -18,11 +18,6 @@ import type {
   SyncOptions,
 } from '@/types/providers'
 import { METADATA_BY_PROVIDER } from './metadata'
-import {
-  exchangeForLongLivedToken,
-  refreshLongLivedToken,
-  InstagramAPIError,
-} from '@/lib/instagram'
 import { generateState, parseState, upsertConnection, decryptToken } from './base'
 
 /* ── Constantes ──────────────────────────────────────────────────────────── */
@@ -77,6 +72,61 @@ interface Campaign {
   objective: string
   created_time: string
   effective_status: string
+}
+
+/* ── Token exchange (Facebook Graph API, NÃO Instagram) ─────────────────── */
+
+/**
+ * Troca short-lived user token por long-lived (~60 dias).
+ * Endpoint: graph.facebook.com (NÃO graph.instagram.com).
+ */
+async function exchangeFBLongLivedToken(
+  shortToken: string,
+  appId: string,
+  appSecret: string
+): Promise<{ access_token: string; token_type: string; expires_in: number }> {
+  const url = new URL(`${FB_GRAPH}/oauth/access_token`)
+  url.searchParams.set('grant_type', 'fb_exchange_token')
+  url.searchParams.set('client_id', appId)
+  url.searchParams.set('client_secret', appSecret)
+  url.searchParams.set('fb_exchange_token', shortToken)
+
+  const res = await fetch(url.toString())
+  const data = (await res.json()) as {
+    access_token?: string
+    token_type?: string
+    expires_in?: number
+    error?: { message: string; code: number; type: string }
+  }
+
+  if (data.error) {
+    throw new Error(
+      `Erro ao trocar long-lived token FB [${data.error.code}] ${data.error.type}: ${data.error.message}`
+    )
+  }
+
+  if (!data.access_token) {
+    throw new Error('Resposta do Facebook sem access_token')
+  }
+
+  return {
+    access_token: data.access_token,
+    token_type: data.token_type ?? 'bearer',
+    expires_in: data.expires_in ?? 5184000, // 60 dias default
+  }
+}
+
+/**
+ * Renova um long-lived token estendendo por mais ~60 dias.
+ * Mesma chamada do exchange — basta passar o token atual.
+ */
+async function refreshFBLongLivedToken(
+  token: string,
+  appId: string,
+  appSecret: string
+): Promise<{ access_token: string; expires_in: number }> {
+  const result = await exchangeFBLongLivedToken(token, appId, appSecret)
+  return { access_token: result.access_token, expires_in: result.expires_in }
 }
 
 /* ── Helpers de action stats ─────────────────────────────────────────────── */
@@ -221,8 +271,8 @@ export const metaAdsDriver: ConnectionDriver = {
     // 1. Short-lived token
     const shortToken = await exchangeMetaCode(code, appId, appSecret, redirectUri)
 
-    // 2. Long-lived token (~60 dias) — reutiliza função de instagram.ts
-    const longToken = await exchangeForLongLivedToken(shortToken.access_token, appSecret)
+    // 2. Long-lived token (~60 dias) — usa Facebook Graph API
+    const longToken = await exchangeFBLongLivedToken(shortToken.access_token, appId, appSecret)
     const userToken = longToken.access_token
 
     // 3. Listar Ad Accounts
@@ -294,10 +344,8 @@ export const metaAdsDriver: ConnectionDriver = {
       return true
     } catch (err) {
       const msg =
-        err instanceof InstagramAPIError
-          ? `Meta API [${err.code}]: ${err.message}`
-          : err instanceof Error
-          ? err.message
+        err instanceof Error
+          ? `Meta API: ${err.message}`
           : 'Erro desconhecido na verificação'
 
       const supabase = getAdminSupabase()
@@ -313,12 +361,17 @@ export const metaAdsDriver: ConnectionDriver = {
   /* ── refreshToken ──────────────────────────────────────────────────────── */
 
   async refreshToken(connection: Connection): Promise<Connection> {
-    // Tokens do Meta expiram em ~60 dias — renova usando refresh_access_token
+    // Tokens do Meta expiram em ~60 dias — renova via Graph API do Facebook
     const token = decryptToken(connection.access_token)
+    const appId = process.env.META_APP_ID
+    const appSecret = process.env.META_APP_SECRET
+    if (!appId || !appSecret) {
+      throw new Error('META_APP_ID ou META_APP_SECRET não configurados')
+    }
 
     let newToken: { access_token: string; expires_in: number }
     try {
-      newToken = await refreshLongLivedToken(token)
+      newToken = await refreshFBLongLivedToken(token, appId, appSecret)
     } catch (err) {
       throw new Error(
         `Falha ao renovar token Meta Ads: ${err instanceof Error ? err.message : err}. Reconecte a conta.`
