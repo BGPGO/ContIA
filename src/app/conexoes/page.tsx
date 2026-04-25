@@ -401,7 +401,9 @@ export default function ConexoesPage() {
     if (meta.status === "coming_soon") return;
     // For OAuth providers redirect; for others show details drawer
     if (meta.status === "available") {
-      window.location.href = `/api/${key}/auth?empresa_id=${empresa?.id}`;
+      // Provider keys usam underscore (ex: meta_ads) mas as rotas usam hífen (ex: /api/meta-ads)
+      const slug = key.replace(/_/g, "-");
+      window.location.href = `/api/${slug}/auth?empresa_id=${empresa?.id}`;
     }
   }
 

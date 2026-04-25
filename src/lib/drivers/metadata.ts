@@ -76,7 +76,7 @@ export const METADATA_BY_PROVIDER: Record<ProviderKey, ProviderMetadata> = {
     color: '#1877F2',
     iconName: 'Facebook',
     category: 'social',
-    status: 'coming_soon',
+    status: 'available',
     estimatedTime: '30 segundos',
     requirements: [
       {
@@ -350,7 +350,7 @@ export const METADATA_BY_PROVIDER: Record<ProviderKey, ProviderMetadata> = {
     color: '#0668E1',
     iconName: 'Target',
     category: 'ads',
-    status: 'coming_soon',
+    status: 'available',
     estimatedTime: '1 minuto',
     requirements: [
       {
