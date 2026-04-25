@@ -13,10 +13,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "empresa_id obrigatório" }, { status: 400 });
   }
 
-  const appId = process.env.META_APP_ID;
+  // Instagram Login usa o "Instagram App ID" (diferente do Facebook App ID).
+  // Fallback para META_APP_ID mantém retrocompatibilidade.
+  const appId = process.env.INSTAGRAM_APP_ID || process.env.META_APP_ID;
   if (!appId) {
     return NextResponse.json(
-      { error: "META_APP_ID não configurado no servidor" },
+      { error: "INSTAGRAM_APP_ID não configurado no servidor" },
       { status: 500 }
     );
   }

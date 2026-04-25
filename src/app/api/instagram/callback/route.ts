@@ -37,8 +37,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL("/conexoes?error=invalid_state", origin));
   }
 
-  const appId = process.env.META_APP_ID!;
-  const appSecret = process.env.META_APP_SECRET!;
+  // Instagram Login usa credenciais do "Instagram App" (diferente do Facebook App).
+  // Fallback para META_APP_ID/SECRET mantém retrocompatibilidade.
+  const appId = (process.env.INSTAGRAM_APP_ID || process.env.META_APP_ID)!;
+  const appSecret = (process.env.INSTAGRAM_APP_SECRET || process.env.META_APP_SECRET)!;
   const redirectUri = `${origin}/api/instagram/callback`;
 
   try {

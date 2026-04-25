@@ -26,6 +26,7 @@ import { CodeBlock } from "@/components/setup/CodeBlock";
 
 /* ── Card IDs (order defines display) ── */
 const CARD_IDS = [
+  "meta-app-credentials",
   "migration-009",
   "paginas-legais",
   "meta-redirect-uris",
@@ -266,6 +267,93 @@ export default function SetupPage() {
       <div className="space-y-3">
         {sortedIds.map((id) => {
           switch (id) {
+            /* ────────────────────────────────────────────── */
+            case "meta-app-credentials":
+              return (
+                <SetupCard
+                  key={id}
+                  id={id}
+                  icon={KeyRound}
+                  title="Meta App: separar credenciais Instagram x Facebook"
+                  reason="Instagram Login e Facebook Login usam IDs DIFERENTES no mesmo Meta App. Sem isso, FB e Meta Ads dão erro 'ID do app inválido'."
+                  estimatedTime="5 min"
+                  done={isDone(id)}
+                  onToggleDone={() => toggleDone(id)}
+                  defaultOpen={!isDone(id)}
+                >
+                  <Section title="Por que duas credenciais" />
+                  <p className="text-[12px] text-text-muted">
+                    O Meta tem <strong className="text-text-primary">dois logins separados</strong>:
+                    Instagram Login (endpoint <code className="text-accent">instagram.com/oauth</code>)
+                    e Facebook Login (endpoint <code className="text-accent">facebook.com/v23.0/dialog/oauth</code>).
+                    Cada um usa seu próprio App ID e Secret — mesmo que estejam no mesmo Meta App.
+                  </p>
+
+                  <Section title="Pegar Instagram App ID + Secret" />
+                  <Step n={1}>
+                    Abra{" "}
+                    <ExtLink href="https://developers.facebook.com/apps/3845537452420704/instagram-business/IG%20API%20Setup">
+                      Meta App &gt; Instagram &gt; API Setup with Instagram Login
+                    </ExtLink>
+                  </Step>
+                  <Step n={2}>
+                    Role até <strong className="text-text-primary">3. Set up Instagram business login</strong>.
+                    Copie:
+                    <ul className="mt-1 ml-4 list-disc text-text-muted">
+                      <li><strong className="text-text-primary">Instagram app ID</strong> (numérico, ~16 dígitos)</li>
+                      <li><strong className="text-text-primary">Instagram app secret</strong> (clicar &quot;Show&quot;)</li>
+                    </ul>
+                  </Step>
+
+                  <Section title="Pegar Facebook App ID + Secret" />
+                  <Step n={3}>
+                    Abra{" "}
+                    <ExtLink href="https://developers.facebook.com/apps/3845537452420704/settings/basic/">
+                      App Settings &gt; Basic
+                    </ExtLink>
+                  </Step>
+                  <Step n={4}>
+                    No topo da página, copie:
+                    <ul className="mt-1 ml-4 list-disc text-text-muted">
+                      <li><strong className="text-text-primary">App ID</strong> (deve ser <code className="text-accent">3845537452420704</code>)</li>
+                      <li><strong className="text-text-primary">App Secret</strong> (clicar &quot;Show&quot; — pode pedir senha)</li>
+                    </ul>
+                  </Step>
+
+                  <Section title="Configurar no Coolify" />
+                  <Step n={5}>
+                    Abra{" "}
+                    <ExtLink href="http://187.77.238.125:8000/project/frrqapqbem8i13ncaifx9xzo/u5gr1pwn7x320gb92ej1kb4s/environment-variables">
+                      Coolify &gt; ContIA &gt; Environment Variables
+                    </ExtLink>{" "}
+                    e adicione/atualize as 4 variáveis:
+                  </Step>
+                  <CodeBlock
+                    code={`META_APP_ID=3845537452420704
+META_APP_SECRET=[Facebook App Secret]
+INSTAGRAM_APP_ID=[Instagram app ID que você copiou]
+INSTAGRAM_APP_SECRET=[Instagram app secret que você copiou]`}
+                  />
+                  <Step n={6}>
+                    Salve e clique <strong className="text-text-primary">Redeploy</strong>.
+                  </Step>
+
+                  <Callout>
+                    Se você já tinha <code className="text-warning">META_APP_ID</code> configurado com
+                    o ID do Instagram (1593174835244249), TROQUE para o Facebook App ID
+                    (3845537452420704). O ID do Instagram agora vai em <code className="text-warning">INSTAGRAM_APP_ID</code>.
+                    Sem isso, Facebook e Meta Ads continuam dando &quot;ID do app inválido&quot;.
+                  </Callout>
+
+                  <NoteInput
+                    label="Conferência (anotação)"
+                    placeholder="Ex: META_APP_ID=3845537452420704 ✓ INSTAGRAM_APP_ID=159... ✓"
+                    value={getNotes(id)}
+                    onChange={(v) => setNotes(id, v)}
+                  />
+                </SetupCard>
+              );
+
             /* ────────────────────────────────────────────── */
             case "migration-009":
               return (

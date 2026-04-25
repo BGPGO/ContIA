@@ -74,10 +74,11 @@ export const instagramDriver: ConnectionDriver = {
   /* ── buildAuthUrl ─────────────────────────────────────── */
 
   async buildAuthUrl(empresaId: string, userId: string): Promise<string> {
-    const appId = process.env.META_APP_ID
+    // Instagram Login usa "Instagram App" credentials (separado do Facebook App).
+    const appId = process.env.INSTAGRAM_APP_ID || process.env.META_APP_ID
     if (!appId) {
       throw new Error(
-        'META_APP_ID não configurado — defina a variável de ambiente no servidor'
+        'INSTAGRAM_APP_ID não configurado — defina a variável de ambiente no servidor'
       )
     }
 
@@ -96,12 +97,12 @@ export const instagramDriver: ConnectionDriver = {
   /* ── handleCallback ───────────────────────────────────── */
 
   async handleCallback(code: string, stateParam: string): Promise<Connection> {
-    const appId = process.env.META_APP_ID
-    const appSecret = process.env.META_APP_SECRET
+    const appId = process.env.INSTAGRAM_APP_ID || process.env.META_APP_ID
+    const appSecret = process.env.INSTAGRAM_APP_SECRET || process.env.META_APP_SECRET
 
     if (!appId || !appSecret) {
       throw new Error(
-        'META_APP_ID ou META_APP_SECRET não configurados'
+        'INSTAGRAM_APP_ID ou INSTAGRAM_APP_SECRET não configurados'
       )
     }
 
