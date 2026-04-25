@@ -86,6 +86,7 @@ export interface ProviderAnalyticsData {
   trafficSources: BreakdownItem[] | null;
   topPages: TopPageItem[] | null;
   campaigns: CampaignRow[] | null;
+  insightsSummary: InsightsSummary | null;
 }
 
 export interface ProviderPost {
@@ -204,4 +205,27 @@ export interface InstagramAdvancedAnalytics {
 
 export interface ProviderAnalyticsDataWithInstagram extends ProviderAnalyticsData {
   instagramAdvanced?: InstagramAdvancedAnalytics;
+}
+
+/* ── Strategic Insights ────────────────────────────────────────── */
+
+export interface StrategicInsight {
+  id: string;
+  category: "growth" | "engagement" | "content" | "timing" | "anomaly";
+  severity: "positive" | "neutral" | "warning" | "critical";
+  title: string;
+  description: string;
+  metric?: string;
+  actionable?: string;
+}
+
+export interface InsightsSummary {
+  bestPostingDay: number | null;
+  bestPostingHour: number | null;
+  formatWinner: { type: string; label: string; engagementRate: number } | null;
+  growthRate: number | null;
+  engagementTrend: "accelerating" | "stable" | "decelerating" | null;
+  avgPostingFrequency: number | null;
+  topCTAs: string[];
+  insights: StrategicInsight[];
 }

@@ -1,77 +1,324 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useMemo, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import {
-  ArrowLeft,
+  ChevronLeft,
   RefreshCw,
   Cable,
+  Camera,
+  Users,
+  Globe,
+  Music2,
+  Play,
+  Share2,
+  type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useProviderAnalytics } from "@/hooks/useProviderAnalytics";
 import { useEmpresa } from "@/hooks/useEmpresa";
 import { usePeriodSelector } from "@/hooks/usePeriodSelector";
 import { METADATA_BY_PROVIDER } from "@/lib/drivers/metadata";
+
+/* ── Componentes insights ── */
 import { KPICard } from "@/components/insights/KPICard";
+import { TimeSeriesChart } from "@/components/insights/TimeSeriesChart";
+import { FollowersDeltaChart } from "@/components/insights/FollowersDeltaChart";
 import { PeriodSelector } from "@/components/insights/PeriodSelector";
+import { BestTimeHeatmap } from "@/components/insights/BestTimeHeatmap";
+import { ContentTypePerformance } from "@/components/insights/ContentTypePerformance";
+import { AnomalyBadge } from "@/components/insights/AnomalyBadge";
 import { EmptyState } from "@/components/insights/EmptyState";
-import { MetricChart } from "@/components/analytics/MetricChart";
-import { PostsTable } from "@/components/analytics/PostsTable";
-import { HeatmapChart } from "@/components/analytics/HeatmapChart";
+import { StrategicInsightsCard } from "@/components/insights/StrategicInsightsCard";
+
+/* ── Componentes analytics ── */
 import { BreakdownPie } from "@/components/analytics/BreakdownPie";
-import { FunnelChart } from "@/components/analytics/FunnelChart";
+import { PostsTable } from "@/components/analytics/PostsTable";
+import { SaveRateCard } from "@/components/analytics/SaveRateCard";
 import { EngagementBreakdown } from "@/components/analytics/EngagementBreakdown";
 import { FormatPerformanceCards } from "@/components/analytics/FormatPerformanceCards";
-import { TopPostsGrid } from "@/components/analytics/TopPostsGrid";
-import { SaveRateCard } from "@/components/analytics/SaveRateCard";
-import { CaptionAnalysisCard } from "@/components/analytics/CaptionAnalysisCard";
+
+/* ── Tipos ── */
 import type { ProviderKey } from "@/types/providers";
+import type { AnalyticsKPI, ProviderPost } from "@/types/analytics";
+import type { Anomaly } from "@/components/insights/AnomalyBadge";
+import type { HeatmapCell } from "@/components/insights/BestTimeHeatmap";
+import type { PostsTableRow } from "@/components/analytics/PostsTable";
+import type { FormatItem } from "@/components/analytics/FormatPerformanceCards";
+import type { ContentTypeData } from "@/components/insights/ContentTypePerformance";
+import type { BreakdownPieItem } from "@/components/analytics/BreakdownPie";
 
-/* ── Metric config per provider category ───────────────────────── */
+/* ── Label mapeamento de tipo de conteúdo ── */
+const CONTENT_TYPE_LABELS: Record<string, string> = {
+  reel: "Reels",
+  post: "Posts",
+  carousel: "Carrossel",
+  story: "Stories",
+  video: "Videos",
+  image: "Imagens",
+};
 
-interface ChartConfig {
-  dataKey: string;
-  label: string;
-  color: string;
+function getContentTypeLabel(type: string): string {
+  return CONTENT_TYPE_LABELS[type.toLowerCase()] ?? type;
 }
 
-function getChartConfigs(provider: ProviderKey, providerColor: string): ChartConfig[] {
-  if (
-    provider === "instagram" ||
-    provider === "facebook" ||
-    provider === "linkedin" ||
-    provider === "youtube"
-  ) {
-    return [
-      { dataKey: "followers", label: "Seguidores", color: providerColor },
-      { dataKey: "reach", label: provider === "youtube" ? "Views" : "Alcance", color: "#fbbf24" },
-      { dataKey: "impressions", label: "Impressoes", color: "#6c5ce7" },
-    ];
+/* ── Ícone do provider ── */
+function getProviderIcon(provider: string): LucideIcon {
+  switch (provider) {
+    case "instagram":
+      return Camera;
+    case "linkedin":
+      return Users;
+    case "facebook":
+      return Share2;
+    case "youtube":
+      return Play;
+    case "tiktok":
+      return Music2;
+    default:
+      return Globe;
   }
-  if (provider === "ga4") {
-    return [
-      { dataKey: "sessions", label: "Sessoes", color: providerColor },
-      { dataKey: "users", label: "Usuarios", color: "#6c5ce7" },
-    ];
-  }
-  if (provider === "google_ads" || provider === "meta_ads") {
-    return [
-      { dataKey: "spend", label: "Investimento", color: providerColor },
-      { dataKey: "clicks", label: "Cliques", color: "#fbbf24" },
-    ];
-  }
-  if (provider === "crm") {
-    return [
-      { dataKey: "leads", label: "Leads Novos", color: providerColor },
-    ];
-  }
-  return [
-    { dataKey: "followers", label: "Seguidores", color: providerColor },
-  ];
 }
 
-/* ── Main ──────────────────────────────────────────────────────── */
+/* ── Seção helper ── */
+function SectionHeader({
+  title,
+  subtitle,
+}: {
+  title: string;
+  subtitle?: string;
+}) {
+  return (
+    <div className="mb-4">
+      <div className="flex items-center gap-3 mb-1">
+        <div className="h-px flex-1 bg-border/60" />
+        <h2 className="text-[13px] font-semibold text-text-muted uppercase tracking-widest whitespace-nowrap">
+          {title}
+        </h2>
+        <div className="h-px flex-1 bg-border/60" />
+      </div>
+      {subtitle && (
+        <p className="text-center text-[12px] text-text-muted/70 mt-1">{subtitle}</p>
+      )}
+    </div>
+  );
+}
+
+/* ── Skeleton de loading ── */
+function ProviderSkeleton() {
+  return (
+    <div className="space-y-5 p-2 sm:p-4 md:p-6 max-w-7xl mx-auto animate-pulse">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-28 bg-bg-card border border-border rounded-xl" />
+        ))}
+      </div>
+      <div className="h-72 bg-bg-card border border-border rounded-xl" />
+      <div className="h-60 bg-bg-card border border-border rounded-xl" />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="h-52 bg-bg-card border border-border rounded-xl" />
+        ))}
+      </div>
+      <div className="h-64 bg-bg-card border border-border rounded-xl" />
+    </div>
+  );
+}
+
+/* ── Animação helper ── */
+function sectionAnim(delay: number) {
+  return {
+    initial: { opacity: 0, y: 10 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.4, delay },
+  } as const;
+}
+
+/* ── Cálculos client-side ── */
+
+function computeAnomalies(kpis: AnalyticsKPI[]): Anomaly[] {
+  const detected: Anomaly[] = [];
+  const now = new Date().toISOString();
+
+  for (const kpi of kpis) {
+    if (kpi.deltaPercent === null || kpi.value === null || kpi.previousValue === null)
+      continue;
+    const absDelta = Math.abs(kpi.deltaPercent);
+    if (absDelta <= 30) continue;
+
+    const direction: "spike" | "drop" = kpi.deltaPercent > 0 ? "spike" : "drop";
+    const severity: "high" | "medium" | "low" =
+      absDelta > 50 ? "high" : absDelta > 30 ? "medium" : "low";
+
+    detected.push({
+      metric: kpi.key,
+      metricLabel: kpi.label,
+      direction,
+      severity,
+      currentValue: kpi.value,
+      expectedValue: kpi.previousValue,
+      deviationPercent: kpi.deltaPercent,
+      detectedAt: now,
+    });
+  }
+
+  const SEVERITY_ORDER = { high: 0, medium: 1, low: 2 };
+  detected.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
+  return detected.slice(0, 3);
+}
+
+function computeBreakdownPieData(posts: ProviderPost[]): BreakdownPieItem[] {
+  const counts: Record<string, number> = {};
+  for (const p of posts) {
+    const key = (p.content_type ?? "post").toLowerCase();
+    counts[key] = (counts[key] ?? 0) + 1;
+  }
+  return Object.entries(counts).map(([type, value]) => ({
+    label: getContentTypeLabel(type),
+    value,
+  }));
+}
+
+function computeEngagementTotals(posts: ProviderPost[]) {
+  let likes = 0;
+  let comments = 0;
+  let saves = 0;
+  let shares = 0;
+  for (const p of posts) {
+    const m = p.metrics ?? {};
+    likes += m.likes ?? m.like_count ?? 0;
+    comments += m.comments ?? m.comments_count ?? 0;
+    saves += m.saves ?? 0;
+    shares += m.shares ?? m.share_count ?? 0;
+  }
+  return { likes, comments, saves, shares };
+}
+
+function computeFormatItems(posts: ProviderPost[]): FormatItem[] {
+  const groups: Record<
+    string,
+    { engSum: number; reachSum: number; count: number }
+  > = {};
+
+  for (const p of posts) {
+    const type = (p.content_type ?? "post").toLowerCase();
+    const m = p.metrics ?? {};
+    const likes = m.likes ?? m.like_count ?? 0;
+    const comments = m.comments ?? m.comments_count ?? 0;
+    const saves = m.saves ?? 0;
+    const shares = m.shares ?? m.share_count ?? 0;
+    const reach = m.reach ?? 0;
+    const eng = likes + comments + saves + shares;
+    const engRate = reach > 0 ? eng / reach : 0;
+
+    if (!groups[type]) groups[type] = { engSum: 0, reachSum: 0, count: 0 };
+    groups[type].engSum += engRate;
+    groups[type].reachSum += reach;
+    groups[type].count += 1;
+  }
+
+  return Object.entries(groups).map(([type, g]) => ({
+    type,
+    label: getContentTypeLabel(type),
+    count: g.count,
+    avgEngagement: g.count > 0 ? g.engSum / g.count : 0,
+    avgReach: g.count > 0 ? Math.round(g.reachSum / g.count) : 0,
+  }));
+}
+
+function computeContentTypeData(posts: ProviderPost[]): ContentTypeData[] {
+  const groups: Record<
+    string,
+    { engRateSum: number; reachSum: number; count: number }
+  > = {};
+
+  for (const p of posts) {
+    const type = (p.content_type ?? "post").toLowerCase();
+    const m = p.metrics ?? {};
+    const likes = m.likes ?? m.like_count ?? 0;
+    const comments = m.comments ?? m.comments_count ?? 0;
+    const saves = m.saves ?? 0;
+    const shares = m.shares ?? m.share_count ?? 0;
+    const reach = m.reach ?? 0;
+    const eng = likes + comments + saves + shares;
+    const engRate = reach > 0 ? eng / reach : 0;
+
+    if (!groups[type]) groups[type] = { engRateSum: 0, reachSum: 0, count: 0 };
+    groups[type].engRateSum += engRate;
+    groups[type].reachSum += reach;
+    groups[type].count += 1;
+  }
+
+  return Object.entries(groups).map(([type, g]) => ({
+    type,
+    label: getContentTypeLabel(type),
+    avgEngagementRate: g.count > 0 ? g.engRateSum / g.count : 0,
+    avgReach: g.count > 0 ? Math.round(g.reachSum / g.count) : 0,
+    count: g.count,
+  }));
+}
+
+function computeHeatmapCells(posts: ProviderPost[]): HeatmapCell[] {
+  if (posts.length < 7) return [];
+
+  const cellMap = new Map<
+    string,
+    { dayOfWeek: number; hour: number; engagement: number; postCount: number }
+  >();
+
+  for (const p of posts) {
+    if (!p.published_at) continue;
+    const dt = new Date(p.published_at);
+    if (isNaN(dt.getTime())) continue;
+
+    const dayOfWeek = dt.getDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+    const hour = dt.getHours();
+    const key = `${dayOfWeek}-${hour}`;
+
+    const m = p.metrics ?? {};
+    const likes = m.likes ?? m.like_count ?? 0;
+    const comments = m.comments ?? m.comments_count ?? 0;
+    const saves = m.saves ?? 0;
+    const shares = m.shares ?? m.share_count ?? 0;
+    const engagement = likes + comments + saves + shares;
+
+    const existing = cellMap.get(key);
+    if (existing) {
+      existing.engagement += engagement;
+      existing.postCount += 1;
+    } else {
+      cellMap.set(key, { dayOfWeek, hour, engagement, postCount: 1 });
+    }
+  }
+
+  return Array.from(cellMap.values()) as HeatmapCell[];
+}
+
+function computePostsTableRows(posts: ProviderPost[], provider: string): PostsTableRow[] {
+  return posts.map((p) => {
+    const m = p.metrics ?? {};
+    const likes = m.likes ?? m.like_count ?? 0;
+    const comments = m.comments ?? m.comments_count ?? 0;
+    const saves = m.saves ?? 0;
+    const shares = m.shares ?? m.share_count ?? 0;
+    const reach = m.reach ?? 0;
+    const eng = likes + comments + saves + shares;
+    const engagementRate = reach > 0 ? eng / reach : undefined;
+
+    return {
+      id: p.id,
+      thumbnail: p.thumbnail_url ?? undefined,
+      caption: p.caption ?? p.title ?? "",
+      provider,
+      publishedAt: p.published_at ?? new Date().toISOString(),
+      metrics: { likes, comments, saves, shares, reach },
+      engagementRate,
+    };
+  });
+}
+
+/* ── Main content ── */
 
 function ProviderAnalyticsContent() {
   const params = useParams();
@@ -86,6 +333,100 @@ function ProviderAnalyticsContent() {
     range.end
   );
 
+  /* Estado de anomalias descartadas */
+  const [dismissedAnomalies, setDismissedAnomalies] = useState<Set<string>>(new Set());
+  const handleDismissAnomaly = useCallback((metric: string) => {
+    setDismissedAnomalies((prev) => new Set([...prev, metric]));
+  }, []);
+
+  /* Ícone do provider */
+  const ProviderIcon: LucideIcon = meta ? getProviderIcon(provider) : Globe;
+
+  /* Título dinâmico */
+  const pageTitle = meta ? `Analytics — ${meta.displayName}` : "Analytics";
+
+  /* ── Cálculos memoizados ── */
+  const posts = data?.posts ?? [];
+
+  const anomalies = useMemo(() => {
+    if (!data?.kpis) return [];
+    return computeAnomalies(data.kpis).filter((a) => !dismissedAnomalies.has(a.metric));
+  }, [data?.kpis, dismissedAnomalies]);
+
+  const breakdownPieData = useMemo(() => computeBreakdownPieData(posts), [posts]);
+
+  const engagementTotals = useMemo(() => computeEngagementTotals(posts), [posts]);
+
+  const formatItems = useMemo(() => {
+    /* Se há instagramAdvanced com formatPerformance, usar ele (já agregado) */
+    const igFP = data?.instagramAdvanced?.formatPerformance;
+    if (igFP && igFP.length > 0) {
+      return igFP.map((f) => ({
+        type: f.format.toLowerCase(),
+        label: f.label,
+        count: f.count,
+        /* avgEngagement já vem em 0..100 na API — normalizar para 0..1 */
+        avgEngagement: f.avgEngagement > 1 ? f.avgEngagement / 100 : f.avgEngagement,
+        avgReach: f.avgReach,
+        bestPostId: f.bestPost?.permalink,
+      }));
+    }
+    return computeFormatItems(posts);
+  }, [data?.instagramAdvanced?.formatPerformance, posts]);
+
+  const contentTypeData = useMemo(() => computeContentTypeData(posts), [posts]);
+
+  const heatmapCells = useMemo(() => computeHeatmapCells(posts), [posts]);
+
+  const postsTableRows = useMemo(
+    () => computePostsTableRows(posts, provider),
+    [posts, provider]
+  );
+
+  /* SaveRate — preferir igAdvanced, senão calcular dos posts */
+  const saveRate = useMemo(() => {
+    const igSR = data?.instagramAdvanced?.saveRateAnalysis?.avgSaveRate;
+    if (igSR != null) return igSR > 1 ? igSR / 100 : igSR;
+    /* Calcular dos posts: sum(saves)/sum(reach) */
+    let totalSaves = 0;
+    let totalReach = 0;
+    for (const p of posts) {
+      const m = p.metrics ?? {};
+      totalSaves += m.saves ?? 0;
+      totalReach += m.reach ?? 0;
+    }
+    return totalReach > 0 ? totalSaves / totalReach : 0;
+  }, [data?.instagramAdvanced?.saveRateAnalysis?.avgSaveRate, posts]);
+
+  /* EngagementBreakdown — preferir igAdvanced se disponível */
+  const engBreakdown = useMemo(() => {
+    const ig = data?.instagramAdvanced?.engagementBreakdown;
+    if (ig) {
+      return {
+        likes: ig.avgLikes,
+        comments: ig.avgComments,
+        saves: ig.avgSaves,
+        shares: ig.avgShares,
+      };
+    }
+    return engagementTotals;
+  }, [data?.instagramAdvanced?.engagementBreakdown, engagementTotals]);
+
+  /* Série de seguidores para FollowersDeltaChart */
+  const followersSeries = useMemo(() => {
+    if (!data?.timeSeries?.length) return [];
+    return data.timeSeries
+      .filter((pt) => {
+        const v = pt[`${provider}_followers`] ?? pt["followers"];
+        return typeof v === "number";
+      })
+      .map((pt) => ({
+        date: pt.date as string,
+        followers: (pt[`${provider}_followers`] ?? pt["followers"]) as number,
+      }));
+  }, [data?.timeSeries, provider]);
+
+  /* ── Guards ── */
   if (!meta) {
     return (
       <div className="flex items-center justify-center h-64 text-text-secondary">
@@ -102,89 +443,93 @@ function ProviderAnalyticsContent() {
     );
   }
 
-  const chartConfigs = getChartConfigs(provider, meta.color);
-  const isSocial = meta.category === "social";
-  const isAds = meta.category === "ads";
-  const isInstagram = provider === "instagram";
-  const igAdvanced = data?.instagramAdvanced;
-
+  /* ── Render ── */
   return (
     <div className="space-y-5 sm:space-y-6 p-2 sm:p-4 md:p-6 max-w-7xl mx-auto">
-      {/* Header */}
+      {/* ── SEÇÃO 0: HEADER ── */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
         className="page-header"
       >
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          {/* Lado esquerdo: voltar + ícone + título */}
           <div className="flex items-center gap-3">
             <Link
               href="/analytics"
               className="p-1.5 rounded-lg hover:bg-bg-elevated transition-colors"
               aria-label="Voltar para Analytics"
             >
-              <ArrowLeft size={18} className="text-text-muted" />
+              <ChevronLeft size={18} className="text-text-muted" />
             </Link>
+
             <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center"
+              className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
               style={{ backgroundColor: `${meta.color}20` }}
             >
-              <span
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: meta.color }}
-              />
+              <ProviderIcon size={18} style={{ color: meta.color }} />
             </div>
+
             <div>
               <h1 className="text-lg sm:text-xl font-bold text-text-primary tracking-tight">
-                {meta.displayName}
+                {pageTitle}
               </h1>
               <p className="text-[13px] text-text-secondary">
-                Analytics detalhado
+                {label ? `Periodo: ${label}` : "Analytics detalhado"}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* Lado direito: PeriodSelector + Atualizar */}
+          <div className="flex flex-col gap-2 items-end">
             <button
               onClick={refresh}
               disabled={loading}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-all disabled:opacity-50"
+              aria-label="Atualizar dados"
             >
-              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+              <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
               Atualizar
             </button>
+            <PeriodSelector
+              preset={preset}
+              onPresetChange={setPreset}
+              onCustomRange={setCustomRange}
+              label={label}
+            />
           </div>
         </div>
 
-        <div className="mt-4">
-          <PeriodSelector
-            preset={preset}
-            onPresetChange={setPreset}
-            onCustomRange={setCustomRange}
-            label={label}
-          />
-        </div>
+        {/* SyncStatusBadge: removido até backend popular syncStatus/lastSyncedAt no response */}
       </motion.div>
 
-      {/* Loading */}
-      {loading && !data && (
-        <div className="flex items-center justify-center h-64">
-          <div className="flex items-center gap-3 text-text-secondary">
-            <RefreshCw size={18} className="animate-spin text-accent" />
-            <span className="text-[14px]">Carregando dados de {meta.displayName}...</span>
+      {/* ── LOADING ── */}
+      {loading && !data && <ProviderSkeleton />}
+
+      {/* ── ERROR ── */}
+      {error && !loading && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="bg-danger/10 border border-danger/20 rounded-xl p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4"
+        >
+          <div className="flex-1">
+            <p className="text-[14px] font-semibold text-danger mb-1">
+              Erro ao carregar analytics
+            </p>
+            <p className="text-[13px] text-danger/80">{error}</p>
           </div>
-        </div>
+          <button
+            onClick={refresh}
+            className="px-4 py-2 rounded-lg bg-danger/20 hover:bg-danger/30 text-danger text-[13px] font-medium transition-all shrink-0"
+          >
+            Tentar novamente
+          </button>
+        </motion.div>
       )}
 
-      {/* Error */}
-      {error && (
-        <div className="bg-danger/10 border border-danger/20 rounded-xl p-4 text-[13px] text-danger">
-          {error}
-        </div>
-      )}
-
-      {/* Not connected */}
+      {/* ── NÃO CONECTADO ── */}
       {data && !data.connected && (
         <EmptyState
           icon={Cable}
@@ -194,17 +539,43 @@ function ProviderAnalyticsContent() {
               ? `A integracao com ${meta.displayName} estara disponivel em breve.`
               : `Conecte sua conta ${meta.displayName} para visualizar analytics detalhados.`
           }
-          actionLabel={meta.status !== "coming_soon" ? "Conectar" : undefined}
+          actionLabel={meta.status !== "coming_soon" ? "Conectar agora" : undefined}
           actionHref={meta.status !== "coming_soon" ? "/conexoes" : undefined}
         />
       )}
 
-      {/* Connected content */}
+      {/* ── DASHBOARD ── */}
       {data && data.connected && (
         <>
-          {/* KPIs */}
+          {/* ── SEÇÃO 1: ANOMALIAS (condicional) ── */}
+          <AnimatePresence>
+            {anomalies.length > 0 && (
+              <motion.div {...sectionAnim(0)}>
+                <AnomalyBadge anomalies={anomalies} onDismiss={handleDismissAnomaly} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* ── SEÇÃO 2: INSIGHTS ESTRATÉGICOS ── */}
+          <motion.div {...sectionAnim(0.05)}>
+            <SectionHeader
+              title="Insights Estrategicos"
+              subtitle="O que esses numeros dizem sobre o seu conteudo"
+            />
+            <StrategicInsightsCard
+              insights={data.insightsSummary?.insights ?? []}
+              title="Inteligencia da conta"
+              subtitle="Analise automatica baseada nos dados do periodo selecionado"
+              emptyMessage="Aguardando dados suficientes para gerar insights. Expanda o periodo ou publique mais conteudo."
+            />
+          </motion.div>
+
+          {/* ── SEÇÃO 3: HERO KPIs ── */}
           {data.kpis.length > 0 && (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <motion.div
+              {...sectionAnim(0.1)}
+              className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4"
+            >
               {data.kpis.map((kpi, i) => (
                 <KPICard
                   key={kpi.key}
@@ -215,135 +586,118 @@ function ProviderAnalyticsContent() {
                   deltaPercent={kpi.deltaPercent}
                   trend={kpi.trend}
                   icon={kpi.icon}
-                  animationDelay={i * 0.08}
+                  animationDelay={i * 0.07}
                 />
               ))}
-            </div>
-          )}
-
-          {/* Charts */}
-          {data.timeSeries.length > 0 && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {chartConfigs.map((cfg) => (
-                <motion.div
-                  key={cfg.dataKey}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3, duration: 0.4 }}
-                  className="bg-bg-card border border-border rounded-xl p-4 sm:p-5"
-                >
-                  <h3 className="text-[14px] font-semibold text-text-primary mb-3">
-                    {cfg.label}
-                  </h3>
-                  <MetricChart
-                    data={data.timeSeries}
-                    dataKey={cfg.dataKey}
-                    label={cfg.label}
-                    color={cfg.color}
-                    variant="area"
-                    height={220}
-                  />
-                </motion.div>
-              ))}
-            </div>
-          )}
-
-          {/* Breakdown pie + Heatmap side by side */}
-          {(data.breakdown.length > 0 || data.heatmap) && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {data.breakdown.length > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.4, duration: 0.4 }}
-                >
-                  <BreakdownPie
-                    data={data.breakdown}
-                    title="Breakdown por Formato"
-                  />
-                </motion.div>
-              )}
-
-              {data.heatmap && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.45, duration: 0.4 }}
-                >
-                  <HeatmapChart data={data.heatmap} />
-                </motion.div>
-              )}
-            </div>
-          )}
-
-          {/* ── Instagram Advanced Analytics ── */}
-          {isInstagram && igAdvanced && (
-            <>
-              {/* Engagement Breakdown + Save Rate side by side */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <EngagementBreakdown
-                  likes={igAdvanced.engagementBreakdown.avgLikes}
-                  comments={igAdvanced.engagementBreakdown.avgComments}
-                  saves={igAdvanced.engagementBreakdown.avgSaves}
-                  shares={igAdvanced.engagementBreakdown.avgShares}
-                  title="Quebra do engajamento (média por post)"
-                />
-                <SaveRateCard
-                  saveRate={igAdvanced.saveRateAnalysis.avgSaveRate / 100}
-                />
-              </div>
-
-              {/* Format Performance Cards */}
-              {igAdvanced.formatPerformance.length > 0 && (
-                <FormatPerformanceCards
-                  formats={igAdvanced.formatPerformance.map((f) => ({
-                    type: f.format.toLowerCase(),
-                    label: f.label,
-                    count: f.count,
-                    avgEngagement: f.avgEngagement / 100,
-                    avgReach: f.avgReach,
-                    bestPostId: f.bestPost?.permalink,
-                  }))}
-                />
-              )}
-
-              {/* Top Posts Grid */}
-              {igAdvanced.topPosts.length > 0 && (
-                <TopPostsGrid posts={igAdvanced.topPosts} />
-              )}
-
-              {/* Caption & CTA Analysis */}
-              <CaptionAnalysisCard data={igAdvanced.captionAnalysis} />
-            </>
-          )}
-
-          {/* Funnel (CRM) */}
-          {data.funnelStages && data.funnelStages.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5, duration: 0.4 }}
-            >
-              <FunnelChart stages={data.funnelStages} />
             </motion.div>
           )}
 
-          {/* Top Hashtags */}
+          {/* ── SEÇÃO 4: EVOLUÇÃO ── */}
+          {data.timeSeries.length > 0 && (
+            <motion.div {...sectionAnim(0.15)} className="space-y-4">
+              <SectionHeader
+                title="Evolucao"
+                subtitle="Crescimento de seguidores, alcance e engajamento ao longo do periodo"
+              />
+
+              {/* TimeSeriesChart — full width, métricas toggláveis */}
+              <TimeSeriesChart
+                data={data.timeSeries}
+                providers={[provider]}
+                singleProvider={provider}
+                height={320}
+              />
+
+              {/* FollowersDeltaChart — variação diária */}
+              {followersSeries.length >= 2 && (
+                <motion.div {...sectionAnim(0.2)}>
+                  <FollowersDeltaChart
+                    data={followersSeries}
+                    provider={meta.displayName}
+                    height={240}
+                  />
+                </motion.div>
+              )}
+            </motion.div>
+          )}
+
+          {/* ── SEÇÃO 5: PERFORMANCE DE CONTEÚDO ── */}
+          <motion.div {...sectionAnim(0.25)} className="space-y-4">
+            <SectionHeader
+              title="Performance de Conteudo"
+              subtitle="Taxa de salvamentos, distribuicao de engajamento e formatos com melhor resultado"
+            />
+
+            {/* Row: SaveRateCard | EngagementBreakdown | BreakdownPie */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <SaveRateCard saveRate={saveRate} benchmark={0.02} />
+              <EngagementBreakdown
+                likes={engBreakdown.likes}
+                comments={engBreakdown.comments}
+                saves={engBreakdown.saves}
+                shares={engBreakdown.shares}
+                title={
+                  data.instagramAdvanced
+                    ? "Quebra do engajamento (media por post)"
+                    : "Quebra do engajamento"
+                }
+              />
+              <BreakdownPie
+                title="Distribuicao por tipo"
+                subtitle="Reels, posts, carrosseis e stories"
+                data={breakdownPieData.length > 0 ? breakdownPieData : []}
+                centerLabel={posts.length > 0 ? `${posts.length} posts` : undefined}
+                emptyMessage="Nenhum post no periodo"
+              />
+            </div>
+
+            {/* FormatPerformanceCards */}
+            {formatItems.length > 0 && (
+              <FormatPerformanceCards formats={formatItems} />
+            )}
+
+            {/* ContentTypePerformance — Radar chart */}
+            {contentTypeData.length > 0 && (
+              <ContentTypePerformance
+                data={contentTypeData}
+                metric="engagement"
+                title="Performance por tipo de conteudo"
+              />
+            )}
+          </motion.div>
+
+          {/* ── SEÇÃO 6: MELHOR MOMENTO ── */}
+          <motion.div {...sectionAnim(0.3)}>
+            <SectionHeader
+              title="Melhor Momento"
+              subtitle="Horarios e dias com maior engajamento com base nos posts publicados"
+            />
+            <BestTimeHeatmap
+              data={heatmapCells}
+              title="Melhores horarios para postar"
+              metric="engagement"
+            />
+          </motion.div>
+
+          {/* ── SEÇÃO 7: HASHTAGS ── */}
           {data.topHashtags && data.topHashtags.length > 0 && (
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5, duration: 0.4 }}
+              {...sectionAnim(0.35)}
               className="bg-bg-card border border-border rounded-xl p-4 sm:p-5"
             >
-              <h3 className="text-[14px] font-semibold text-text-primary mb-3">
-                Top Hashtags
-              </h3>
+              <div className="mb-4">
+                <h2 className="text-[14px] font-semibold text-text-primary">
+                  Top hashtags
+                </h2>
+                <p className="text-[12px] text-text-muted mt-0.5">
+                  As mais usadas e que geraram engajamento
+                </p>
+              </div>
               <div className="flex flex-wrap gap-2">
-                {data.topHashtags.map((tag) => (
+                {data.topHashtags.slice(0, 15).map((tag) => (
                   <span
                     key={tag.tag}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-bg-elevated text-[12px] text-text-secondary"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-bg-elevated text-[12px] text-text-secondary border border-border/50"
                   >
                     <span className="text-accent font-medium">{tag.tag}</span>
                     <span className="text-text-muted">({tag.count})</span>
@@ -353,57 +707,41 @@ function ProviderAnalyticsContent() {
             </motion.div>
           )}
 
-          {/* Posts table */}
-          {data.posts.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.55, duration: 0.4 }}
-              className="space-y-3"
-            >
-              <h3 className="text-[14px] font-semibold text-text-primary">
-                Posts no Periodo
-              </h3>
+          {/* ── SEÇÃO 8: TOP POSTS ── */}
+          {postsTableRows.length > 0 ? (
+            <motion.div {...sectionAnim(0.4)}>
+              <SectionHeader
+                title="Top Posts"
+                subtitle="Publicacoes do periodo ordenadas por data, curtidas ou taxa de engajamento"
+              />
               <PostsTable
-                posts={data.posts.map((p) => ({
-                  id: p.id,
-                  thumbnail: p.thumbnail_url ?? undefined,
-                  caption: p.caption ?? p.title ?? "",
-                  provider: provider,
-                  publishedAt: p.published_at ?? new Date().toISOString(),
-                  metrics: {
-                    likes: p.metrics.likes ?? p.metrics.like_count ?? 0,
-                    comments: p.metrics.comments ?? p.metrics.comments_count ?? 0,
-                    saves: p.metrics.saves ?? 0,
-                    shares: p.metrics.shares ?? p.metrics.share_count ?? 0,
-                    reach: p.metrics.reach ?? 0,
-                  },
-                }))}
+                posts={postsTableRows}
+                limit={10}
+                emptyMessage="Nenhum post no periodo selecionado"
               />
             </motion.div>
+          ) : (
+            !loading && (
+              <motion.div {...sectionAnim(0.4)}>
+                <SectionHeader title="Top Posts" />
+                <div className="bg-bg-card border border-border rounded-xl p-8 flex items-center justify-center">
+                  <p className="text-[13px] text-text-muted text-center">
+                    Nenhum post encontrado no periodo selecionado.
+                  </p>
+                </div>
+              </motion.div>
+            )
           )}
 
-          {/* LinkedIn CMA notice */}
-          {provider === "linkedin" && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.6 }}
-              className="bg-[#0A66C2]/10 border border-[#0A66C2]/20 rounded-xl p-4 text-[13px] text-text-secondary"
-            >
-              <strong className="text-text-primary">Nota:</strong> Analytics completo do LinkedIn
-              requer aprovacao da Community Management API (CMA). Sem ela, apenas publicacao
-              e dados basicos estao disponiveis.
-            </motion.div>
-          )}
-
-          {/* No data state */}
-          {data.kpis.length === 0 && data.posts.length === 0 && data.timeSeries.length === 0 && (
-            <EmptyState
-              title="Sem dados no periodo"
-              description={`Nenhum dado encontrado para ${meta.displayName} no periodo selecionado. Tente expandir o intervalo de datas.`}
-            />
-          )}
+          {/* Empty state global — sem KPIs, posts e timeSeries */}
+          {data.kpis.length === 0 &&
+            posts.length === 0 &&
+            data.timeSeries.length === 0 && (
+              <EmptyState
+                title="Sem dados no periodo"
+                description={`Nenhum dado encontrado para ${meta.displayName} no periodo selecionado. Tente expandir o intervalo de datas.`}
+              />
+            )}
         </>
       )}
     </div>

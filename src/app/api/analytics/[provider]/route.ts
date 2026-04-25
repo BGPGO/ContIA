@@ -10,6 +10,8 @@ import type {
   BreakdownItem,
   HeatmapData,
   HashtagStat,
+  InsightsSummary,
+  StrategicInsight,
 } from "@/types/analytics";
 import {
   fetchInstagramLive,
@@ -38,6 +40,311 @@ const CONTENT_TYPE_COLORS: Record<string, string> = {
   email: "#8B5CF6",
   whatsapp: "#25D366",
 };
+
+const DIAS_SEMANA_PT_BR = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+
+const CONTENT_TYPE_LABELS: Record<string, string> = {
+  post: "Post",
+  reel: "Reels",
+  story: "Stories",
+  video: "Vídeo",
+  youtube_video: "Vídeo YouTube",
+  youtube_short: "Short YouTube",
+  carousel: "Carrossel",
+  landing_page: "Landing Page",
+  ad_campaign: "Campanha",
+  email: "E-mail",
+  whatsapp: "WhatsApp",
+};
+
+const SEVERITY_ORDER: Record<string, number> = {
+  critical: 0,
+  warning: 1,
+  positive: 2,
+  neutral: 3,
+};
+
+interface InsightsInput {
+  posts: ProviderPost[];
+  kpis: AnalyticsKPI[];
+  periodStart: string;
+  periodEnd: string;
+}
+
+function computeInsightsSummary(input: InsightsInput): InsightsSummary {
+  const { posts, kpis, periodStart, periodEnd } = input;
+
+  const startDate = new Date(periodStart);
+  const endDate = new Date(periodEnd);
+  const diasNoPeriodo = Math.max(
+    1,
+    Math.round((endDate.getTime() - startDate.getTime()) / 86400000)
+  );
+
+  // ── bestPostingDay / bestPostingHour ──────────────────────────────
+  let bestPostingDay: number | null = null;
+  let bestPostingHour: number | null = null;
+
+  if (posts.length >= 5) {
+    // Map: "day_hour" => { totalEngRate: number, count: number }
+    const cellMap = new Map<string, { totalEngRate: number; count: number }>();
+    for (const post of posts) {
+      if (!post.published_at) continue;
+      const d = new Date(post.published_at);
+      const day = d.getDay();
+      const hour = d.getHours();
+      const m = post.metrics;
+      const reach = m.reach ?? m.impressions ?? 1;
+      const eng = (m.likes ?? m.like_count ?? 0) + (m.comments ?? m.comments_count ?? 0) + (m.saves ?? 0) + (m.shares ?? m.share_count ?? 0);
+      const engRate = reach > 0 ? eng / reach : 0;
+      const key = `${day}_${hour}`;
+      const existing = cellMap.get(key);
+      if (existing) {
+        existing.totalEngRate += engRate;
+        existing.count += 1;
+      } else {
+        cellMap.set(key, { totalEngRate: engRate, count: 1 });
+      }
+    }
+
+    let bestAvg = -1;
+    for (const [key, { totalEngRate, count }] of cellMap.entries()) {
+      if (count < 2) continue;
+      const avg = totalEngRate / count;
+      if (avg > bestAvg) {
+        bestAvg = avg;
+        const [dayStr, hourStr] = key.split("_");
+        bestPostingDay = parseInt(dayStr, 10);
+        bestPostingHour = parseInt(hourStr, 10);
+      }
+    }
+  }
+
+  // ── formatWinner ──────────────────────────────────────────────────
+  let formatWinner: InsightsSummary["formatWinner"] = null;
+
+  const formatMap = new Map<string, { totalEngRate: number; count: number }>();
+  for (const post of posts) {
+    const type = post.content_type ?? "post";
+    const m = post.metrics;
+    const reach = m.reach ?? m.impressions ?? 1;
+    const eng = (m.likes ?? m.like_count ?? 0) + (m.comments ?? m.comments_count ?? 0) + (m.saves ?? 0) + (m.shares ?? m.share_count ?? 0);
+    const engRate = reach > 0 ? eng / reach : 0;
+    const existing = formatMap.get(type);
+    if (existing) {
+      existing.totalEngRate += engRate;
+      existing.count += 1;
+    } else {
+      formatMap.set(type, { totalEngRate: engRate, count: 1 });
+    }
+  }
+
+  let bestFormatAvg = -1;
+  for (const [type, { totalEngRate, count }] of formatMap.entries()) {
+    if (count < 3) continue;
+    const avg = totalEngRate / count;
+    if (avg > bestFormatAvg) {
+      bestFormatAvg = avg;
+      formatWinner = {
+        type,
+        label: CONTENT_TYPE_LABELS[type] ?? type,
+        engagementRate: avg,
+      };
+    }
+  }
+
+  // ── growthRate ────────────────────────────────────────────────────
+  let growthRate: number | null = null;
+
+  if (diasNoPeriodo >= 7) {
+    const followersKpi = kpis.find((k) => k.key === "followers");
+    if (followersKpi && followersKpi.value !== null && followersKpi.previousValue !== null) {
+      const current = followersKpi.value;
+      const previous = followersKpi.previousValue;
+      if (previous > 0) {
+        const diff = current - previous;
+        const weeklyDiff = (diff / diasNoPeriodo) * 7;
+        growthRate = Math.round(((weeklyDiff / previous) * 100) * 10) / 10;
+      }
+    }
+  }
+
+  // ── engagementTrend ───────────────────────────────────────────────
+  let engagementTrend: InsightsSummary["engagementTrend"] = null;
+
+  if (posts.length >= 6) {
+    const sorted = [...posts]
+      .filter((p) => p.published_at !== null)
+      .sort((a, b) => new Date(a.published_at!).getTime() - new Date(b.published_at!).getTime());
+
+    if (sorted.length >= 6) {
+      const mid = Math.floor(sorted.length / 2);
+      const firstHalf = sorted.slice(0, mid);
+      const secondHalf = sorted.slice(mid);
+
+      const avgEngRate = (arr: ProviderPost[]) => {
+        if (arr.length === 0) return 0;
+        const sum = arr.reduce((acc, post) => {
+          const m = post.metrics;
+          const reach = m.reach ?? m.impressions ?? 1;
+          const eng = (m.likes ?? m.like_count ?? 0) + (m.comments ?? m.comments_count ?? 0) + (m.saves ?? 0) + (m.shares ?? m.share_count ?? 0);
+          return acc + (reach > 0 ? eng / reach : 0);
+        }, 0);
+        return sum / arr.length;
+      };
+
+      const firstAvg = avgEngRate(firstHalf);
+      const secondAvg = avgEngRate(secondHalf);
+
+      if (firstAvg > 0) {
+        const change = ((secondAvg - firstAvg) / firstAvg) * 100;
+        if (change > 10) engagementTrend = "accelerating";
+        else if (change < -10) engagementTrend = "decelerating";
+        else engagementTrend = "stable";
+      } else {
+        engagementTrend = secondAvg > 0 ? "accelerating" : "stable";
+      }
+    }
+  }
+
+  // ── avgPostingFrequency ───────────────────────────────────────────
+  const avgPostingFrequency = Math.round(((posts.length / diasNoPeriodo) * 7) * 10) / 10;
+
+  // ── topCTAs ───────────────────────────────────────────────────────
+  const CTA_REGEX = /\b(clique|confira|veja|descubra|saiba|aproveite|garanta|inscreva|compre|salve|compartilhe|comente|siga)\b/gi;
+  const ctaCounts = new Map<string, number>();
+  for (const post of posts) {
+    if (!post.caption) continue;
+    const matches = post.caption.match(CTA_REGEX) ?? [];
+    for (const match of matches) {
+      const normalized = match.toLowerCase();
+      ctaCounts.set(normalized, (ctaCounts.get(normalized) ?? 0) + 1);
+    }
+  }
+  const topCTAs = Array.from(ctaCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([word]) => word);
+
+  // ── Build insights array ──────────────────────────────────────────
+  const insights: StrategicInsight[] = [];
+
+  // Format winner
+  if (formatWinner) {
+    insights.push({
+      id: "format_winner",
+      category: "content",
+      severity: "positive",
+      title: `${formatWinner.label} é seu melhor formato`,
+      description: `Posts em ${formatWinner.label.toLowerCase()} têm taxa de engajamento de ${(formatWinner.engagementRate * 100).toFixed(1)}%, acima da média geral.`,
+      metric: `${(formatWinner.engagementRate * 100).toFixed(1)}%`,
+      actionable: `Postar mais conteúdo em ${formatWinner.label.toLowerCase()}.`,
+    });
+  }
+
+  // Best time
+  if (bestPostingDay !== null && bestPostingHour !== null) {
+    const diaNome = DIAS_SEMANA_PT_BR[bestPostingDay];
+    insights.push({
+      id: "best_time",
+      category: "timing",
+      severity: "positive",
+      title: `${diaNome} às ${bestPostingHour}h é seu melhor horário`,
+      description: `Posts publicados ${diaNome.toLowerCase()}-feira por volta de ${bestPostingHour}h tiveram maior engajamento.`,
+      actionable: `Agendar próximos posts para ${diaNome} ${bestPostingHour}h.`,
+    });
+  }
+
+  // Growth rate
+  if (growthRate !== null) {
+    if (growthRate > 1) {
+      insights.push({
+        id: "growth_strong",
+        category: "growth",
+        severity: "positive",
+        title: "Crescimento acelerado de seguidores",
+        description: `Você cresce ${growthRate.toFixed(1)}% por semana em seguidores. Continue o ritmo.`,
+        metric: `+${growthRate.toFixed(1)}%/semana`,
+      });
+    } else if (growthRate < -0.5) {
+      insights.push({
+        id: "growth_loss",
+        category: "growth",
+        severity: "critical",
+        title: "Você está perdendo seguidores",
+        description: `Queda de ${Math.abs(growthRate).toFixed(1)}% por semana. Investigue posts recentes ou pausas de atividade.`,
+        metric: `${growthRate.toFixed(1)}%/semana`,
+        actionable: "Revisar últimos 7 dias para identificar a causa.",
+      });
+    }
+  }
+
+  // Engagement trend
+  if (engagementTrend === "decelerating") {
+    insights.push({
+      id: "eng_decel",
+      category: "engagement",
+      severity: "warning",
+      title: "Engajamento em queda",
+      description: "A taxa de engajamento na segunda metade do período foi menor que na primeira. Conteúdo perdendo tração.",
+      actionable: "Testar novo formato ou tema esta semana.",
+    });
+  } else if (engagementTrend === "accelerating") {
+    insights.push({
+      id: "eng_accel",
+      category: "engagement",
+      severity: "positive",
+      title: "Engajamento em alta",
+      description: "Taxa subiu na segunda metade do período. Está acertando o tom.",
+    });
+  }
+
+  // Posting frequency
+  if (avgPostingFrequency < 2) {
+    insights.push({
+      id: "freq_low",
+      category: "content",
+      severity: "warning",
+      title: "Frequência baixa de postagem",
+      description: `Você posta ${avgPostingFrequency.toFixed(1)}x por semana. Marcas em crescimento postam 4-5x.`,
+      actionable: "Aumentar para pelo menos 3 posts/semana.",
+    });
+  }
+
+  // KPI anomalies (delta > 30%)
+  for (const kpi of kpis) {
+    if (kpi.deltaPercent === null) continue;
+    if (Math.abs(kpi.deltaPercent) > 30) {
+      insights.push({
+        id: `kpi_${kpi.key}`,
+        category: "anomaly",
+        severity: kpi.deltaPercent < 0 ? "critical" : "positive",
+        title: kpi.deltaPercent < 0
+          ? `Queda expressiva em ${kpi.label}`
+          : `Alta expressiva em ${kpi.label}`,
+        description: kpi.deltaPercent < 0
+          ? `${kpi.label} caiu ${Math.abs(kpi.deltaPercent).toFixed(1)}% em relação ao período anterior. Monitore a causa.`
+          : `${kpi.label} cresceu ${kpi.deltaPercent.toFixed(1)}% em relação ao período anterior.`,
+        metric: `${kpi.deltaPercent > 0 ? "+" : ""}${kpi.deltaPercent.toFixed(1)}%`,
+      });
+    }
+  }
+
+  // Sort by severity and cap at 6
+  insights.sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 99) - (SEVERITY_ORDER[b.severity] ?? 99));
+  const cappedInsights = insights.slice(0, 6);
+
+  return {
+    bestPostingDay,
+    bestPostingHour,
+    formatWinner,
+    growthRate,
+    engagementTrend,
+    avgPostingFrequency,
+    topCTAs,
+    insights: cappedInsights,
+  };
+}
 
 /**
  * GET /api/analytics/[provider]?empresa_id=xxx&period_start=YYYY-MM-DD&period_end=YYYY-MM-DD
@@ -155,6 +462,7 @@ export async function GET(
       trafficSources: null,
       topPages: null,
       campaigns: null,
+      insightsSummary: null,
     });
   }
 
@@ -225,12 +533,15 @@ export async function GET(
           ? historicalTimeSeries
           : toProviderTimeSeries(liveData);
 
+      const livePosts = toProviderPosts(liveData);
+      const liveKpis = toProviderKPIs(liveData);
+
       return NextResponse.json({
         provider,
         connected: true,
-        kpis: toProviderKPIs(liveData),
+        kpis: liveKpis,
         timeSeries: finalTimeSeries,
-        posts: toProviderPosts(liveData),
+        posts: livePosts,
         breakdown: toProviderBreakdown(liveData),
         heatmap: toProviderHeatmap(liveData),
         funnelStages: null,
@@ -239,6 +550,12 @@ export async function GET(
         topPages: null,
         campaigns: null,
         instagramAdvanced: toInstagramAdvanced(liveData),
+        insightsSummary: computeInsightsSummary({
+          posts: livePosts,
+          kpis: liveKpis,
+          periodStart,
+          periodEnd,
+        }),
       });
     } catch (err) {
       console.error("[analytics/provider] Instagram live fetch falhou:", err instanceof Error ? err.message : err);
@@ -585,5 +902,11 @@ export async function GET(
     trafficSources: null,
     topPages: null,
     campaigns: null,
+    insightsSummary: computeInsightsSummary({
+      posts,
+      kpis,
+      periodStart,
+      periodEnd,
+    }),
   });
 }
