@@ -25,13 +25,13 @@ import { generateState, parseState, upsertConnection, decryptToken } from './bas
 const FB_GRAPH = 'https://graph.facebook.com/v23.0'
 const FB_OAUTH_URL = 'https://www.facebook.com/v23.0/dialog/oauth'
 
+// Mínimo para listar Pages e ler engajamento (analytics orgânico).
+// pages_manage_posts/pages_read_user_content/email exigem App Review e dão "Invalid Scopes".
+// Quando precisar publicar via API, reativar pages_manage_posts após aprovação.
 const FB_SCOPES = [
   'pages_show_list',
   'pages_read_engagement',
-  'pages_manage_posts',
-  'pages_read_user_content',
   'public_profile',
-  'email',
 ].join(',')
 
 /* ── Admin Supabase ──────────────────────────────────────────────────────── */

@@ -19,6 +19,7 @@ import {
   Check,
   RefreshCw,
   ShieldCheck,
+  Shield,
 } from "lucide-react";
 import { useSetupProgress } from "@/hooks/useSetupProgress";
 import { SetupCard } from "@/components/setup/SetupCard";
@@ -27,6 +28,7 @@ import { CodeBlock } from "@/components/setup/CodeBlock";
 /* ── Card IDs (order defines display) ── */
 const CARD_IDS = [
   "meta-app-credentials",
+  "meta-permissions",
   "migration-009",
   "paginas-legais",
   "meta-redirect-uris",
@@ -351,6 +353,79 @@ INSTAGRAM_APP_SECRET=[Instagram app secret que você copiou]`}
                     value={getNotes(id)}
                     onChange={(v) => setNotes(id, v)}
                   />
+                </SetupCard>
+              );
+
+            /* ────────────────────────────────────────────── */
+            case "meta-permissions":
+              return (
+                <SetupCard
+                  key={id}
+                  id={id}
+                  icon={Shield}
+                  title="Meta App: habilitar Permissions (ads_read, pages_*)"
+                  reason="Sem habilitar essas permissões no app, o OAuth dá 'Invalid Scopes' mesmo em dev mode."
+                  estimatedTime="5 min"
+                  done={isDone(id)}
+                  onToggleDone={() => toggleDone(id)}
+                  defaultOpen={!isDone(id)}
+                >
+                  <Section title="O que e Permissions and Features" />
+                  <p className="text-[12px] text-text-muted">
+                    O Meta separa as permissões em duas camadas: <strong className="text-text-primary">Standard</strong>{" "}
+                    (sem App Review) e <strong className="text-text-primary">Advanced</strong> (precisa App Review pra
+                    usar fora de testers). Mesmo testers só podem usar uma permission se ela estiver
+                    <strong className="text-text-primary"> habilitada no app</strong>.
+                  </p>
+
+                  <Section title="Habilitar Meta Ads (ads_read)" />
+                  <Step n={1}>
+                    Abra{" "}
+                    <ExtLink href="https://developers.facebook.com/apps/3845537452420704/app-review/permissions/">
+                      Meta App &gt; App Review &gt; Permissions and Features
+                    </ExtLink>
+                  </Step>
+                  <Step n={2}>
+                    Na lista, procure <code className="text-accent">ads_read</code>. Se não aparecer,
+                    adicione &quot;<strong className="text-text-primary">Marketing API</strong>&quot; em
+                    <ExtLink href="https://developers.facebook.com/apps/3845537452420704/use_cases/">
+                      Use Cases
+                    </ExtLink>
+                    {" "}primeiro.
+                  </Step>
+                  <Step n={3}>
+                    Clique em <strong className="text-text-primary">&quot;Get advanced access&quot;</strong> ou
+                    pelo menos confirme que a permission está listada como
+                    <strong className="text-text-primary"> &quot;Standard access&quot;</strong>.
+                    Em dev mode com tester, Standard access basta.
+                  </Step>
+
+                  <Section title="Habilitar Facebook Pages (pages_show_list, pages_read_engagement)" />
+                  <Step n={4}>
+                    Volte em <strong className="text-text-primary">Permissions and Features</strong> e habilite:
+                  </Step>
+                  <CodeBlock
+                    code={`pages_show_list
+pages_read_engagement`}
+                  />
+                  <Step n={5}>
+                    Se essas não aparecem, adicione &quot;<strong className="text-text-primary">Page Public Content Access</strong>&quot;
+                    em <ExtLink href="https://developers.facebook.com/apps/3845537452420704/use_cases/">Use Cases</ExtLink>.
+                  </Step>
+
+                  <Callout>
+                    Não precisa pedir App Review formal agora. Como você é tester do app
+                    (cards Meta Testers + Instagram Testers acima), basta as permissions estarem
+                    habilitadas como <strong>Standard</strong>. App Review só será necessário
+                    quando outras pessoas (não-testers) forem usar.
+                  </Callout>
+
+                  <Section title="Validar (depois)" />
+                  <Step n={6}>
+                    Volta em <ExtLink href="https://contia.bertuzzipatrimonial.com.br/conexoes">contia.../conexoes</ExtLink>{" "}
+                    e tenta conectar Facebook e Meta Ads. Se ainda der &quot;Invalid Scopes&quot;,
+                    cole o erro pro Claude diagnosticar.
+                  </Step>
                 </SetupCard>
               );
 

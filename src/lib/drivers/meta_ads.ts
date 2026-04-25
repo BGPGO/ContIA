@@ -30,11 +30,11 @@ import { generateState, parseState, upsertConnection, decryptToken } from './bas
 const FB_GRAPH = 'https://graph.facebook.com/v23.0'
 const FB_OAUTH_URL = 'https://www.facebook.com/v23.0/dialog/oauth'
 
+// Mantemos só o estritamente necessário pra leitura.
+// business_management e email exigem App Review e dão "Invalid Scopes" sem aprovação.
 const META_ADS_SCOPES = [
   'ads_read',
-  'business_management',
   'public_profile',
-  'email',
 ].join(',')
 
 /* ── Admin Supabase ──────────────────────────────────────────────────────── */
