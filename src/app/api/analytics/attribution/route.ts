@@ -337,18 +337,19 @@ function computeAttributionInsights(
     });
   }
 
-  // 6. Match rate baixo — < 40% das campanhas Meta linkadas com CRM
+  // 6. Match rate baixo — < 50% das campanhas Meta ATIVAS linkadas com CRM
+  // (totalMetaCampaigns aqui ja e o numero de campanhas ATIVAS — vem de input)
   if (totalMetaCampaigns > 0) {
     const matchRate = matchedCount / totalMetaCampaigns;
-    if (matchRate < 0.4) {
+    if (matchRate < 0.5) {
       insights.push({
         id: "attribution_low_match_rate",
         category: "anomaly",
         severity: "warning",
         title: "Rastreamento UTM incompleto",
-        description: `Apenas ${(matchRate * 100).toFixed(0)}% das campanhas Meta (${matchedCount}/${totalMetaCampaigns}) foram cruzadas com leads do CRM. UTMs podem estar ausentes nas URLs dos anúncios.`,
+        description: `Apenas ${(matchRate * 100).toFixed(0)}% das campanhas Meta ativas (${matchedCount}/${totalMetaCampaigns}) foram cruzadas com leads do CRM. Algumas podem ser awareness sem CTA, ou ter UTM mal configurado.`,
         metric: `${(matchRate * 100).toFixed(0)}% match`,
-        actionable: "Adicionar utm_campaign igual ao nome da campanha Meta em todos os anúncios.",
+        actionable: "Confira no Ads Manager se as campanhas com spend tem UTM no template de URL.",
       });
     }
   }
@@ -455,50 +456,80 @@ export async function GET(req: NextRequest) {
   };
 
   // ── channelROI ────────────────────────────────────────────────────
-  const channelROI: ChannelROI[] = crmChannels.map((ch) => {
-    const chLeads = pickLeads(ch);
-    const chDealsWon = pickDealsWon(ch);
-    const chRevenue = pickRevenue(ch);
-    const conversionRate =
-      chLeads > 0 ? chDealsWon / chLeads : 0;
-    const avgTicket: number | null =
-      chDealsWon > 0 ? Math.round(chRevenue / chDealsWon) : null;
-
-    // Spend é null para canais orgânicos — mapeamos Meta Ads como "meta/cpc"
-    const isMetaChannel =
-      ch.source.toLowerCase().includes("meta") ||
-      ch.source.toLowerCase().includes("facebook") ||
-      ch.medium?.toLowerCase().includes("cpc");
-
-    // Spend do canal: soma das campanhas Meta que matcham este source
-    let channelSpend: number | null = null;
-    if (isMetaChannel) {
-      const totalMetaSpend = metaCampaigns.reduce((sum, c) => {
-        const m = c.metrics as Record<string, number>;
-        return sum + (m.spend ?? 0);
-      }, 0);
-      channelSpend = totalMetaSpend > 0 ? totalMetaSpend : null;
+  /**
+   * Normaliza source+medium pra "canonical channel".
+   * Meta Ads gera leads com utm_source=Facebook ou Instagram + medium=cpc.
+   * Aqui agrupamos isso como "meta_ads" pra UX clara — gestor pensa em "Meta Ads",
+   * não em "Facebook cpc". Inconsistencias de capitalização também são unificadas.
+   */
+  function canonicalChannel(source: string, medium: string | null): ChannelSource {
+    const s = source.toLowerCase().trim();
+    const m = (medium ?? "").toLowerCase().trim();
+    // Meta Ads: source Facebook/Instagram + medium cpc/paid
+    if ((s === "facebook" || s === "instagram") && (m === "cpc" || m === "paid")) {
+      return "meta_ads";
     }
+    if (s.includes("meta")) return "meta_ads";
+    if (s === "facebook") return "facebook";
+    if (s === "instagram") return "instagram";
+    if (s.includes("google") && (m === "cpc" || m === "paid")) return "google_ads";
+    if (s.includes("google")) return "google";
+    if (s === "linkedin") return "linkedin";
+    if (s === "direto" || s === "(direct)" || s === "" || s === "none") return "direto";
+    return (s || "outro") as ChannelSource;
+  }
+
+  // Agrupar canais CRM por canonicalChannel pra agregar capitalizações inconsistentes
+  type ChannelAgg = { leads: number; dealsWon: number; revenue: number; medium: string | null };
+  const channelMap = new Map<ChannelSource, ChannelAgg>();
+  for (const ch of crmChannels) {
+    const canonical = canonicalChannel(ch.source ?? "", ch.medium ?? null);
+    const existing = channelMap.get(canonical);
+    if (existing) {
+      existing.leads += pickLeads(ch);
+      existing.dealsWon += pickDealsWon(ch);
+      existing.revenue += pickRevenue(ch);
+    } else {
+      channelMap.set(canonical, {
+        leads: pickLeads(ch),
+        dealsWon: pickDealsWon(ch),
+        revenue: pickRevenue(ch),
+        medium: ch.medium ?? null,
+      });
+    }
+  }
+
+  // Total de spend Meta (única fonte de spend que temos hoje — atribuído ao canal meta_ads)
+  const totalMetaSpend = metaCampaigns.reduce((sum, c) => {
+    const m = c.metrics as Record<string, number>;
+    return sum + (m.spend ?? 0);
+  }, 0);
+
+  const channelROI: ChannelROI[] = [...channelMap.entries()].map(([source, agg]) => {
+    const conversionRate = agg.leads > 0 ? agg.dealsWon / agg.leads : 0;
+    const avgTicket: number | null =
+      agg.dealsWon > 0 ? Math.round(agg.revenue / agg.dealsWon) : null;
+
+    // Apenas o canal meta_ads recebe spend Meta — google_ads precisaria de driver próprio
+    const channelSpend: number | null =
+      source === "meta_ads" && totalMetaSpend > 0 ? totalMetaSpend : null;
 
     const cac =
-      channelSpend !== null && chDealsWon > 0
-        ? channelSpend / chDealsWon
+      channelSpend !== null && agg.dealsWon > 0
+        ? channelSpend / agg.dealsWon
         : null;
     const roas =
       channelSpend !== null && channelSpend > 0
-        ? chRevenue / channelSpend
+        ? agg.revenue / channelSpend
         : null;
-
-    // Normalize source to ChannelSource
-    const source: ChannelSource = (ch.source ?? "outro") as ChannelSource;
 
     return {
       source,
-      medium: ch.medium,
+      medium: agg.medium,
       spend: channelSpend,
-      leads: chLeads,
-      dealsWon: chDealsWon,
-      revenue: chRevenue,
+      leads: agg.leads,
+      dealsWon: agg.dealsWon,
+      revenue: agg.revenue,
       cac,
       roas,
       conversionRate,
@@ -672,10 +703,7 @@ export async function GET(req: NextRequest) {
   });
 
   // ── totals ────────────────────────────────────────────────────────
-  const totalMetaSpend = metaCampaigns.reduce((sum, c) => {
-    const m = c.metrics as Record<string, number>;
-    return sum + (m.spend ?? 0);
-  }, 0);
+  // (totalMetaSpend ja foi calculado no bloco de channelROI acima)
 
   const igTotalEngagement = igPosts.reduce((sum, p) => {
     const m = p.metrics as Record<string, number>;
@@ -693,9 +721,17 @@ export async function GET(req: NextRequest) {
     (c) => c.matched && c.metaCampaignId !== null
   ).length;
 
+  // Denominador: apenas campanhas Meta ATIVAS no período (com spend > 0).
+  // Antes incluia todas (50, com 37 paradas) — match rate vinha 16% mesmo
+  // com tracking funcionando bem em 8 de 13 ativas (= 62%). Confunde o user.
+  const activeMetaCampaigns = metaCampaigns.filter((c) => {
+    const m = c.metrics as Record<string, number>;
+    return (m.spend ?? 0) > 0;
+  }).length;
+
   const matchRateFinal =
-    metaCampaigns.length > 0
-      ? matchedCount / metaCampaigns.length
+    activeMetaCampaigns > 0
+      ? matchedCount / activeMetaCampaigns
       : 0;
 
   const totals: AttributionTotals = {
@@ -747,12 +783,14 @@ export async function GET(req: NextRequest) {
     .slice(0, 5);
 
   // ── insights ──────────────────────────────────────────────────────
+  // totalMetaCampaigns = ATIVAS (com spend > 0). Campanhas paradas/teste antigas
+  // distorciam o match rate (50 total, mas 37 sem nem uma chance de gerar lead)
   const insights = computeAttributionInsights({
     campaignAttribution,
     channelROI,
     totals,
     matchedCount,
-    totalMetaCampaigns: metaCampaigns.length,
+    totalMetaCampaigns: activeMetaCampaigns,
   });
 
   // ── Response ──────────────────────────────────────────────────────
