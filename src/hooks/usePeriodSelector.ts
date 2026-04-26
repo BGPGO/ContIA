@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
-export type PeriodPreset = "7d" | "30d" | "90d" | "custom";
+export type PeriodPreset = "today" | "7d" | "30d" | "thisMonth" | "90d" | "custom";
 
 export interface PeriodRange {
   start: Date;
@@ -34,10 +34,25 @@ function today(): Date {
   return d;
 }
 
+function startOfMonth(): Date {
+  const d = new Date();
+  d.setDate(1);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function startOfToday(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
 function computeRange(preset: PeriodPreset, customStart?: Date, customEnd?: Date): PeriodRange {
   if (preset === "custom" && customStart && customEnd) {
     return { start: customStart, end: customEnd };
   }
+  if (preset === "today") return { start: startOfToday(), end: today() };
+  if (preset === "thisMonth") return { start: startOfMonth(), end: today() };
   const days = preset === "7d" ? 7 : preset === "30d" ? 30 : 90;
   return { start: daysAgo(days), end: today() };
 }
@@ -45,17 +60,17 @@ function computeRange(preset: PeriodPreset, customStart?: Date, customEnd?: Date
 /** Retorna true se o preset cobre algum período a partir de earliestConnectionDate */
 function presetIsValid(preset: PeriodPreset, earliestConnectionDate: Date | null): boolean {
   if (!earliestConnectionDate || preset === "custom") return true;
+  if (preset === "today") return startOfToday() >= earliestConnectionDate;
+  if (preset === "thisMonth") return startOfMonth() >= earliestConnectionDate;
   const days = preset === "7d" ? 7 : preset === "30d" ? 30 : 90;
   const periodStart = daysAgo(days);
-  // Preset válido se a data de início do período NÃO é anterior à data de conexão
-  // (ou seja: há dados reais disponíveis naquele intervalo)
   return periodStart >= earliestConnectionDate;
 }
 
 /** Encontra o maior preset válido. Se nenhum couber, retorna "custom" */
 function findBestValidPreset(earliestConnectionDate: Date | null): PeriodPreset {
-  const ordered: PeriodPreset[] = ["7d", "30d", "90d"];
-  for (const p of ordered) {
+  const ordered: PeriodPreset[] = ["today", "7d", "thisMonth", "30d", "90d"];
+  for (const p of ordered.reverse()) {
     if (presetIsValid(p, earliestConnectionDate)) return p;
   }
   return "custom";
@@ -70,7 +85,9 @@ function computePreviousRange(range: PeriodRange): PeriodRange {
 
 const STORAGE_KEY = "contia_period_preset";
 const PRESETS_LABELS: Record<PeriodPreset, string> = {
+  today: "Hoje",
   "7d": "Ultimos 7 dias",
+  thisMonth: "Este mes",
   "30d": "Ultimos 30 dias",
   "90d": "Ultimos 90 dias",
   custom: "Personalizado",

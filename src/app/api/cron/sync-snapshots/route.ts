@@ -145,7 +145,10 @@ export async function GET(req: NextRequest) {
           // syncInsights para as campanhas coletadas
           const campaignIds = content.map((c) => c.provider_content_id);
           const insights = campaignIds.length > 0 && metaAdsDriver.syncInsights
-            ? await metaAdsDriver.syncInsights(conn, campaignIds)
+            ? await metaAdsDriver.syncInsights(conn, campaignIds, {
+                since: metaAdsDateRange.since,
+                until: metaAdsDateRange.until,
+              })
             : [];
           void profile; void metrics;
           return 1 + content.length + insights.length;

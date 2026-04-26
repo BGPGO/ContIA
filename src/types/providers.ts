@@ -194,7 +194,7 @@ export interface ConnectionDriver {
   syncMetrics(connection: Connection, options?: SyncOptions): Promise<MetricSet>
 
   /** Insights detalhados por conteúdo — opcional (nem todo provider suporta) */
-  syncInsights?(connection: Connection, contentIds: string[]): Promise<InsightData[]>
+  syncInsights?(connection: Connection, contentIds: string[], options?: SyncOptions): Promise<InsightData[]>
 }
 
 /* ── SyncJob (sync_jobs row) ──────────────────────────────────────────────── */

@@ -18,7 +18,9 @@ interface PeriodSelectorProps {
 }
 
 const PRESETS: { key: PeriodPreset; label: string; days: number | null }[] = [
+  { key: "today", label: "Hoje", days: 1 },
   { key: "7d", label: "7 dias", days: 7 },
+  { key: "thisMonth", label: "Este mes", days: null },
   { key: "30d", label: "30 dias", days: 30 },
   { key: "90d", label: "90 dias", days: 90 },
   { key: "custom", label: "Personalizado", days: null },
@@ -87,6 +89,14 @@ export function PeriodSelector({
 
   function checkPresetValid(p: PeriodPreset, earliest: Date | null): boolean {
     if (!earliest || p === "custom") return true;
+    if (p === "today") {
+      const start = new Date(); start.setHours(0,0,0,0);
+      return start >= earliest;
+    }
+    if (p === "thisMonth") {
+      const start = new Date(); start.setDate(1); start.setHours(0,0,0,0);
+      return start >= earliest;
+    }
     const meta = PRESETS.find((x) => x.key === p);
     if (!meta?.days) return true;
     const periodStart = daysAgo(meta.days);
@@ -94,7 +104,7 @@ export function PeriodSelector({
   }
 
   function findBestValidPreset(earliest: Date | null): PeriodPreset {
-    const ordered: PeriodPreset[] = ["7d", "30d", "90d"];
+    const ordered: PeriodPreset[] = ["today", "7d", "thisMonth", "30d", "90d"];
     for (const p of ordered) {
       if (checkPresetValid(p, earliest)) return p;
     }

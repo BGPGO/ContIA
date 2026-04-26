@@ -796,13 +796,35 @@ export const metaAdsDriver: ConnectionDriver = {
 
   async syncInsights(
     connection: Connection,
-    campaignIds: string[]
+    campaignIds: string[],
+    options?: SyncOptions & { dateRange?: { since: string; until: string } }
   ): Promise<InsightData[]> {
     if (campaignIds.length === 0) return []
 
     const token = decryptToken(connection.access_token)
+    const accountId = resolveAccountId(connection)
     const supabase = getAdminSupabase()
+    const now = new Date().toISOString()
 
+    // Resolver range (mesma lógica de syncMetrics)
+    const toDateString = (d: Date | string): string =>
+      typeof d === 'string' ? d.split('T')[0] : d.toISOString().split('T')[0]
+
+    let resolvedRange: { since: string; until: string } | null = null
+    if (options?.dateRange) {
+      resolvedRange = options.dateRange
+    } else if (options?.since && options?.until) {
+      resolvedRange = {
+        since: toDateString(options.since),
+        until: toDateString(options.until),
+      }
+    }
+
+    const dateParams: Record<string, string> = resolvedRange
+      ? { time_range: JSON.stringify(resolvedRange) }
+      : { date_preset: 'last_30d' } // padrão: últimos 30d em vez de lifetime
+
+    // Carrega map de content_items pra fazer update em batch
     const { data: contentRows } = await supabase
       .from('content_items')
       .select('id, provider_content_id, metrics')
@@ -816,69 +838,72 @@ export const metaAdsDriver: ConnectionDriver = {
       ])
     )
 
-    const results: InsightData[] = []
+    // 1 ÚNICO request: /{accountId}/insights?level=campaign retorna 1 row por campanha com atividade
+    let perCampaign: Array<{
+      campaign_id?: string
+      campaign_name?: string
+      spend?: string
+      impressions?: string
+      clicks?: string
+      ctr?: string
+      cpc?: string
+      reach?: string
+      frequency?: string
+      actions?: ActionStat[]
+      action_values?: ActionStat[]
+      purchase_roas?: ActionStat[]
+    }> = []
 
-    for (const campaignId of campaignIds) {
-      try {
-        const insightRes = await fbFetch<{
-          data: Array<{
-            spend?: string
-            impressions?: string
-            clicks?: string
-            ctr?: string
-            cpc?: string
-            reach?: string
-            frequency?: string
-            actions?: ActionStat[]
-            action_values?: ActionStat[]
-            purchase_roas?: ActionStat[]
-          }>
-        }>(`/${campaignId}/insights`, {
+    try {
+      const res = await fbFetch<{ data: typeof perCampaign }>(
+        `/${accountId}/insights`,
+        {
           access_token: token,
           fields:
-            'spend,impressions,clicks,ctr,cpc,reach,frequency,actions,action_values,purchase_roas',
-          date_preset: 'lifetime',
-        })
+            'campaign_id,campaign_name,spend,impressions,clicks,ctr,cpc,reach,frequency,actions,action_values,purchase_roas',
+          level: 'campaign',
+          limit: '500',
+          ...dateParams,
+        }
+      )
+      perCampaign = res.data ?? []
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err)
+      console.warn('[MetaAdsDriver.syncInsights] Falha ao buscar insights por campanha:', errMsg)
+      await supabase
+        .from('social_connections')
+        .update({ last_error: `syncInsights ${now}: ${errMsg}`, updated_at: now })
+        .eq('id', connection.id)
+      return []
+    }
 
-        const raw = insightRes.data?.[0] ?? {}
-        const rawInsights = parseMetricsRow(raw)
+    const results: InsightData[] = []
 
-        if (Object.values(rawInsights).every((v) => v === 0)) continue
+    // Update individual mas em paralelo (Promise.all) — muito mais rápido que loop sequencial
+    await Promise.all(
+      perCampaign.map(async (row) => {
+        if (!row.campaign_id) return
+        const rawInsights = parseMetricsRow(row)
+        const contentRow = contentMap.get(row.campaign_id)
+        if (!contentRow?.id) return
 
-        const row = contentMap.get(campaignId)
-        if (row?.id) {
-          const mergedMetrics: Record<string, number> = {
-            ...(row.metrics ?? {}),
-            ...rawInsights,
-          }
-          await supabase
-            .from('content_items')
-            .update({ metrics: mergedMetrics, synced_at: new Date().toISOString() })
-            .eq('id', row.id)
+        const merged: Record<string, number> = {
+          ...(contentRow.metrics ?? {}),
+          ...rawInsights,
         }
 
-        results.push({
-          provider_content_id: campaignId,
-          metrics: rawInsights,
-          raw: raw as unknown as Record<string, unknown>,
-        })
-      } catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err)
-        console.warn(
-          `[MetaAdsDriver.syncInsights] Falha ao buscar insights para campanha ${campaignId}:`,
-          errMsg
-        )
-
-        // Registrar last_error na conexão
         await supabase
-          .from('social_connections')
-          .update({
-            last_error: `syncInsights ${new Date().toISOString()}: ${errMsg}`,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', connection.id)
-      }
-    }
+          .from('content_items')
+          .update({ metrics: merged, synced_at: now })
+          .eq('id', contentRow.id)
+
+        results.push({
+          provider_content_id: row.campaign_id,
+          metrics: rawInsights,
+          raw: row as unknown as Record<string, unknown>,
+        })
+      })
+    )
 
     return results
   },
