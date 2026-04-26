@@ -376,7 +376,7 @@ function AnalyticsContent() {
 
   /* SaveRate */
   const saveRateKpi = data?.contentPerformance?.kpis?.find(
-    (k) => k.label === "Save rate"
+    (k) => k.key === "save_rate"
   );
   const saveRate = saveRateKpi?.raw ?? 0;
   const saveRatePrevious =

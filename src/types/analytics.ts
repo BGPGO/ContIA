@@ -20,12 +20,30 @@ export interface AnalyticsKPI {
   suffix?: string;
 }
 
+export interface ProviderKPI {
+  label: string;
+  value: string;
+  raw: number;
+  /** Ícone lucide (nome string) — opcional */
+  icon?: string;
+}
+
 export interface ProviderSummary {
   provider: ProviderKey;
   displayName: string;
   color: string;
   connected: boolean;
-  kpis: { label: string; value: string; raw: number }[];
+  /** KPIs legados (compat) */
+  kpis: ProviderKPI[];
+  /**
+   * KPIs do mês corrente (do dia 1 até hoje) agrupados por provider.
+   * Substitui os kpis genéricos na Visão por Rede.
+   */
+  monthlyKpis: ProviderKPI[];
+  /** ISO string do snapshot mais recente do mês (undefined = sem dados) */
+  lastSnapshotAt?: string;
+  /** true quando a conexão existe mas ainda não há snapshot no mês corrente */
+  awaitingFirstSync?: boolean;
 }
 
 export interface RecentPost {
@@ -47,6 +65,8 @@ export interface TimeSeriesDataPoint {
 }
 
 export interface ContentPerformanceKPI {
+  /** Chave estável usada por consumidores (ex: "save_rate", "posts_count"). */
+  key?: string;
   label: string;
   value: number | string;
   raw: number;
@@ -93,6 +113,8 @@ export interface ProviderAnalyticsData {
   metaAdsAdvanced?: MetaAdsAdvanced;
   /** Bloco avançado disponível só para provider="facebook" */
   facebookAdvanced?: FacebookAdvanced;
+  /** Bloco avançado disponível só para provider="crm" */
+  crmAdvanced?: CrmAdvanced;
 }
 
 export interface ProviderPost {
@@ -271,6 +293,50 @@ export interface FacebookAdvanced {
     shares: number;
     reach: number;
   }>;
+}
+
+/* ── CRM Advanced Analytics ───────────────────────────────────── */
+
+export interface CrmFunnelStage {
+  stage: string;
+  label: string;
+  count: number;
+  color: string;
+}
+
+export interface CrmLeadOrigin {
+  origin: string;
+  label: string;
+  count: number;
+  pct: number;
+}
+
+export interface CrmAdvanced {
+  funnel: CrmFunnelStage[];
+  leadsByOrigin: CrmLeadOrigin[];
+  leadsByTemperature: { hot: number; warm: number; cold: number };
+  conversion: {
+    rate: number;
+    won: number;
+    revenue: number;
+    avgTicket: number;
+  };
+  email: {
+    campaigns: number;
+    sent: number;
+    openRate: number;
+    clickRate: number;
+    bounceRate: number;
+  };
+  whatsapp: {
+    sent: number;
+    delivered: number;
+    deliveryRate: number;
+    replies: number;
+    replyRate: number;
+    conversions: number;
+  };
+  greatpages: { leads: number; landingPages: number };
 }
 
 /* ── Strategic Insights ────────────────────────────────────────── */

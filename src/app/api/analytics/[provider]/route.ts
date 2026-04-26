@@ -15,6 +15,9 @@ import type {
   MetaAdsAdvanced,
   AdCampaignSummary,
   FacebookAdvanced,
+  CrmAdvanced,
+  CrmFunnelStage,
+  CrmLeadOrigin,
 } from "@/types/analytics";
 import {
   fetchInstagramLive,
@@ -933,22 +936,33 @@ export async function GET(
       });
     }
   } else if (provider === "crm") {
-    for (const [key, label, icon] of [
-      ["leads_new", "Leads Novos", "user_plus"],
-      ["conversion_rate", "Conversao", "trending"],
-      ["deals_won", "Deals Ganhos", "dollar"],
-      ["pipeline_value", "Pipeline", "dollar"],
-    ] as const) {
-      const v = latestMetric(snapshots, key);
-      const pv = latestMetric(prevSnapshots, key);
+    // Helper para somar uma métrica em todos os snapshots do período (métricas cumulativas).
+    const sumMetric = (snaps: typeof snapshots, key: string): number => {
+      return snaps.reduce((acc, s) => {
+        const m = s.metrics as Record<string, number>;
+        return acc + (m[key] ?? 0);
+      }, 0);
+    };
+
+    // Hero KPIs — 4 cards principais
+    // leads_new e deals_won são CUMULATIVOS no período (somar todos snapshots).
+    // pipeline_value e conversion_rate são de ESTADO (último snapshot).
+    for (const cfg of [
+      { key: "leads_new", label: "Leads Novos", icon: "user_plus", suffix: undefined, agg: "sum" as const },
+      { key: "deals_won", label: "Deals Fechados", icon: "dollar", suffix: undefined, agg: "sum" as const },
+      { key: "pipeline_value", label: "Pipeline", icon: "dollar", suffix: "R$", agg: "latest" as const },
+      { key: "conversion_rate", label: "Conversao", icon: "trending", suffix: "%", agg: "latest" as const },
+    ]) {
+      const v = cfg.agg === "sum" ? sumMetric(snapshots, cfg.key) : latestMetric(snapshots, cfg.key);
+      const pv = cfg.agg === "sum" ? sumMetric(prevSnapshots, cfg.key) : latestMetric(prevSnapshots, cfg.key);
       kpis.push({
-        key,
-        label,
+        key: cfg.key,
+        label: cfg.label,
         value: v,
         previousValue: pv,
         ...computeDelta(v, pv),
-        icon,
-        suffix: key === "conversion_rate" ? "%" : undefined,
+        icon: cfg.icon,
+        suffix: cfg.suffix,
       });
     }
   } else if (provider === "greatpages") {
@@ -1475,6 +1489,127 @@ export async function GET(
       insightsSummary: computeInsightsSummary({
         posts,
         kpis: fbKpis,
+        periodStart,
+        periodEnd,
+      }),
+    });
+  }
+
+  // ── CRM Advanced ────────────────────────────────────────────────────────
+  if (provider === "crm") {
+    const m0 = snapshots.length > 0
+      ? (snapshots[snapshots.length - 1].metrics as Record<string, number>)
+      : {} as Record<string, number>;
+
+    // Funil — ordem da entrada até fechamento
+    const FUNNEL_STAGES: Array<{ stage: string; label: string; color: string }> = [
+      { stage: "funnel_stage_lead",                   label: "Lead",                   color: "#3b82f6" },
+      { stage: "funnel_stage_contato_feito",          label: "Contato Feito",          color: "#6366f1" },
+      { stage: "funnel_stage_marcar_reunião",         label: "Marcar Reunião",         color: "#8b5cf6" },
+      { stage: "funnel_stage_reunião_agendada",       label: "Reunião Agendada",       color: "#a855f7" },
+      { stage: "funnel_stage_aguardando_dados",       label: "Aguardando Dados",       color: "#d946ef" },
+      { stage: "funnel_stage_proposta_enviada",       label: "Proposta Enviada",       color: "#f59e0b" },
+      { stage: "funnel_stage_aguardando_assinatura",  label: "Aguardando Assinatura",  color: "#f97316" },
+      { stage: "funnel_stage_ganho_fechado",          label: "Ganho Fechado",          color: "#22c55e" },
+    ];
+
+    const funnel: CrmFunnelStage[] = FUNNEL_STAGES.map(({ stage, label, color }) => ({
+      stage,
+      label,
+      count: m0[stage] ?? 0,
+      color,
+    }));
+
+    // Origens dos leads
+    const ORIGIN_LABELS: Record<string, string> = {
+      leads_origin_cpc:           "CPC",
+      leads_origin_direto:        "Direto",
+      "leads_origin_www.google.com": "Google Orgânico",
+    };
+
+    const originEntries = Object.entries(ORIGIN_LABELS).map(([key, label]) => ({
+      origin: key,
+      label,
+      count: m0[key] ?? 0,
+    }));
+    const totalOrigins = originEntries.reduce((s, e) => s + e.count, 0) || 1;
+    const leadsByOrigin: CrmLeadOrigin[] = originEntries
+      .map((e) => ({
+        ...e,
+        pct: Math.round((e.count / totalOrigins) * 1000) / 10,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    // Temperatura
+    const hot  = m0.leads_hot  ?? 0;
+    const warm = m0.leads_warm ?? 0;
+    const cold = m0.leads_cold ?? 0;
+
+    // Conversão
+    const won     = m0.deals_won  ?? m0.funnel_won    ?? 0;
+    const revenue = m0.pipeline_value ?? m0.funnel_revenue ?? 0;
+    const convRate = m0.conversion_rate ?? m0.funnel_conversion_rate ?? 0;
+    const avgTicket = won > 0 ? Math.round(revenue / won) : 0;
+
+    // Email
+    const emailCampaigns = m0.email_campaigns ?? 0;
+    const emailSent      = m0.email_sent       ?? 0;
+    const emailOpenRate  = m0.email_open_rate  ?? 0;
+    const emailClickRate = m0.email_click_rate ?? 0;
+    const emailBounce    = m0.email_bounce_rate ?? 0;
+
+    // WhatsApp
+    const waSent         = m0.wa_sent          ?? 0;
+    const waDelivered    = m0.wa_delivered      ?? 0;
+    const waReplies      = m0.wa_replies        ?? 0;
+    const waConversions  = m0.wa_conversions    ?? 0;
+    const deliveryRate   = waSent > 0 ? Math.round((waDelivered / waSent) * 1000) / 10 : 0;
+    const replyRate      = waSent > 0 ? Math.round((waReplies   / waSent) * 1000) / 10 : 0;
+
+    // GreatPages
+    const gpLeads = m0.gp_leads        ?? 0;
+    const gpLPs   = m0.gp_landing_pages ?? 0;
+
+    const crmAdvanced: CrmAdvanced = {
+      funnel,
+      leadsByOrigin,
+      leadsByTemperature: { hot, warm, cold },
+      conversion: { rate: convRate, won, revenue, avgTicket },
+      email: {
+        campaigns: emailCampaigns,
+        sent:      emailSent,
+        openRate:  emailOpenRate,
+        clickRate: emailClickRate,
+        bounceRate: emailBounce,
+      },
+      whatsapp: {
+        sent:         waSent,
+        delivered:    waDelivered,
+        deliveryRate,
+        replies:      waReplies,
+        replyRate,
+        conversions:  waConversions,
+      },
+      greatpages: { leads: gpLeads, landingPages: gpLPs },
+    };
+
+    return NextResponse.json({
+      provider,
+      connected: true,
+      kpis,
+      timeSeries,
+      posts,
+      breakdown,
+      heatmap: null,
+      funnelStages: null,
+      topHashtags: null,
+      trafficSources: null,
+      topPages: null,
+      campaigns: null,
+      crmAdvanced,
+      insightsSummary: computeInsightsSummary({
+        posts,
+        kpis,
         periodStart,
         periodEnd,
       }),

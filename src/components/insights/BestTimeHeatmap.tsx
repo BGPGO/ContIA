@@ -122,7 +122,7 @@ export function BestTimeHeatmap({
             </svg>
           </div>
           <p className="text-[13px] text-text-muted max-w-xs leading-relaxed">
-            Aguardando dados. Heatmap aparecerá após semanas de atividade.
+            Publique pelo menos 7 posts para ativar este gráfico — quanto mais consistência de horários, mais preciso o heatmap.
           </p>
         </div>
       </div>

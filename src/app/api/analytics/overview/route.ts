@@ -9,6 +9,7 @@ import type { ProviderKey } from "@/types/providers";
 import type {
   AnalyticsKPI,
   ProviderSummary,
+  ProviderKPI,
   TimeSeriesDataPoint,
   RecentPost,
 } from "@/types/analytics";
@@ -408,6 +409,26 @@ export async function GET(req: NextRequest) {
   const reachD = computeDelta(currentReach, prevReach);
   const postsCount = contentItems.length;
 
+  // Engajamento e Posts: computar delta real usando prevContentItems
+  const prevTotalEngagement = prevContentItems.reduce((acc, item) => {
+    const m = item.metrics as Record<string, number>;
+    return (
+      acc +
+      (m.likes ?? m.like_count ?? 0) +
+      (m.comments ?? m.comments_count ?? 0) +
+      (m.shares ?? m.share_count ?? 0) +
+      (m.saves ?? 0)
+    );
+  }, 0);
+  // engRate prev: total engagement / posts / followers (mesma fórmula)
+  const prevEngRate =
+    prevFollowers > 0 && prevContentItems.length > 0
+      ? Math.round(((prevTotalEngagement / prevContentItems.length / prevFollowers) * 100) * 100) / 100
+      : 0;
+  const kpiEngD = computeDelta(engRate, prevEngRate);
+  const prevPostsCount = prevContentItems.length;
+  const kpiPostsD = computeDelta(postsCount, prevPostsCount);
+
   const kpis: AnalyticsKPI[] = [
     {
       key: "followers",
@@ -429,10 +450,8 @@ export async function GET(req: NextRequest) {
       key: "engagement",
       label: "Engajamento",
       value: engRate,
-      previousValue: 0,
-      delta: 0,
-      deltaPercent: 0,
-      trend: "flat",
+      previousValue: prevEngRate,
+      ...kpiEngD,
       icon: "heart",
       suffix: "%",
     },
@@ -440,21 +459,90 @@ export async function GET(req: NextRequest) {
       key: "posts",
       label: "Posts",
       value: postsCount,
-      previousValue: 0,
-      delta: postsCount,
-      deltaPercent: 0,
-      trend: postsCount > 0 ? "up" : "flat",
+      previousValue: prevPostsCount,
+      ...kpiPostsD,
       icon: "file",
     },
   ];
+
+  // --- Mês corrente: do dia 1 até hoje ---
+  const now = new Date();
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  const monthEnd = now.toISOString().split("T")[0]; // hoje
+
+  // Snapshots do mês corrente (subconjunto de currentSnapshots se period inclui o mês, senão busca separado)
+  // Para simplicidade e confiabilidade, usamos currentSnapshots filtrados por [monthStart, monthEnd]
+  // quando o period já cobre o mês; caso o usuário tenha escolhido um período diferente, re-filtramos.
+  const monthlySnapshotsRaw = currentSnapshots.filter((s) => {
+    const d = s.snapshot_date as string;
+    return d >= monthStart && d <= monthEnd;
+  });
+
+  // Se o período selecionado pelo user não inclui o mês corrente, precisamos buscar separado.
+  // Verificamos se monthStart < periodStart (mês começou antes do período escolhido).
+  let monthlySnapshots = monthlySnapshotsRaw;
+  if (monthStart < periodStart) {
+    // Período escolhido é menor que o mês — buscar snapshots do mês complementar
+    const { data: extraSnaps } = await admin
+      .from("provider_snapshots")
+      .select("*")
+      .eq("empresa_id", empresaId)
+      .gte("snapshot_date", monthStart)
+      .lt("snapshot_date", periodStart)
+      .order("snapshot_date", { ascending: true });
+    if (extraSnaps && extraSnaps.length > 0) {
+      monthlySnapshots = [...(extraSnaps as typeof currentSnapshots), ...monthlySnapshotsRaw];
+    }
+  }
+
+  /**
+   * Soma todos os snapshots do mês para um provider e uma chave de métrica.
+   * Usado para métricas de FLUXO como spend, impressions, clicks (que são acumuladas por dia).
+   */
+  function sumMonthlyMetricForProvider(pk: string, key: string): number {
+    return monthlySnapshots
+      .filter((s) => (s.provider as string) === pk)
+      .reduce((acc, s) => {
+        const m = s.metrics as Record<string, number>;
+        return acc + (m[key] ?? 0);
+      }, 0);
+  }
+
+  /**
+   * Retorna o valor mais recente de uma métrica de ESTADO (ex: followers_count, fan_count).
+   * Pega o snapshot com snapshot_date mais alto dentro do mês.
+   */
+  function latestMonthlyMetricForProvider(pk: string, key: string): number {
+    const snaps = monthlySnapshots
+      .filter((s) => (s.provider as string) === pk)
+      .sort((a, b) => (b.snapshot_date as string).localeCompare(a.snapshot_date as string));
+    if (snaps.length === 0) return 0;
+    const m = snaps[0].metrics as Record<string, number>;
+    return m[key] ?? 0;
+  }
+
+  /**
+   * Retorna o snapshot mais recente de um provider no mês.
+   */
+  function latestSnapshotForProvider(pk: string): string | undefined {
+    const snaps = monthlySnapshots
+      .filter((s) => (s.provider as string) === pk)
+      .sort((a, b) => (b.created_at as string).localeCompare(a.created_at as string));
+    return snaps.length > 0 ? (snaps[0].created_at as string) : undefined;
+  }
 
   // --- Provider summaries ---
   const providers: ProviderSummary[] = PROVIDER_DISPLAY_ORDER.map((pk) => {
     const meta = METADATA_BY_PROVIDER[pk];
     const connected = connectedSet.has(pk);
-    const provKpis: ProviderSummary["kpis"] = [];
+    const legacyKpis: ProviderKPI[] = [];
+    const monthlyKpis: ProviderKPI[] = [];
+
+    const hasMonthlyData = monthlySnapshots.some((s) => (s.provider as string) === pk);
+    const lastSnapshotAt = latestSnapshotForProvider(pk);
 
     if (connected) {
+      // ── KPIs legados (para compatibilidade) ──
       const byProvider = latestMetricByProvider(currentSnapshots, "followers_count");
       const followers = byProvider.get(pk) ?? 0;
       const provContent = contentItems.filter(
@@ -474,22 +562,204 @@ export async function GET(req: NextRequest) {
           : 0;
 
       if (pk === "ga4") {
-        provKpis.push({ label: "Sessoes", value: "0", raw: 0 });
-        provKpis.push({ label: "Usuarios", value: "0", raw: 0 });
+        legacyKpis.push({ label: "Sessoes", value: "0", raw: 0 });
+        legacyKpis.push({ label: "Usuarios", value: "0", raw: 0 });
       } else if (pk === "google_ads" || pk === "meta_ads") {
-        provKpis.push({ label: "Spend", value: "R$ 0", raw: 0 });
-        provKpis.push({ label: "CTR", value: "0%", raw: 0 });
+        // Legado mantém 0 pois será substituído pelos monthlyKpis
+        legacyKpis.push({ label: "Spend", value: "R$ 0", raw: 0 });
+        legacyKpis.push({ label: "CTR", value: "0%", raw: 0 });
       } else {
-        provKpis.push({
+        legacyKpis.push({
           label: "Seguidores",
           value: formatCompact(followers),
           raw: followers,
+          icon: "users",
         });
-        provKpis.push({
+        legacyKpis.push({
           label: "Engajamento",
           value: `${provEngRate}%`,
           raw: provEngRate,
+          icon: "heart",
         });
+      }
+
+      // ── KPIs do mês corrente por tipo de provider ──
+      if (hasMonthlyData) {
+        if (pk === "instagram" || pk === "facebook" || pk === "linkedin") {
+          // Métricas de estado: pegar o mais recente
+          const monthFollowers = latestMonthlyMetricForProvider(
+            pk,
+            pk === "facebook" ? "fan_count" : "followers_count"
+          );
+          // Engajamento: somar do período para o mês
+          const monthProvContent = contentItems.filter(
+            (c) => (c.provider as ProviderKey) === pk
+          );
+          const monthEng = monthProvContent.reduce((acc, item) => {
+            const m = item.metrics as Record<string, number>;
+            return (
+              acc +
+              (m.likes ?? m.like_count ?? 0) +
+              (m.comments ?? m.comments_count ?? 0) +
+              (m.saves ?? 0)
+            );
+          }, 0);
+          const monthEngRate =
+            monthFollowers > 0 && monthProvContent.length > 0
+              ? Math.round(((monthEng / monthProvContent.length / monthFollowers) * 100) * 100) / 100
+              : 0;
+          const monthReach = monthProvContent.reduce((acc, item) => {
+            const m = item.metrics as Record<string, number>;
+            return acc + (m.reach ?? 0);
+          }, 0);
+
+          monthlyKpis.push({
+            label: "Seguidores",
+            value: formatCompact(monthFollowers),
+            raw: monthFollowers,
+            icon: "users",
+          });
+          monthlyKpis.push({
+            label: "Engajamento",
+            value: `${monthEngRate}%`,
+            raw: monthEngRate,
+            icon: "heart",
+          });
+          monthlyKpis.push({
+            label: "Posts",
+            value: monthProvContent.length.toString(),
+            raw: monthProvContent.length,
+            icon: "image",
+          });
+          if (monthReach > 0) {
+            monthlyKpis.push({
+              label: "Alcance",
+              value: formatCompact(monthReach),
+              raw: monthReach,
+              icon: "eye",
+            });
+          }
+        } else if (pk === "meta_ads" || pk === "google_ads") {
+          // Métricas de FLUXO: somar TODOS os snapshots do mês
+          // O syncMetrics do Meta Ads salva spend/impressions/clicks/conversions por dia
+          const monthSpend = sumMonthlyMetricForProvider(pk, "spend");
+          const monthImpressions = sumMonthlyMetricForProvider(pk, "impressions");
+          const monthClicks = sumMonthlyMetricForProvider(pk, "clicks");
+          const monthConversions = sumMonthlyMetricForProvider(pk, "conversions");
+          const monthCtr =
+            monthImpressions > 0
+              ? Math.round((monthClicks / monthImpressions) * 10000) / 100
+              : 0;
+          const monthRoas =
+            monthSpend > 0 && monthConversions > 0
+              ? Math.round((monthConversions / monthSpend) * 100) / 100
+              : null;
+
+          monthlyKpis.push({
+            label: "Investimento",
+            value: `R$ ${monthSpend.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            raw: monthSpend,
+            icon: "dollar-sign",
+          });
+          monthlyKpis.push({
+            label: "Cliques",
+            value: formatCompact(monthClicks),
+            raw: monthClicks,
+            icon: "mouse-pointer-click",
+          });
+          monthlyKpis.push({
+            label: "Conversoes",
+            value: monthConversions.toString(),
+            raw: monthConversions,
+            icon: "target",
+          });
+          if (monthRoas !== null) {
+            monthlyKpis.push({
+              label: "ROAS",
+              value: `${monthRoas}x`,
+              raw: monthRoas,
+              icon: "trending-up",
+            });
+          } else {
+            monthlyKpis.push({
+              label: "CTR",
+              value: `${monthCtr}%`,
+              raw: monthCtr,
+              icon: "percent",
+            });
+          }
+        } else if (pk === "ga4") {
+          const monthSessions = sumMonthlyMetricForProvider(pk, "sessions");
+          const monthUsers = latestMonthlyMetricForProvider(pk, "users");
+          monthlyKpis.push({
+            label: "Sessoes",
+            value: formatCompact(monthSessions),
+            raw: monthSessions,
+            icon: "activity",
+          });
+          monthlyKpis.push({
+            label: "Usuarios",
+            value: formatCompact(monthUsers),
+            raw: monthUsers,
+            icon: "users",
+          });
+        } else if (pk === "crm") {
+          // CRM: pegar métricas do snapshot mais recente (agregadas pelo CRM endpoint)
+          const monthLeads = latestMonthlyMetricForProvider(pk, "new_leads");
+          const monthDeals = latestMonthlyMetricForProvider(pk, "deals_closed");
+          const monthPipeline = latestMonthlyMetricForProvider(pk, "pipeline_value");
+          const monthConvRate = latestMonthlyMetricForProvider(pk, "conversion_rate");
+
+          monthlyKpis.push({
+            label: "Leads novos",
+            value: formatCompact(monthLeads),
+            raw: monthLeads,
+            icon: "user-plus",
+          });
+          monthlyKpis.push({
+            label: "Deals fechados",
+            value: monthDeals.toString(),
+            raw: monthDeals,
+            icon: "handshake",
+          });
+          if (monthPipeline > 0) {
+            monthlyKpis.push({
+              label: "Pipeline",
+              value: `R$ ${formatCompact(monthPipeline)}`,
+              raw: monthPipeline,
+              icon: "dollar-sign",
+            });
+          }
+          if (monthConvRate > 0) {
+            monthlyKpis.push({
+              label: "Conversao",
+              value: `${Math.round(monthConvRate * 10) / 10}%`,
+              raw: monthConvRate,
+              icon: "percent",
+            });
+          }
+        } else if (pk === "youtube") {
+          const monthSubscribers = latestMonthlyMetricForProvider(pk, "subscribers");
+          const monthViews = sumMonthlyMetricForProvider(pk, "views");
+          monthlyKpis.push({
+            label: "Inscritos",
+            value: formatCompact(monthSubscribers),
+            raw: monthSubscribers,
+            icon: "users",
+          });
+          monthlyKpis.push({
+            label: "Views",
+            value: formatCompact(monthViews),
+            raw: monthViews,
+            icon: "eye",
+          });
+          monthlyKpis.push({
+            label: "Tempo assistido",
+            value: "—",
+            raw: 0,
+            icon: "clock",
+          });
+        }
       }
     }
 
@@ -498,7 +768,10 @@ export async function GET(req: NextRequest) {
       displayName: meta.displayName,
       color: meta.color,
       connected,
-      kpis: provKpis,
+      kpis: legacyKpis,
+      monthlyKpis,
+      lastSnapshotAt,
+      awaitingFirstSync: connected && !hasMonthlyData,
     };
   });
 
@@ -625,30 +898,35 @@ export async function GET(req: NextRequest) {
     label: "Performance de Conteúdo",
     kpis: [
       {
+        key: "posts_count",
         label: "Posts publicados",
         value: currContent.postsCount,
         raw: currContent.postsCount,
         ...postsD,
       },
       {
+        key: "engagement_total",
         label: "Engajamento",
         value: currContent.totalEngagement,
         raw: currContent.totalEngagement,
         ...engD,
       },
       {
+        key: "reach_total",
         label: "Alcance",
         value: currContent.totalReach,
         raw: currContent.totalReach,
         ...reachContentD,
       },
       {
+        key: "save_rate",
         label: "Save rate",
         value: saveRatePct,
         raw: currContent.saveRate ?? 0,
         ...saveRateD,
       },
       {
+        key: "engagement_rate",
         label: "Taxa de engajamento",
         value: engRatePct,
         raw: currContent.engagementRate ?? 0,

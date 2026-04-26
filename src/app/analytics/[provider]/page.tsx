@@ -42,10 +42,15 @@ import { FormatPerformanceCards } from "@/components/analytics/FormatPerformance
 import { SpendTimelineChart } from "@/components/analytics/SpendTimelineChart";
 import { CampaignsTable } from "@/components/analytics/CampaignsTable";
 import { AdsKPIHero } from "@/components/analytics/AdsKPIHero";
+import { SalesFunnelChart } from "@/components/analytics/SalesFunnelChart";
+import { LeadsByOriginCard } from "@/components/analytics/LeadsByOriginCard";
+import { LeadTemperatureGauge } from "@/components/analytics/LeadTemperatureGauge";
+import { EmailEngagementCard } from "@/components/analytics/EmailEngagementCard";
+import { WhatsAppEngagementCard } from "@/components/analytics/WhatsAppEngagementCard";
 
 /* ── Tipos ── */
 import type { ProviderKey } from "@/types/providers";
-import type { AnalyticsKPI, ProviderPost, AdCampaignSummary } from "@/types/analytics";
+import type { AnalyticsKPI, ProviderPost, AdCampaignSummary, CrmAdvanced } from "@/types/analytics";
 import type { Anomaly } from "@/components/insights/AnomalyBadge";
 import type { HeatmapCell } from "@/components/insights/BestTimeHeatmap";
 import type { PostsTableRow } from "@/components/analytics/PostsTable";
@@ -54,7 +59,7 @@ import type { ContentTypeData } from "@/components/insights/ContentTypePerforman
 import type { BreakdownPieItem } from "@/components/analytics/BreakdownPie";
 
 /* ── Layout type ── */
-type LayoutType = "paid" | "social" | "default";
+type LayoutType = "crm" | "paid" | "social" | "default";
 
 /* ── Label mapeamento de tipo de conteúdo ── */
 const CONTENT_TYPE_LABELS: Record<string, string> = {
@@ -447,6 +452,7 @@ function ProviderAnalyticsContent() {
 
   /* Layout type */
   const layoutType = useMemo<LayoutType>(() => {
+    if (provider === "crm") return "crm";
     if (provider === "meta_ads" || provider === "google_ads") return "paid";
     if (
       provider === "instagram" ||
@@ -506,6 +512,18 @@ function ProviderAnalyticsContent() {
     return totalReach > 0 ? totalSaves / totalReach : 0;
   }, [data?.instagramAdvanced?.saveRateAnalysis?.avgSaveRate, posts]);
 
+  /* Share rate (Facebook): shares / reach — substitui SaveRate para FB */
+  const shareRate = useMemo(() => {
+    let totalShares = 0;
+    let totalReach = 0;
+    for (const p of posts) {
+      const m = p.metrics ?? {};
+      totalShares += m.shares ?? m.share_count ?? 0;
+      totalReach += m.reach ?? 0;
+    }
+    return totalReach > 0 ? totalShares / totalReach : 0;
+  }, [posts]);
+
   const engBreakdown = useMemo(() => {
     const ig = data?.instagramAdvanced?.engagementBreakdown;
     if (ig) {
@@ -551,6 +569,12 @@ function ProviderAnalyticsContent() {
   const worstPerf = useMemo(
     () => data?.metaAdsAdvanced?.worstPerformingCampaign ?? null,
     [data?.metaAdsAdvanced?.worstPerformingCampaign]
+  );
+
+  /* ── CRM Advanced memos ── */
+  const crmAdvanced = useMemo<CrmAdvanced | null>(
+    () => data?.crmAdvanced ?? null,
+    [data?.crmAdvanced]
   );
 
   /* ── Guards ── */
@@ -605,7 +629,7 @@ function ProviderAnalyticsContent() {
                 </h1>
                 {layoutType === "paid" && (
                   <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-yellow-500/15 text-yellow-400 border border-yellow-500/30">
-                    Midia Paga
+                    Mídia Paga
                   </span>
                 )}
               </div>
@@ -676,6 +700,131 @@ function ProviderAnalyticsContent() {
         />
       )}
 
+      {/* ── DASHBOARD — LAYOUT CRM ── */}
+      {data && data.connected && layoutType === "crm" && (
+        <>
+          {/* SEÇÃO 1: ANOMALIAS */}
+          <AnimatePresence>
+            {anomalies.length > 0 && (
+              <motion.div {...sectionAnim(0)}>
+                <AnomalyBadge anomalies={anomalies} onDismiss={handleDismissAnomaly} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* SEÇÃO 2: INSIGHTS ESTRATÉGICOS */}
+          <motion.div {...sectionAnim(0.05)}>
+            <SectionHeader
+              title="Insights Estrategicos"
+              subtitle="O que os dados do CRM revelam sobre seu funil de vendas"
+            />
+            <StrategicInsightsCard
+              insights={data.insightsSummary?.insights ?? []}
+              title="Inteligencia de Vendas"
+              subtitle="Analise automatica baseada nos dados do periodo selecionado"
+              emptyMessage="Aguardando dados suficientes para gerar insights. Expanda o periodo ou aguarde a sincronizacao do CRM."
+            />
+          </motion.div>
+
+          {/* SEÇÃO 3: HERO KPIs */}
+          {data.kpis.length > 0 && (
+            <motion.div
+              {...sectionAnim(0.1)}
+              className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4"
+            >
+              {data.kpis.map((kpi, i) => (
+                <KPICard
+                  key={kpi.key}
+                  label={kpi.label}
+                  value={kpi.value}
+                  previousValue={kpi.previousValue}
+                  delta={kpi.delta}
+                  deltaPercent={kpi.deltaPercent}
+                  trend={kpi.trend}
+                  icon={kpi.icon}
+                  animationDelay={i * 0.07}
+                />
+              ))}
+            </motion.div>
+          )}
+
+          {/* SEÇÃO 4: FUNIL */}
+          {crmAdvanced && (
+            <motion.div {...sectionAnim(0.15)}>
+              <SectionHeader
+                title="Funil de Vendas"
+                subtitle="Distribuicao de leads por etapa — da captacao ao fechamento"
+              />
+              <SalesFunnelChart funnel={crmAdvanced.funnel} />
+            </motion.div>
+          )}
+
+          {/* SEÇÃO 5: ORIGENS + TEMPERATURA */}
+          {crmAdvanced && (
+            <motion.div {...sectionAnim(0.2)} className="space-y-4">
+              <SectionHeader
+                title="Perfil dos Leads"
+                subtitle="De onde vem e qual e a temperatura dos seus leads"
+              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <LeadsByOriginCard data={crmAdvanced.leadsByOrigin} />
+                <LeadTemperatureGauge
+                  hot={crmAdvanced.leadsByTemperature.hot}
+                  warm={crmAdvanced.leadsByTemperature.warm}
+                  cold={crmAdvanced.leadsByTemperature.cold}
+                />
+              </div>
+            </motion.div>
+          )}
+
+          {/* SEÇÃO 6: ENGAJAMENTO (Email + WhatsApp) */}
+          {crmAdvanced && (
+            <motion.div {...sectionAnim(0.25)} className="space-y-4">
+              <SectionHeader
+                title="Engajamento"
+                subtitle="Performance de email marketing e cadencias de WhatsApp"
+              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <EmailEngagementCard email={crmAdvanced.email} />
+                <WhatsAppEngagementCard whatsapp={crmAdvanced.whatsapp} />
+              </div>
+            </motion.div>
+          )}
+
+          {/* SEÇÃO 7: GREATPAGES (condicional) */}
+          {crmAdvanced && crmAdvanced.greatpages.leads > 0 && (
+            <motion.div {...sectionAnim(0.3)}>
+              <SectionHeader
+                title="Landing Pages"
+                subtitle="Leads captados pelas paginas de conversao"
+              />
+              <div className="bg-bg-card border border-border rounded-xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div>
+                  <p className="text-[13px] text-text-muted">Leads via GreatPages</p>
+                  <p className="text-[32px] font-bold text-accent tabular-nums leading-none mt-1">
+                    {crmAdvanced.greatpages.leads.toLocaleString("pt-BR")}
+                  </p>
+                </div>
+                <div className="text-center sm:text-right">
+                  <p className="text-[13px] text-text-muted">Landing Pages ativas</p>
+                  <p className="text-[32px] font-bold text-text-primary tabular-nums leading-none mt-1">
+                    {crmAdvanced.greatpages.landingPages}
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Empty state global */}
+          {data.kpis.length === 0 && !crmAdvanced && (
+            <EmptyState
+              title="Sem dados no periodo"
+              description="Nenhum dado de CRM encontrado para o periodo selecionado. Tente expandir o intervalo de datas."
+            />
+          )}
+        </>
+      )}
+
       {/* ── DASHBOARD — LAYOUT PAGO ── */}
       {data && data.connected && layoutType === "paid" && (
         <>
@@ -697,9 +846,17 @@ function ProviderAnalyticsContent() {
               />
               <AdsKPIHero
                 totalSpend={data.metaAdsAdvanced.totalSpend}
+                totalSpendDelta={data.kpis.find((k) => k.key === "spend")?.delta ?? null}
+                totalSpendDeltaPct={data.kpis.find((k) => k.key === "spend")?.deltaPercent ?? null}
                 avgROAS={data.metaAdsAdvanced.avgROAS}
+                avgROASDelta={data.kpis.find((k) => k.key === "roas")?.delta ?? null}
+                avgROASDeltaPct={data.kpis.find((k) => k.key === "roas")?.deltaPercent ?? null}
                 totalConversions={data.metaAdsAdvanced.totalConversions}
+                totalConversionsDelta={data.kpis.find((k) => k.key === "conversions")?.delta ?? null}
+                totalConversionsDeltaPct={data.kpis.find((k) => k.key === "conversions")?.deltaPercent ?? null}
                 avgCPC={data.metaAdsAdvanced.avgCPC}
+                avgCPCDelta={data.kpis.find((k) => k.key === "cpc")?.delta ?? null}
+                avgCPCDeltaPct={data.kpis.find((k) => k.key === "cpc")?.deltaPercent ?? null}
               />
             </motion.div>
           )}
@@ -730,7 +887,14 @@ function ProviderAnalyticsContent() {
               title="Gasto por dia"
             />
 
-            {data.timeSeries.length > 0 && (
+            {/* TimeSeriesChart só faz sentido se há followers/reach > 0;
+                ads (meta_ads, google_ads) não têm followers, então escondemos quando todos zero. */}
+            {data.timeSeries.length > 0 &&
+              data.timeSeries.some((pt) => {
+                const f = pt[`${provider}_followers`];
+                const r = pt[`${provider}_reach`];
+                return (typeof f === "number" && f > 0) || (typeof r === "number" && r > 0);
+              }) && (
               <TimeSeriesChart
                 data={data.timeSeries}
                 providers={[provider]}
@@ -855,7 +1019,37 @@ function ProviderAnalyticsContent() {
             />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <SaveRateCard saveRate={saveRate} benchmark={0.02} />
+              {provider === "facebook" ? (
+                <div className="bg-bg-card border border-border rounded-xl p-4 sm:p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center"
+                      style={{ backgroundColor: "#1877F220" }}
+                    >
+                      <Share2 size={16} style={{ color: "#1877F2" }} />
+                    </div>
+                    <div>
+                      <h3 className="text-[14px] font-semibold text-text-primary">
+                        Taxa de Compartilhamento
+                      </h3>
+                      <p className="text-[11px] text-text-muted">Shares / Alcance</p>
+                    </div>
+                  </div>
+                  <p className="text-3xl font-bold text-text-primary tabular-nums">
+                    {(shareRate * 100).toFixed(2)}%
+                  </p>
+                  {data.facebookAdvanced && (
+                    <p className="text-[11px] text-text-muted mt-2">
+                      {data.facebookAdvanced.totalShares.toLocaleString("pt-BR")} compartilhamentos
+                      {data.facebookAdvanced.pageNewFans > 0 && (
+                        <> · +{data.facebookAdvanced.pageNewFans.toLocaleString("pt-BR")} novos fãs</>
+                      )}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <SaveRateCard saveRate={saveRate} benchmark={0.02} />
+              )}
               <EngagementBreakdown
                 likes={engBreakdown.likes}
                 comments={engBreakdown.comments}
@@ -931,7 +1125,53 @@ function ProviderAnalyticsContent() {
           )}
 
           {/* SEÇÃO 8: TOP POSTS */}
-          {postsTableRows.length > 0 ? (
+          {provider === "facebook" && data.facebookAdvanced && data.facebookAdvanced.topPosts.length > 0 ? (
+            <motion.div {...sectionAnim(0.4)}>
+              <SectionHeader
+                title="Top Posts do Facebook"
+                subtitle="Publicacoes com maior engajamento (reacoes + comentarios + compartilhamentos)"
+              />
+              <div className="bg-bg-card border border-border rounded-xl divide-y divide-border">
+                {data.facebookAdvanced.topPosts.map((p, idx) => {
+                  const total = p.reactions + p.comments + p.shares;
+                  return (
+                    <div key={p.id} className="flex items-start gap-3 p-4">
+                      <div className="w-7 h-7 shrink-0 rounded-full bg-bg-elevated flex items-center justify-center text-[11px] font-semibold text-text-secondary">
+                        {idx + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] text-text-primary line-clamp-2">
+                          {p.message || "(sem texto)"}
+                        </p>
+                        <div className="flex items-center gap-4 mt-2 text-[11px] text-text-muted tabular-nums">
+                          <span>{p.reactions.toLocaleString("pt-BR")} reacoes</span>
+                          <span>{p.comments.toLocaleString("pt-BR")} comentarios</span>
+                          <span>{p.shares.toLocaleString("pt-BR")} shares</span>
+                          {p.reach > 0 && <span>{p.reach.toLocaleString("pt-BR")} alcance</span>}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-[14px] font-semibold text-text-primary tabular-nums">
+                          {total.toLocaleString("pt-BR")}
+                        </p>
+                        <p className="text-[10px] text-text-muted">eng. total</p>
+                        {p.permalink && (
+                          <a
+                            href={p.permalink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-accent hover:underline"
+                          >
+                            Abrir
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          ) : postsTableRows.length > 0 ? (
             <motion.div {...sectionAnim(0.4)}>
               <SectionHeader
                 title="Top Posts"
