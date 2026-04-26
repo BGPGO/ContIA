@@ -142,7 +142,25 @@ async function listPages(userToken: string): Promise<FBPage[]> {
     access_token: userToken,
     fields: 'id,name,username,picture,fan_count,followers_count,access_token',
   })
-  return res.data ?? []
+  const pages = res.data ?? []
+  console.log(`[FB Driver] /me/accounts retornou ${pages.length} pages:`, pages.map(p => ({ id: p.id, name: p.name })))
+  return pages
+}
+
+/**
+ * Inspeciona um user_token e retorna scopes concedidos.
+ * Útil pra diagnosticar quando granular_scopes derrubam permissions.
+ */
+async function debugToken(userToken: string, appId: string, appSecret: string): Promise<{ scopes: string[]; granular_scopes?: Array<{ scope: string; target_ids?: string[] }> }> {
+  const url = new URL(`${FB_GRAPH}/debug_token`)
+  url.searchParams.set('input_token', userToken)
+  url.searchParams.set('access_token', `${appId}|${appSecret}`)
+  const res = await fetch(url.toString())
+  const data = (await res.json()) as { data?: { scopes?: string[]; granular_scopes?: Array<{ scope: string; target_ids?: string[] }> } }
+  return {
+    scopes: data.data?.scopes ?? [],
+    granular_scopes: data.data?.granular_scopes,
+  }
 }
 
 /* ── Driver ──────────────────────────────────────────────────────────────── */
@@ -208,8 +226,30 @@ export const facebookDriver: ConnectionDriver = {
     // 3. Listar Pages administradas pelo usuário
     const pages = await listPages(userToken)
     if (pages.length === 0) {
+      // Debug: inspecionar o token pra entender que scopes foram concedidos
+      try {
+        const debug = await debugToken(userToken, appId, appSecret)
+        console.log('[FB Driver] Token concedeu scopes:', debug.scopes, 'granular:', debug.granular_scopes)
+        const hasPagesScope = debug.scopes.includes('pages_show_list')
+        const granularPages = debug.granular_scopes?.find((g) => g.scope === 'pages_show_list')
+
+        if (!hasPagesScope) {
+          throw new Error(
+            'Permissão pages_show_list não foi concedida. Reconecte autorizando todas as permissões pedidas.'
+          )
+        }
+        if (granularPages && (!granularPages.target_ids || granularPages.target_ids.length === 0)) {
+          throw new Error(
+            'Você precisa selecionar pelo menos uma Página no diálogo de autorização do Facebook. Reconecte e marque a página da Bertuzzi.'
+          )
+        }
+      } catch (err) {
+        if (err instanceof Error && err.message !== 'Nenhuma Facebook Page encontrada. Você precisa ser administrador de pelo menos uma página.') {
+          throw err
+        }
+      }
       throw new Error(
-        'Nenhuma Facebook Page encontrada. Você precisa ser administrador de pelo menos uma página.'
+        'Nenhuma Facebook Page retornada. Você precisa ser admin de uma página E selecioná-la no diálogo de autorização.'
       )
     }
 
