@@ -13,7 +13,7 @@ export const runtime = "nodejs";
 // Timeout maximo da funcao (Coolify/Node — Vercel usa maxDuration)
 export const maxDuration = 300; // 5 minutos
 
-const TIMEOUT_PER_CONNECTION_MS = 30_000; // 30s por conexao
+const TIMEOUT_PER_CONNECTION_MS = 90_000; // 90s (meta_ads c/ backfill 30d + insights pode levar mais)
 
 /**
  * GET /api/cron/sync-snapshots
@@ -158,7 +158,7 @@ export async function GET(req: NextRequest) {
         syncPromise,
         new Promise<never>((_, reject) =>
           setTimeout(
-            () => reject(new Error("Timeout: sincronizacao excedeu 30s")),
+            () => reject(new Error(`Timeout: sincronizacao excedeu ${TIMEOUT_PER_CONNECTION_MS / 1000}s`)),
             TIMEOUT_PER_CONNECTION_MS
           )
         ),

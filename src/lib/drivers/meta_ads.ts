@@ -701,38 +701,41 @@ export const metaAdsDriver: ConnectionDriver = {
 
     const dailyRows = insightsData.data ?? []
 
-    // --- Modo backfill: upsert 1 snapshot por dia do range ---
+    // --- Modo backfill: BATCH upsert de todos os snapshots do range em 1 query ---
+    // (loop sequencial estourava timeout 30s do cron)
     if (resolvedRange && dailyRows.length > 0) {
-      for (const row of dailyRows) {
-        const snapshotDate = row.date_start ?? today
-        const metrics = parseMetricsRow(row)
+      const snapshotRows = dailyRows.map((row) => ({
+        empresa_id: connection.empresa_id,
+        connection_id: connection.id,
+        provider: 'meta_ads' as const,
+        snapshot_date: row.date_start ?? today,
+        metrics: parseMetricsRow(row),
+      }))
 
-        await supabase.from('provider_snapshots').upsert(
-          {
-            empresa_id: connection.empresa_id,
-            connection_id: connection.id,
-            provider: 'meta_ads',
-            snapshot_date: snapshotDate,
-            metrics,
-          },
-          { onConflict: 'connection_id,snapshot_date' }
-        )
+      await supabase.from('provider_snapshots').upsert(snapshotRows, {
+        onConflict: 'connection_id,snapshot_date',
+      })
 
-        if (Object.keys(metrics).length > 0) {
-          const metricEvents = Object.entries(metrics).map(([key, value]) => ({
-            empresa_id: connection.empresa_id,
-            connection_id: connection.id,
-            provider: 'meta_ads' as const,
-            metric_key: key,
-            metric_value: value,
-            dimension: {} as Record<string, unknown>,
-            occurred_at: snapshotDate,
-            collected_at: now,
-          }))
-          await supabase.from('metric_events').upsert(metricEvents, {
-            onConflict: 'connection_id,metric_key,occurred_at,dimension',
-          })
-        }
+      // Achatar todos metric_events em 1 array e fazer 1 upsert só
+      const allMetricEvents = snapshotRows.flatMap((s) =>
+        Object.keys(s.metrics).length > 0
+          ? Object.entries(s.metrics).map(([key, value]) => ({
+              empresa_id: connection.empresa_id,
+              connection_id: connection.id,
+              provider: 'meta_ads' as const,
+              metric_key: key,
+              metric_value: value,
+              dimension: {} as Record<string, unknown>,
+              occurred_at: s.snapshot_date,
+              collected_at: now,
+            }))
+          : []
+      )
+
+      if (allMetricEvents.length > 0) {
+        await supabase.from('metric_events').upsert(allMetricEvents, {
+          onConflict: 'connection_id,metric_key,occurred_at,dimension',
+        })
       }
 
       // Retornar o snapshot do último dia do range como representante
