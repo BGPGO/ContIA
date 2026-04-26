@@ -10,6 +10,7 @@ interface UseProviderAnalyticsReturn {
   loading: boolean;
   error: string | null;
   refresh: () => void;
+  invalidate: (empresaId: string, prov: string) => void;
 }
 
 const CACHE_TTL = 60_000;
@@ -29,12 +30,13 @@ export function useProviderAnalytics(
   const startISO = periodStart.toISOString().split("T")[0];
   const endISO = periodEnd.toISOString().split("T")[0];
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (forceRefresh = false) => {
     if (!empresa?.id) return;
 
     const cacheKey = `${empresa.id}_${provider}_${startISO}_${endISO}`;
     const cached = cache.get(cacheKey);
-    if (cached && Date.now() - cached.ts < CACHE_TTL) {
+    // Fix 4: forceRefresh=true bypassa o cache (usado por refresh() e invalidate())
+    if (!forceRefresh && cached && Date.now() - cached.ts < CACHE_TTL) {
       setData(cached.data);
       return;
     }
@@ -73,5 +75,20 @@ export function useProviderAnalytics(
     return () => abortRef.current?.abort();
   }, [fetchData]);
 
-  return { data, loading, error, refresh: fetchData };
+  // Fix 4: refresh força bypass de cache (não reutiliza entrada expirada ou não)
+  const refresh = useCallback(() => {
+    fetchData(true);
+  }, [fetchData]);
+
+  // Fix 4: invalida todas as entradas de cache para um empresa+provider específicos
+  // Útil para chamar após sync manual antes de recarregar os dados
+  const invalidate = useCallback((emp: string, prov: string) => {
+    for (const key of Array.from(cache.keys())) {
+      if (key.startsWith(`${emp}_${prov}_`)) {
+        cache.delete(key);
+      }
+    }
+  }, []);
+
+  return { data, loading, error, refresh, invalidate };
 }

@@ -24,10 +24,12 @@ export const maxDuration = 60; // 1 minuto — endpoint interativo
  *   { status: "error", message: "..." }
  */
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ connectionId: string }> }
 ) {
   const { connectionId } = await params;
+  // Fix 6: ?full_range=true força sync dos últimos 30 dias (backfill on-demand)
+  const fullRange = req.nextUrl.searchParams.get("full_range") === "true";
 
   if (!connectionId) {
     return NextResponse.json(
@@ -147,10 +149,22 @@ export async function POST(
       ]);
       snapshotCount = 1 + content.length;
     } else if (connection.provider === "meta_ads") {
+      // Fix 6: se full_range=true, sincroniza os últimos 30 dias (backfill on-demand)
+      let metaAdsSyncOptions: { since?: Date; until?: Date } | undefined;
+      if (fullRange) {
+        const metaToday = new Date();
+        const metaSince = new Date(metaToday);
+        metaSince.setDate(metaSince.getDate() - 30);
+        metaAdsSyncOptions = { since: metaSince, until: metaToday };
+        console.log(
+          `[connections/sync] meta_ads full_range=true: backfill ${metaSince.toISOString().split("T")[0]}..${metaToday.toISOString().split("T")[0]}`
+        );
+      }
+
       const [, content] = await Promise.all([
         metaAdsDriver.syncProfile(connection),
-        metaAdsDriver.syncContent(connection),
-        metaAdsDriver.syncMetrics(connection),
+        metaAdsDriver.syncContent(connection, metaAdsSyncOptions),
+        metaAdsDriver.syncMetrics(connection, metaAdsSyncOptions),
       ]);
       const campaignIds = content.map((c) => c.provider_content_id);
       const insights = campaignIds.length > 0 && metaAdsDriver.syncInsights

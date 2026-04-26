@@ -131,12 +131,28 @@ async function refreshFBLongLivedToken(
 
 /* ── Helpers de action stats ─────────────────────────────────────────────── */
 
+type ActionStat = { action_type: string; value: string }
+
 /**
  * Soma os valores (em moeda) de actions cujo action_type contém uma das chaves.
  * Usado pra extrair conversion_value de `action_values` da Graph API.
  */
 function sumActionValues(
-  actions: Array<{ action_type: string; value: string }> | undefined,
+  actions: ActionStat[] | undefined,
+  matchKeys: string[]
+): number {
+  if (!actions || actions.length === 0) return 0
+  return actions
+    .filter((a) => matchKeys.some((k) => a.action_type.includes(k)))
+    .reduce((sum, a) => sum + (parseFloat(a.value) || 0), 0)
+}
+
+/**
+ * Soma o COUNT de actions cujo action_type contém uma das chaves.
+ * Diferente de sumActionValues que soma `value` (valor monetário) — esse soma quantidade.
+ */
+function sumActions(
+  actions: ActionStat[] | undefined,
   matchKeys: string[]
 ): number {
   if (!actions || actions.length === 0) return 0
@@ -150,7 +166,7 @@ function sumActionValues(
  * cujo type contém uma das chaves. Meta retorna ROAS por tipo de conversão.
  */
 function avgActionValues(
-  actions: Array<{ action_type: string; value: string }> | undefined,
+  actions: ActionStat[] | undefined,
   matchKeys: string[]
 ): number {
   if (!actions || actions.length === 0) return 0
@@ -160,6 +176,51 @@ function avgActionValues(
     .filter((v) => v > 0)
   if (values.length === 0) return 0
   return values.reduce((s, v) => s + v, 0) / values.length
+}
+
+/**
+ * Extrai métricas numéricas de uma linha de insights da Marketing API.
+ * Suporta tanto `actions[]` (conversions count) quanto `action_values[]` (valor).
+ */
+function parseMetricsRow(raw: {
+  spend?: string
+  impressions?: string
+  clicks?: string
+  ctr?: string
+  cpc?: string
+  reach?: string
+  frequency?: string
+  actions?: ActionStat[]
+  action_values?: ActionStat[]
+  purchase_roas?: ActionStat[]
+}): Record<string, number> {
+  const conversionValue = sumActionValues(raw.action_values, ['purchase', 'lead', 'complete_registration'])
+  const conversions = sumActions(raw.actions, ['offsite_conversion', 'lead', 'complete_registration', 'purchase'])
+  const roas = avgActionValues(raw.purchase_roas, ['purchase'])
+  return {
+    spend: parseFloat(raw.spend ?? '0') || 0,
+    impressions: parseInt(raw.impressions ?? '0', 10) || 0,
+    clicks: parseInt(raw.clicks ?? '0', 10) || 0,
+    ctr: parseFloat(raw.ctr ?? '0') || 0,
+    cpc: parseFloat(raw.cpc ?? '0') || 0,
+    reach: parseInt(raw.reach ?? '0', 10) || 0,
+    frequency: parseFloat(raw.frequency ?? '0') || 0,
+    conversions,
+    conversion_value: conversionValue,
+    roas,
+  }
+}
+
+/**
+ * Resolve o accountId ativo: prefere `active_account_id` (selecionado via picker)
+ * antes de cair no `ad_account_id` original do callback.
+ */
+function resolveAccountId(connection: Connection): string {
+  return (
+    (connection.metadata?.active_account_id as string | undefined) ??
+    (connection.metadata?.ad_account_id as string | undefined) ??
+    `act_${connection.provider_user_id}`
+  )
 }
 
 /* ── HTTP helper ─────────────────────────────────────────────────────────── */
@@ -327,8 +388,7 @@ export const metaAdsDriver: ConnectionDriver = {
   async verify(connection: Connection): Promise<boolean> {
     try {
       const token = decryptToken(connection.access_token)
-      const accountId = (connection.metadata?.ad_account_id as string | undefined) ??
-        `act_${connection.provider_user_id}`
+      const accountId = resolveAccountId(connection)
 
       await fbFetch<{ id: string; name: string }>(`/${accountId}`, {
         access_token: token,
@@ -415,8 +475,7 @@ export const metaAdsDriver: ConnectionDriver = {
 
   async syncProfile(connection: Connection): Promise<ProfileData> {
     const token = decryptToken(connection.access_token)
-    const accountId = (connection.metadata?.ad_account_id as string | undefined) ??
-      `act_${connection.provider_user_id}`
+    const accountId = resolveAccountId(connection)
 
     const account = await fbFetch<{
       id: string
@@ -489,8 +548,7 @@ export const metaAdsDriver: ConnectionDriver = {
     options?: SyncOptions
   ): Promise<ContentItem[]> {
     const token = decryptToken(connection.access_token)
-    const accountId = (connection.metadata?.ad_account_id as string | undefined) ??
-      `act_${connection.provider_user_id}`
+    const accountId = resolveAccountId(connection)
     const limit = options?.contentLimit ?? 50
 
     let res: { data: Campaign[] }
@@ -558,56 +616,139 @@ export const metaAdsDriver: ConnectionDriver = {
 
   async syncMetrics(
     connection: Connection,
-    _options?: SyncOptions
+    options?: SyncOptions & { dateRange?: { since: string; until: string } }
   ): Promise<MetricSet> {
     const token = decryptToken(connection.access_token)
-    const accountId = (connection.metadata?.ad_account_id as string | undefined) ??
-      `act_${connection.provider_user_id}`
+    const accountId = resolveAccountId(connection)
     const today = new Date().toISOString().split('T')[0]
+    const supabase = getAdminSupabase()
+    const now = new Date().toISOString()
 
-    type ActionStat = { action_type: string; value: string }
+    // Aceita 3 formas de definir o range:
+    //   1. options.dateRange = { since: "YYYY-MM-DD", until: "YYYY-MM-DD" } (explicit)
+    //   2. options.since + options.until = Date (do SyncOptions padrão — usado por cron/sync)
+    //   3. nenhum — usa date_preset: 'today' (modo legacy)
+    const toDateString = (d: Date | string): string =>
+      typeof d === 'string' ? d.split('T')[0] : d.toISOString().split('T')[0]
+
+    let resolvedRange: { since: string; until: string } | null = null
+    if (options?.dateRange) {
+      resolvedRange = options.dateRange
+    } else if (options?.since && options?.until) {
+      resolvedRange = {
+        since: toDateString(options.since),
+        until: toDateString(options.until),
+      }
+    }
+
+    // Parâmetros de data: range real com time_increment=1 (1 row/dia) ou preset today
+    const dateParams: Record<string, string> = resolvedRange
+      ? {
+          time_range: JSON.stringify(resolvedRange),
+          time_increment: '1',
+        }
+      : { date_preset: 'today' }
+
     let insightsData: {
       data: Array<{
+        date_start?: string
+        date_stop?: string
         spend?: string
         impressions?: string
         clicks?: string
         ctr?: string
         cpc?: string
-        conversions?: string
+        reach?: string
+        frequency?: string
+        actions?: ActionStat[]
         action_values?: ActionStat[]
         purchase_roas?: ActionStat[]
-        conversion_rate_ranking?: string
       }>
     } = { data: [] }
 
+    let fetchSucceeded = false
     try {
       insightsData = await fbFetch<typeof insightsData>(`/${accountId}/insights`, {
         access_token: token,
         fields:
-          'spend,impressions,clicks,ctr,cpc,conversions,action_values,purchase_roas,conversion_rate_ranking',
+          'spend,impressions,clicks,ctr,cpc,reach,frequency,actions,action_values,purchase_roas',
         level: 'account',
-        date_preset: 'today',
+        ...dateParams,
       })
+      fetchSucceeded = true
     } catch (err) {
-      console.warn('[MetaAdsDriver.syncMetrics] Falha ao buscar insights:', err instanceof Error ? err.message : err)
+      const errMsg = err instanceof Error ? err.message : String(err)
+      console.warn('[MetaAdsDriver.syncMetrics] Falha ao buscar insights:', errMsg)
+
+      // Registrar last_error na conexão
+      await supabase
+        .from('social_connections')
+        .update({
+          last_error: `syncMetrics ${now}: ${errMsg}`,
+          updated_at: now,
+        })
+        .eq('id', connection.id)
     }
 
-    const raw = insightsData.data?.[0] ?? {}
-    const conversionValue = sumActionValues(raw.action_values, ['purchase', 'lead', 'complete_registration'])
-    const roas = avgActionValues(raw.purchase_roas, ['purchase'])
-    const metrics: Record<string, number> = {
-      spend: parseFloat(raw.spend ?? '0') || 0,
-      impressions: parseInt(raw.impressions ?? '0', 10) || 0,
-      clicks: parseInt(raw.clicks ?? '0', 10) || 0,
-      ctr: parseFloat(raw.ctr ?? '0') || 0,
-      cpc: parseFloat(raw.cpc ?? '0') || 0,
-      conversions: parseFloat(raw.conversions ?? '0') || 0,
-      conversion_value: conversionValue,
-      roas: roas,
+    // Limpar last_error em caso de sucesso (preserva erros antigos não resolvidos
+    // se a chamada falhou; apaga o erro stale se a chamada agora passou).
+    if (fetchSucceeded) {
+      await supabase
+        .from('social_connections')
+        .update({ last_error: null, updated_at: now })
+        .eq('id', connection.id)
     }
 
-    const supabase = getAdminSupabase()
-    const now = new Date().toISOString()
+    const dailyRows = insightsData.data ?? []
+
+    // --- Modo backfill: upsert 1 snapshot por dia do range ---
+    if (resolvedRange && dailyRows.length > 0) {
+      for (const row of dailyRows) {
+        const snapshotDate = row.date_start ?? today
+        const metrics = parseMetricsRow(row)
+
+        await supabase.from('provider_snapshots').upsert(
+          {
+            empresa_id: connection.empresa_id,
+            connection_id: connection.id,
+            provider: 'meta_ads',
+            snapshot_date: snapshotDate,
+            metrics,
+          },
+          { onConflict: 'connection_id,snapshot_date' }
+        )
+
+        if (Object.keys(metrics).length > 0) {
+          const metricEvents = Object.entries(metrics).map(([key, value]) => ({
+            empresa_id: connection.empresa_id,
+            connection_id: connection.id,
+            provider: 'meta_ads' as const,
+            metric_key: key,
+            metric_value: value,
+            dimension: {} as Record<string, unknown>,
+            occurred_at: snapshotDate,
+            collected_at: now,
+          }))
+          await supabase.from('metric_events').upsert(metricEvents, {
+            onConflict: 'connection_id,metric_key,occurred_at,dimension',
+          })
+        }
+      }
+
+      // Retornar o snapshot do último dia do range como representante
+      const lastRow = dailyRows[dailyRows.length - 1]
+      return {
+        connection_id: connection.id,
+        provider: 'meta_ads',
+        snapshot_date: lastRow.date_start ?? today,
+        metrics: parseMetricsRow(lastRow),
+        raw: { insights: dailyRows } as Record<string, unknown>,
+      }
+    }
+
+    // --- Modo legacy (today) ---
+    const raw = dailyRows[0] ?? {}
+    const metrics = parseMetricsRow(raw)
 
     // Escrita em provider_snapshots
     await supabase.from('provider_snapshots').upsert(
@@ -644,7 +785,7 @@ export const metaAdsDriver: ConnectionDriver = {
       provider: 'meta_ads',
       snapshot_date: today,
       metrics,
-      raw: { insights: insightsData.data } as Record<string, unknown>,
+      raw: { insights: dailyRows } as Record<string, unknown>,
     }
   },
 
@@ -676,7 +817,6 @@ export const metaAdsDriver: ConnectionDriver = {
 
     for (const campaignId of campaignIds) {
       try {
-        type ActionStat = { action_type: string; value: string }
         const insightRes = await fbFetch<{
           data: Array<{
             spend?: string
@@ -684,34 +824,21 @@ export const metaAdsDriver: ConnectionDriver = {
             clicks?: string
             ctr?: string
             cpc?: string
-            conversions?: string
             reach?: string
             frequency?: string
+            actions?: ActionStat[]
             action_values?: ActionStat[]
             purchase_roas?: ActionStat[]
           }>
         }>(`/${campaignId}/insights`, {
           access_token: token,
           fields:
-            'spend,impressions,clicks,ctr,cpc,conversions,reach,frequency,action_values,purchase_roas',
+            'spend,impressions,clicks,ctr,cpc,reach,frequency,actions,action_values,purchase_roas',
           date_preset: 'lifetime',
         })
 
         const raw = insightRes.data?.[0] ?? {}
-        const conversionValue = sumActionValues(raw.action_values, ['purchase', 'lead', 'complete_registration'])
-        const roas = avgActionValues(raw.purchase_roas, ['purchase'])
-        const rawInsights: Record<string, number> = {
-          spend: parseFloat(raw.spend ?? '0') || 0,
-          impressions: parseInt(raw.impressions ?? '0', 10) || 0,
-          clicks: parseInt(raw.clicks ?? '0', 10) || 0,
-          ctr: parseFloat(raw.ctr ?? '0') || 0,
-          cpc: parseFloat(raw.cpc ?? '0') || 0,
-          conversions: parseFloat(raw.conversions ?? '0') || 0,
-          reach: parseInt(raw.reach ?? '0', 10) || 0,
-          frequency: parseFloat(raw.frequency ?? '0') || 0,
-          conversion_value: conversionValue,
-          roas: roas,
-        }
+        const rawInsights = parseMetricsRow(raw)
 
         if (Object.values(rawInsights).every((v) => v === 0)) continue
 
@@ -733,10 +860,20 @@ export const metaAdsDriver: ConnectionDriver = {
           raw: raw as unknown as Record<string, unknown>,
         })
       } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err)
         console.warn(
           `[MetaAdsDriver.syncInsights] Falha ao buscar insights para campanha ${campaignId}:`,
-          err instanceof Error ? err.message : err
+          errMsg
         )
+
+        // Registrar last_error na conexão
+        await supabase
+          .from('social_connections')
+          .update({
+            last_error: `syncInsights ${new Date().toISOString()}: ${errMsg}`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', connection.id)
       }
     }
 

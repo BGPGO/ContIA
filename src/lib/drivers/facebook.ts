@@ -435,14 +435,24 @@ export const facebookDriver: ConnectionDriver = {
       followers_count: page.followers_count ?? 0,
     }
 
-    // Escrita em provider_snapshots
+    // Fix 3: ler snapshot existente e mesclar metrics (JSONB merge — preserva dados de syncMetrics)
+    const { data: existingProfileSnapshot } = await supabase
+      .from('provider_snapshots')
+      .select('metrics')
+      .eq('connection_id', connection.id)
+      .eq('snapshot_date', today)
+      .maybeSingle()
+
+    const mergedProfileMetrics = { ...(existingProfileSnapshot?.metrics ?? {}), ...metrics }
+
+    // Escrita em provider_snapshots com metrics mesclados
     await supabase.from('provider_snapshots').upsert(
       {
         empresa_id: connection.empresa_id,
         connection_id: connection.id,
         provider: 'facebook',
         snapshot_date: today,
-        metrics,
+        metrics: mergedProfileMetrics,
       },
       { onConflict: 'connection_id,snapshot_date' }
     )
@@ -490,16 +500,37 @@ export const facebookDriver: ConnectionDriver = {
     const pageId = connection.page_id ?? connection.provider_user_id
     const limit = options?.contentLimit ?? 50
 
-    let res: { data: FBPost[] }
+    // Fix 4: usar /feed (mais permissivo) com fallback gracioso se falhar por permissão
+    let res: { data: FBPost[] } = { data: [] }
     try {
-      res = await fbFetch<{ data: FBPost[] }>(`/${pageId}/posts`, {
+      res = await fbFetch<{ data: FBPost[] }>(`/${pageId}/feed`, {
         access_token: token,
         fields:
           'id,message,created_time,full_picture,permalink_url,reactions.summary(total_count),comments.summary(total_count),shares',
         limit: String(limit),
       })
     } catch (err) {
-      console.warn('[FacebookDriver.syncContent] Falha ao buscar posts:', err instanceof Error ? err.message : err)
+      const msg = err instanceof Error ? err.message : String(err)
+      const isPermErr = err instanceof Error && (
+        msg.includes('#10') ||
+        msg.includes('pages_read_user_content') ||
+        msg.includes('OAuthException')
+      )
+      if (isPermErr) {
+        console.warn('[FacebookDriver.syncContent] /feed sem permissão. Pulando posts. Solicite pages_read_user_content via App Review.')
+        // Fix 5: registrar last_error em social_connections
+        const supabase = getAdminSupabase()
+        await supabase.from('social_connections').update({
+          last_error: `[${new Date().toISOString()}] syncContent: ${msg}`,
+        }).eq('id', connection.id)
+        return []
+      }
+      console.warn('[FacebookDriver.syncContent] Falha ao buscar feed:', msg)
+      // Fix 5: registrar last_error em social_connections para erros genéricos também
+      const supabase = getAdminSupabase()
+      await supabase.from('social_connections').update({
+        last_error: `[${new Date().toISOString()}] syncContent: ${msg}`,
+      }).eq('id', connection.id)
       return []
     }
 
@@ -568,11 +599,15 @@ export const facebookDriver: ConnectionDriver = {
 
     const INSIGHT_METRICS = [
       'page_impressions',
+      'page_impressions_unique',
       'page_engaged_users',
-      'page_fans',
+      'page_post_engagements',
+      'page_fan_adds',
+      'page_fan_removes',
     ].join(',')
 
     let insightsData: { data: Array<{ name: string; values: Array<{ value: number }> }> } = { data: [] }
+    let insightsFetchSucceeded = false
 
     try {
       insightsData = await fbFetch<typeof insightsData>(`/${pageId}/insights`, {
@@ -580,8 +615,24 @@ export const facebookDriver: ConnectionDriver = {
         metric: INSIGHT_METRICS,
         period: 'day',
       })
+      insightsFetchSucceeded = true
     } catch (err) {
-      console.warn('[FacebookDriver.syncMetrics] Falha ao buscar insights:', err instanceof Error ? err.message : err)
+      const msg = err instanceof Error ? err.message : String(err)
+      console.warn('[FacebookDriver.syncMetrics] Falha ao buscar insights:', msg)
+      // Fix 5: registrar last_error em social_connections
+      const supabase = getAdminSupabase()
+      await supabase.from('social_connections').update({
+        last_error: `[${new Date().toISOString()}] syncMetrics: ${msg}`,
+      }).eq('id', connection.id)
+    }
+
+    // Limpar last_error em caso de sucesso da chamada
+    if (insightsFetchSucceeded) {
+      const supabase = getAdminSupabase()
+      await supabase
+        .from('social_connections')
+        .update({ last_error: null })
+        .eq('id', connection.id)
     }
 
     const metrics: Record<string, number> = {}
@@ -593,14 +644,36 @@ export const facebookDriver: ConnectionDriver = {
     const supabase = getAdminSupabase()
     const now = new Date().toISOString()
 
-    // Escrita em provider_snapshots
+    // Fix 2: guard — não upsert com metrics vazio (preserva snapshot do syncProfile)
+    if (Object.keys(metrics).length === 0) {
+      console.warn('[FacebookDriver.syncMetrics] Nenhum metric retornado — pulando upsert pra preservar dados de syncProfile')
+      return {
+        connection_id: connection.id,
+        provider: 'facebook',
+        snapshot_date: today,
+        metrics: {},
+        raw: {} as Record<string, unknown>,
+      }
+    }
+
+    // Fix 3: ler snapshot existente e mesclar metrics (JSONB merge)
+    const { data: existingSnapshot } = await supabase
+      .from('provider_snapshots')
+      .select('metrics')
+      .eq('connection_id', connection.id)
+      .eq('snapshot_date', today)
+      .maybeSingle()
+
+    const mergedMetrics = { ...(existingSnapshot?.metrics ?? {}), ...metrics }
+
+    // Escrita em provider_snapshots com metrics mesclados
     await supabase.from('provider_snapshots').upsert(
       {
         empresa_id: connection.empresa_id,
         connection_id: connection.id,
         provider: 'facebook',
         snapshot_date: today,
-        metrics,
+        metrics: mergedMetrics,
       },
       { onConflict: 'connection_id,snapshot_date' }
     )

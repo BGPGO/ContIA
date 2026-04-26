@@ -711,6 +711,47 @@ export async function GET(
     // Admin nao disponivel, usar session
   }
 
+  // Fix 1: para providers de anúncios (meta_ads, google_ads), NÃO filtrar content_items
+  // por published_at — campanhas são criadas uma vez mas gastam continuamente além da data de criação.
+  // Apenas providers "post-based" (instagram, facebook, linkedin, youtube) usam o filtro de data.
+  const isPostBased =
+    provider === "instagram" ||
+    provider === "facebook" ||
+    provider === "linkedin" ||
+    provider === "youtube";
+
+  const contentItemsBaseQuery = dbClient
+    .from("content_items")
+    .select("*")
+    .eq("empresa_id", empresaId)
+    .eq("provider", provider);
+
+  const contentItemsQuery = isPostBased
+    ? contentItemsBaseQuery
+        .gte("published_at", periodStart)
+        .lte("published_at", periodEnd)
+        .order("published_at", { ascending: false })
+        .limit(100)
+    : contentItemsBaseQuery
+        .order("synced_at", { ascending: false })
+        .limit(200);
+
+  const prevContentItemsBaseQuery = dbClient
+    .from("content_items")
+    .select("*")
+    .eq("empresa_id", empresaId)
+    .eq("provider", provider);
+
+  const prevContentItemsQuery = isPostBased
+    ? prevContentItemsBaseQuery
+        .gte("published_at", prevStartISO)
+        .lte("published_at", prevEndISO)
+        .order("published_at", { ascending: false })
+        .limit(100)
+    : prevContentItemsBaseQuery
+        .order("synced_at", { ascending: false })
+        .limit(200);
+
   const [snapshotsRes, prevSnapshotsRes, contentRes] = await Promise.all([
     dbClient
       .from("provider_snapshots")
@@ -728,20 +769,17 @@ export async function GET(
       .gte("snapshot_date", prevStartISO)
       .lte("snapshot_date", prevEndISO)
       .order("snapshot_date", { ascending: true }),
-    dbClient
-      .from("content_items")
-      .select("*")
-      .eq("empresa_id", empresaId)
-      .eq("provider", provider)
-      .gte("published_at", periodStart)
-      .lte("published_at", periodEnd)
-      .order("published_at", { ascending: false })
-      .limit(100),
+    contentItemsQuery,
   ]);
 
   const snapshots = snapshotsRes.data ?? [];
   const prevSnapshots = prevSnapshotsRes.data ?? [];
   const contentItems = contentRes.data ?? [];
+
+  // Fix 2: log estruturado para diagnóstico
+  console.log(
+    `[analytics/${provider}] empresa=${empresaId} period=${periodStart}..${periodEnd} snapshots=${snapshots.length} prevSnaps=${prevSnapshots.length} contentItems=${contentItems.length}`
+  );
 
   // Helpers
   function latestMetric(snaps: typeof snapshots, key: string): number {
@@ -1101,6 +1139,11 @@ export async function GET(
       };
     });
 
+    // Fix 2 (meta_ads): log de campanhas coletadas para diagnóstico
+    console.log(
+      `[analytics/meta_ads] empresa=${empresaId} campaignItems=${campaignItems.length} uniqueCampaigns=${campaignMap.size}`
+    );
+
     // Sort by spend desc, top 10
     const topCampaigns = [...allCampaigns]
       .sort((a, b) => b.spend - a.spend)
@@ -1117,6 +1160,11 @@ export async function GET(
     const avgCPC = totalClicks > 0 ? totalSpend / totalClicks : 0;
     const avgCPM = totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0;
     const avgROAS = totalConversionValue > 0 && totalSpend > 0 ? totalConversionValue / totalSpend : null;
+
+    // Fix 2 (meta_ads): log com totais calculados
+    console.log(
+      `[analytics/meta_ads] totalSpend=${totalSpend} totalImpressions=${totalImpressions} totalClicks=${totalClicks} totalConversions=${totalConversions} avgROAS=${avgROAS ?? "null"}`
+    );
 
     // spend by day from snapshots
     const spendByDay = snapshots.map((s) => {
@@ -1323,6 +1371,11 @@ export async function GET(
       shares,
       reach,
     }));
+
+    // Fix 2 (facebook): log para diagnóstico
+    console.log(
+      `[analytics/facebook] empresa=${empresaId} pageFans=${pageFans} pageImpressions=${pageImpressions} totalReactions=${totalReactions} posts=${contentItems.length}`
+    );
 
     const facebookAdvanced: FacebookAdvanced = {
       totalLikes: totalReactions, // reactions = likes on FB API
