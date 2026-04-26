@@ -67,10 +67,18 @@ function presetIsValid(preset: PeriodPreset, earliestConnectionDate: Date | null
   return periodStart >= earliestConnectionDate;
 }
 
-/** Encontra o maior preset válido. Se nenhum couber, retorna "custom" */
+/**
+ * Encontra o melhor preset válido dado o earliestConnectionDate.
+ * Preferência: thisMonth quando cabe; se não cabe, menor preset válido;
+ * se tudo cabe (conexão antiga), ainda assim retorna thisMonth.
+ * Nunca sobe para 30d ou 90d como padrão automático.
+ */
 function findBestValidPreset(earliestConnectionDate: Date | null): PeriodPreset {
-  const ordered: PeriodPreset[] = ["today", "7d", "thisMonth", "30d", "90d"];
-  for (const p of ordered.reverse()) {
+  // thisMonth é o alvo preferido — se for válido, retorna direto
+  if (presetIsValid("thisMonth", earliestConnectionDate)) return "thisMonth";
+  // Conexão nova (menos de 1 mês): cai para o maior preset que ainda cabe
+  const fallbacks: PeriodPreset[] = ["7d", "today"];
+  for (const p of fallbacks) {
     if (presetIsValid(p, earliestConnectionDate)) return p;
   }
   return "custom";
@@ -105,7 +113,7 @@ export function usePeriodSelector(): UsePeriodSelectorReturn {
       const saved = localStorage.getItem(STORAGE_KEY) as PeriodPreset | null;
       if (saved && saved in PRESETS_LABELS) return saved;
     }
-    return "30d";
+    return "thisMonth";
   });
 
   const [customStart, setCustomStart] = useState<Date | undefined>();

@@ -6,6 +6,7 @@ import {
 } from "@/lib/analytics/instagram-fetcher";
 import { facebookDriver } from "@/lib/drivers/facebook";
 import { metaAdsDriver } from "@/lib/drivers/meta_ads";
+import { crmDriver } from "@/lib/drivers/crm";
 import type { Connection } from "@/types/providers";
 import type { ConnectionSyncResult, CronSyncResponse } from "@/types/sync";
 
@@ -21,7 +22,7 @@ const TIMEOUT_PER_CONNECTION_MS = 90_000; // 90s (meta_ads c/ backfill 30d + ins
  * Cron diario que busca dados live de TODAS as conexoes ativas
  * e persiste snapshots historicos no banco.
  *
- * Providers suportados: instagram, facebook, meta_ads
+ * Providers suportados: instagram, facebook, meta_ads, crm
  * Providers ignorados (driver ainda nao existe): linkedin, youtube, ga4, google_ads
  *
  * Configuracao no Coolify:
@@ -78,7 +79,7 @@ export async function GET(req: NextRequest) {
     };
 
     // Providers sem driver: pular silenciosamente
-    const SUPPORTED_PROVIDERS = ["instagram", "facebook", "meta_ads"] as const;
+    const SUPPORTED_PROVIDERS = ["instagram", "facebook", "meta_ads", "crm"] as const;
     type Supported = (typeof SUPPORTED_PROVIDERS)[number];
 
     if (!SUPPORTED_PROVIDERS.includes(conn.provider as Supported)) {
@@ -86,7 +87,8 @@ export async function GET(req: NextRequest) {
       continue;
     }
 
-    if (!conn.access_token) {
+    // CRM autentica via API key do ambiente (CRM_ANALYTICS_API_KEY) — access_token é vazio por design
+    if (!conn.access_token && conn.provider !== "crm") {
       results.push({
         ...baseResult,
         status: "error",
@@ -152,6 +154,40 @@ export async function GET(req: NextRequest) {
             : [];
           void profile; void metrics;
           return 1 + content.length + insights.length;
+        }
+
+        if (conn.provider === "crm") {
+          // crmDriver.syncMetrics persiste em metric_events internamente.
+          // Fazemos também upsert em provider_snapshots para que a rota
+          // /api/analytics/[provider] (case "crm") encontre dados.
+          //
+          // Mapeamento de chaves: o driver gera nomes "verbosos" (leads_total,
+          // funnel_won, funnel_revenue, funnel_conversion_rate), mas o endpoint
+          // /api/analytics/[provider] (case "crm") e o time series leem chaves
+          // "canônicas" (leads_new, deals_won, pipeline_value, conversion_rate).
+          // Mantemos as originais E adicionamos os aliases pra não regredir
+          // nada que já consuma os nomes verbosos.
+          const metricSet = await crmDriver.syncMetrics(conn);
+          const m = metricSet.metrics;
+          const aliasedMetrics: Record<string, number> = {
+            ...m,
+            // KPIs esperados pelo endpoint analytics (case "crm")
+            leads_new: m.leads_total ?? 0,
+            deals_won: m.funnel_won ?? 0,
+            pipeline_value: m.funnel_revenue ?? 0,
+            conversion_rate: m.funnel_conversion_rate ?? 0,
+          };
+          await admin.from("provider_snapshots").upsert(
+            {
+              empresa_id: conn.empresa_id,
+              connection_id: conn.id,
+              provider: "crm",
+              snapshot_date: metricSet.snapshot_date,
+              metrics: aliasedMetrics,
+            },
+            { onConflict: "connection_id,snapshot_date" }
+          );
+          return 1; // 1 snapshot gravado
         }
 
         return 0;
