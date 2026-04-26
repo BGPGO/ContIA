@@ -41,41 +41,82 @@ function getCrmApiKey(): string {
 
 /* ── CRM attribution response types ─────────────────────────────── */
 
+/**
+ * O CRM endpoint retorna shape com campos verbosos (leadsCount, dealsWonCount, dealsWonRevenue).
+ * Aqui usamos any-friendly types que aceitam tanto os nomes verbosos quanto aliases curtos.
+ */
 interface CrmLeadItem {
   id: string;
   createdAt: string;
+  // Pode vir achatado OU dentro de firstTouch
   utm_source?: string | null;
   utm_medium?: string | null;
   utm_campaign?: string | null;
   utm_content?: string | null;
+  firstTouch?: {
+    at?: string;
+    utm_source?: string | null;
+    utm_medium?: string | null;
+    utm_campaign?: string | null;
+    utm_content?: string | null;
+  };
   stage?: string | null;
   dealValue?: number | null;
   closedAt?: string | null;
   won?: boolean;
+  deal?: {
+    value?: number | null;
+    status?: string;
+    closedAt?: string | null;
+  } | null;
 }
 
 interface CrmChannelSummary {
   source: string;
   medium: string | null;
-  leads: number;
-  dealsWon: number;
-  revenue: number;
+  // Aliases verbosos (CRM) e curtos (ContIA esperava)
+  leads?: number;
+  leadsCount?: number;
+  dealsWon?: number;
+  dealsWonCount?: number;
+  revenue?: number;
+  dealsWonRevenue?: number;
   avgLeadToWon_days?: number;
+  conversionRate?: number;
 }
 
 interface CrmCampaignSummary {
   campaign: string;
-  leads: number;
-  dealsWon: number;
-  revenue: number;
+  source?: string;
+  leads?: number;
+  leadsCount?: number;
+  dealsWon?: number;
+  dealsWonCount?: number;
+  revenue?: number;
+  dealsWonRevenue?: number;
+  avgDealValue?: number;
 }
 
 interface CrmCreativeSummary {
   content: string;
   campaign: string;
-  leads: number;
-  dealsWon: number;
-  revenue: number;
+  leads?: number;
+  leadsCount?: number;
+  dealsWon?: number;
+  dealsWonCount?: number;
+  revenue?: number;
+  dealsWonRevenue?: number;
+}
+
+/** Helpers pra normalizar campos com aliases */
+function pickLeads(c: { leads?: number; leadsCount?: number }): number {
+  return c.leads ?? c.leadsCount ?? 0;
+}
+function pickDealsWon(c: { dealsWon?: number; dealsWonCount?: number }): number {
+  return c.dealsWon ?? c.dealsWonCount ?? 0;
+}
+function pickRevenue(c: { revenue?: number; dealsWonRevenue?: number }): number {
+  return c.revenue ?? c.dealsWonRevenue ?? 0;
 }
 
 interface CrmFunnelEntry {
@@ -382,10 +423,13 @@ export async function GET(req: NextRequest) {
 
   // ── channelROI ────────────────────────────────────────────────────
   const channelROI: ChannelROI[] = crmChannels.map((ch) => {
+    const chLeads = pickLeads(ch);
+    const chDealsWon = pickDealsWon(ch);
+    const chRevenue = pickRevenue(ch);
     const conversionRate =
-      ch.leads > 0 ? ch.dealsWon / ch.leads : 0;
+      chLeads > 0 ? chDealsWon / chLeads : 0;
     const avgTicket: number | null =
-      ch.dealsWon > 0 ? Math.round(ch.revenue / ch.dealsWon) : null;
+      chDealsWon > 0 ? Math.round(chRevenue / chDealsWon) : null;
 
     // Spend é null para canais orgânicos — mapeamos Meta Ads como "meta/cpc"
     const isMetaChannel =
@@ -404,24 +448,24 @@ export async function GET(req: NextRequest) {
     }
 
     const cac =
-      channelSpend !== null && ch.dealsWon > 0
-        ? channelSpend / ch.dealsWon
+      channelSpend !== null && chDealsWon > 0
+        ? channelSpend / chDealsWon
         : null;
     const roas =
       channelSpend !== null && channelSpend > 0
-        ? ch.revenue / channelSpend
+        ? chRevenue / channelSpend
         : null;
 
     // Normalize source to ChannelSource
-    const source: ChannelSource = ch.source as ChannelSource;
+    const source: ChannelSource = (ch.source ?? "outro") as ChannelSource;
 
     return {
       source,
       medium: ch.medium,
       spend: channelSpend,
-      leads: ch.leads,
-      dealsWon: ch.dealsWon,
-      revenue: ch.revenue,
+      leads: chLeads,
+      dealsWon: chDealsWon,
+      revenue: chRevenue,
       cac,
       roas,
       conversionRate,
@@ -477,10 +521,13 @@ export async function GET(req: NextRequest) {
       const clicks = metaMetrics?.clicks ?? 0;
       const metaConversions = metaMetrics?.conversions ?? 0;
 
+      const ccLeads = pickLeads(cc);
+      const ccDealsWon = pickDealsWon(cc);
+      const ccRevenue = pickRevenue(cc);
       const cac =
-        spend > 0 && cc.dealsWon > 0 ? spend / cc.dealsWon : null;
+        spend > 0 && ccDealsWon > 0 ? spend / ccDealsWon : null;
       const roas =
-        spend > 0 && cc.revenue > 0 ? cc.revenue / spend : null;
+        spend > 0 && ccRevenue > 0 ? ccRevenue / spend : null;
 
       return {
         campaignName: cc.campaign,
@@ -490,9 +537,9 @@ export async function GET(req: NextRequest) {
         impressions,
         clicks,
         metaConversions,
-        crmLeads: cc.leads,
-        crmDealsWon: cc.dealsWon,
-        crmRevenue: cc.revenue,
+        crmLeads: ccLeads,
+        crmDealsWon: ccDealsWon,
+        crmRevenue: ccRevenue,
         cac,
         roas,
         matched,
@@ -527,17 +574,19 @@ export async function GET(req: NextRequest) {
   campaignAttribution.sort((a, b) => b.spend - a.spend);
 
   // ── creativePerformance ───────────────────────────────────────────
-  const creativePerformance: CreativePerformance[] = crmCreatives.map((cc) => ({
-    contentName: cc.content,
-    campaign: cc.campaign,
-    leadsCount: cc.leads,
-    dealsWonCount: cc.dealsWon,
-    revenue: cc.revenue,
-    cac:
-      cc.revenue > 0 && cc.dealsWon > 0
-        ? Math.round(cc.revenue / cc.dealsWon)
-        : null,
-  }));
+  const creativePerformance: CreativePerformance[] = crmCreatives.map((cc) => {
+    const leads = pickLeads(cc);
+    const dealsWon = pickDealsWon(cc);
+    const revenue = pickRevenue(cc);
+    return {
+      contentName: cc.content,
+      campaign: cc.campaign,
+      leadsCount: leads,
+      dealsWonCount: dealsWon,
+      revenue,
+      cac: revenue > 0 && dealsWon > 0 ? Math.round(revenue / dealsWon) : null,
+    };
+  });
 
   // ── funnelEndToEnd ────────────────────────────────────────────────
 

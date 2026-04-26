@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo } from "react";
+import React, { Suspense, useMemo } from "react";
 import { motion } from "motion/react";
 import {
   GitMerge,
@@ -632,12 +632,59 @@ function IntegradoPage() {
   );
 }
 
-/* ── Export with Suspense (needed for useSearchParams in usePeriodSelector) ── */
+/* ── Error Boundary ─────────────────────────────────────────────── */
+
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  componentDidCatch(error: Error) {
+    console.error("[/analytics/integrado] crash:", error);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="flex flex-col items-center justify-center py-20 text-center px-4 max-w-2xl mx-auto">
+          <AlertTriangle className="w-8 h-8 text-danger mb-3" />
+          <p className="text-[14px] text-danger font-medium mb-2">
+            Erro ao renderizar a tela
+          </p>
+          <p className="text-[12px] text-text-muted mb-2">
+            Detalhes técnicos (mande pro suporte):
+          </p>
+          <pre className="text-[11px] text-text-muted bg-bg-card border border-border rounded-lg p-3 max-w-full overflow-auto whitespace-pre-wrap break-words text-left">
+            {this.state.error.message}
+            {"\n\n"}
+            {this.state.error.stack?.split("\n").slice(0, 6).join("\n")}
+          </pre>
+          <button
+            onClick={() => this.setState({ error: null })}
+            className="mt-4 px-4 py-2 rounded-xl bg-accent text-bg-primary text-[13px] font-semibold hover:opacity-90 transition-opacity"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+/* ── Export with Suspense + ErrorBoundary ─────────────────────── */
 
 export default function IntegradoPageWrapper() {
   return (
-    <Suspense fallback={<PageSkeleton />}>
-      <IntegradoPage />
-    </Suspense>
+    <ErrorBoundary>
+      <Suspense fallback={<PageSkeleton />}>
+        <IntegradoPage />
+      </Suspense>
+    </ErrorBoundary>
   );
 }
