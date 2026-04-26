@@ -618,13 +618,14 @@ export async function GET(req: NextRequest) {
   const funnelEndToEnd: FunnelEndToEndStage[] = crmFunnel.map((stage, idx) => {
     const prevCount =
       idx > 0 ? (crmFunnel[idx - 1]?.count ?? 0) : 0;
+    // Retorna fração 0..1 — componentes (EndToEndFunnel, Sankey) multiplicam por 100 internamente
     const conversionFromPrev =
       idx > 0 && prevCount > 0
-        ? Math.round((stage.count / prevCount) * 1000) / 10
+        ? Math.round((stage.count / prevCount) * 10000) / 10000
         : undefined;
     const conversionFromTop =
       topFunnelCount > 0
-        ? Math.round((stage.count / topFunnelCount) * 1000) / 10
+        ? Math.round((stage.count / topFunnelCount) * 10000) / 10000
         : undefined;
 
     return {
@@ -668,7 +669,7 @@ export async function GET(req: NextRequest) {
     spend: totalMetaSpend,
     leads: crmTotals.leads,
     dealsWon: crmTotals.dealsWon,
-    dealsLost: 0, // CRM attribution endpoint não retorna dealsLost — Gamma pode enriquecer
+    // dealsLost omitido — CRM attribution endpoint não retorna dealsLost ainda
     revenue: crmTotals.revenue,
     cac:
       totalMetaSpend > 0 && crmTotals.dealsWon > 0

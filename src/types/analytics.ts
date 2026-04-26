@@ -319,7 +319,8 @@ export interface CrmAdvanced {
     rate: number;
     won: number;
     revenue: number;
-    avgTicket: number;
+    /** null quando won = 0 para evitar divisão por zero */
+    avgTicket: number | null;
   };
   email: {
     campaigns: number;

@@ -2,7 +2,7 @@
 
 import { Suspense, useMemo, useState, useCallback } from "react";
 import { motion } from "motion/react";
-import { BarChart3, RefreshCw } from "lucide-react";
+import { BarChart3, RefreshCw, TrendingUp, TrendingDown } from "lucide-react";
 import { useEmpresa } from "@/hooks/useEmpresa";
 import { useAnalyticsOverview } from "@/hooks/useAnalyticsOverview";
 import { usePeriodSelector } from "@/hooks/usePeriodSelector";
@@ -20,6 +20,7 @@ import { SyncStatusBadge } from "@/components/insights/SyncStatusBadge";
 import { BestTimeHeatmap } from "@/components/insights/BestTimeHeatmap";
 import { ContentTypePerformance } from "@/components/insights/ContentTypePerformance";
 import { AnomalyBadge } from "@/components/insights/AnomalyBadge";
+import { SectionHeader } from "@/components/insights/SectionHeader";
 
 /* ── Componentes analytics ── */
 import { AdsSummarySection } from "@/components/analytics/AdsSummarySection";
@@ -52,30 +53,6 @@ const CONTENT_TYPE_LABELS: Record<string, string> = {
 
 function getContentTypeLabel(type: string): string {
   return CONTENT_TYPE_LABELS[type.toLowerCase()] ?? type;
-}
-
-/* ── Seção helper ── */
-function SectionHeader({
-  title,
-  subtitle,
-}: {
-  title: string;
-  subtitle?: string;
-}) {
-  return (
-    <div className="mb-4">
-      <div className="flex items-center gap-3 mb-1">
-        <div className="h-px flex-1 bg-border/60" />
-        <h2 className="text-[13px] font-semibold text-text-muted uppercase tracking-widest whitespace-nowrap">
-          {title}
-        </h2>
-        <div className="h-px flex-1 bg-border/60" />
-      </div>
-      {subtitle && (
-        <p className="text-center text-[12px] text-text-muted/70 mt-1">{subtitle}</p>
-      )}
-    </div>
-  );
 }
 
 /* ── Skeleton de loading ── */
@@ -286,6 +263,111 @@ function computePostsTableRows(posts: RecentPost[]): PostsTableRow[] {
   });
 }
 
+/* ── Headline dinâmica do mês ── */
+
+interface HeadlineInput {
+  kpis: Array<{ key: string; label: string; deltaPercent: number | null; value: number | null }>;
+  recentPosts: Array<{ content_type?: string | null; metrics?: Record<string, number> | null }>;
+  providers: Array<{ provider: string; connected: boolean }>;
+}
+
+function generateHeadline(input: HeadlineInput): { text: string; positive: boolean } | null {
+  const { kpis, recentPosts } = input;
+
+  // Achar o KPI com maior magnitude de delta
+  let bestKpi: { key: string; label: string; deltaPercent: number } | null = null;
+  for (const k of kpis) {
+    if (k.deltaPercent == null) continue;
+    if (!bestKpi || Math.abs(k.deltaPercent) > Math.abs(bestKpi.deltaPercent)) {
+      bestKpi = { key: k.key, label: k.label, deltaPercent: k.deltaPercent };
+    }
+  }
+
+  // Detectar tipo de conteúdo dominante
+  if (recentPosts.length >= 3) {
+    const counts: Record<string, number> = {};
+    let totalEng = 0;
+    let totalByType: Record<string, number> = {};
+    for (const p of recentPosts) {
+      const t = (p.content_type ?? "post").toLowerCase();
+      counts[t] = (counts[t] ?? 0) + 1;
+      const m = p.metrics ?? {};
+      const eng = (m.likes ?? m.like_count ?? 0) + (m.comments ?? m.comments_count ?? 0) + (m.saves ?? 0) + (m.shares ?? m.share_count ?? 0);
+      totalEng += eng;
+      totalByType[t] = (totalByType[t] ?? 0) + eng;
+    }
+    const avgEng = totalEng / recentPosts.length;
+    const topType = Object.entries(counts).sort(([, a], [, b]) => b - a)[0];
+    if (topType && topType[1] > recentPosts.length * 0.4) {
+      const typeEng = (totalByType[topType[0]] ?? 0) / topType[1];
+      if (avgEng > 0 && typeEng > avgEng * 1.5) {
+        const ratio = (typeEng / avgEng).toFixed(1);
+        const label = topType[0] === "reel" ? "Reels" : topType[0] === "carousel" ? "Carrosseis" : topType[0];
+        return {
+          text: `${label} dominaram: ${ratio}× o engajamento medio das outras publicacoes`,
+          positive: true,
+        };
+      }
+    }
+  }
+
+  if (!bestKpi) return null;
+
+  const delta = bestKpi.deltaPercent;
+  const absD = Math.abs(delta);
+  const formatted = absD.toFixed(0) + "%";
+
+  if (bestKpi.key === "followers" || bestKpi.label.toLowerCase().includes("seguidor")) {
+    return delta > 0
+      ? { text: `Sua base de seguidores cresceu ${formatted} em relacao ao periodo anterior`, positive: true }
+      : { text: `Seguidores recuaram ${formatted} — testar novos formatos esta semana pode ajudar`, positive: false };
+  }
+  if (bestKpi.key === "save_rate" || bestKpi.label.toLowerCase().includes("save")) {
+    return delta > 0
+      ? { text: `Taxa de salvamentos subiu ${formatted} — conteudo de referencia esta funcionando`, positive: true }
+      : { text: `Taxa de salvamentos caiu ${formatted} — vale revisitar o tipo de conteudo produzido`, positive: false };
+  }
+  if (bestKpi.key === "engagement" || bestKpi.label.toLowerCase().includes("engajamento")) {
+    return delta > 0
+      ? { text: `Engajamento cresceu ${formatted} em relacao ao periodo anterior — boa fase para explorar novos formatos`, positive: true }
+      : { text: `Engajamento caiu ${formatted} — hora de testar um novo formato ou horario de publicacao`, positive: false };
+  }
+  if (bestKpi.key === "reach" || bestKpi.label.toLowerCase().includes("alcance")) {
+    return delta > 0
+      ? { text: `Alcance aumentou ${formatted} — mais pessoas estao descobrindo seu conteudo`, positive: true }
+      : { text: `Alcance reduziu ${formatted} — considere aumentar a frequencia de publicacao`, positive: false };
+  }
+
+  return delta > 0
+    ? { text: `${bestKpi.label} subiu ${formatted} no periodo — bom momento para acelerar a producao`, positive: true }
+    : { text: `${bestKpi.label} caiu ${formatted} no periodo — analise os posts com melhor desempenho anterior`, positive: false };
+}
+
+function HeadlineCard({ input }: { input: HeadlineInput }) {
+  const headline = generateHeadline(input);
+  if (!headline) return null;
+
+  const Icon = headline.positive ? TrendingUp : TrendingDown;
+  const colorClass = headline.positive ? "text-success" : "text-danger";
+  const borderClass = headline.positive ? "border-success/20 bg-success/5" : "border-danger/20 bg-danger/5";
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className={`rounded-xl border px-5 py-4 flex items-start gap-3 ${borderClass}`}
+    >
+      <div className={`mt-0.5 shrink-0 ${colorClass}`}>
+        <Icon size={18} />
+      </div>
+      <p className={`text-[14px] font-medium leading-snug ${colorClass}`}>
+        {headline.text}
+      </p>
+    </motion.div>
+  );
+}
+
 /* ── Animação helper ── */
 
 function sectionAnim(delay: number) {
@@ -392,10 +474,36 @@ function AnalyticsContent() {
     );
   }, [connectedProviders, data?.timeSeries]);
 
+  /* Headline do mês */
+  const headlineInput = useMemo<HeadlineInput>(
+    () => ({
+      kpis: (data?.kpis ?? []).map((k) => ({
+        key: k.key,
+        label: k.label,
+        deltaPercent: k.deltaPercent,
+        value: k.value,
+      })),
+      recentPosts: recentPosts.map((p) => ({
+        content_type: p.content_type,
+        metrics: p.metrics as Record<string, number>,
+      })),
+      providers: (data?.providers ?? []).map((s) => ({
+        provider: s.provider,
+        connected: s.connected,
+      })),
+    }),
+    [data?.kpis, data?.providers, recentPosts]
+  );
+
   /* ── Render ── */
 
   return (
     <div className="space-y-6 p-2 sm:p-4 md:p-6 max-w-7xl mx-auto">
+      {/* ─────────────────── HEADLINE ─────────────────── */}
+      {data && hasConnections && (
+        <HeadlineCard input={headlineInput} />
+      )}
+
       {/* ─────────────────── HEADER ─────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: -12 }}

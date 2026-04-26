@@ -30,6 +30,11 @@ import Link from "next/link";
 import { METADATA_BY_PROVIDER } from "@/lib/drivers/metadata";
 import type { ProviderSummary, ProviderKPI } from "@/types/analytics";
 
+/* Extensão local — deltaPercent pode vir no objeto de runtime mesmo sem estar no tipo */
+interface ProviderKPIRuntime extends ProviderKPI {
+  deltaPercent?: number | null;
+}
+
 interface ProviderSummaryRowProps {
   summary: ProviderSummary;
   index: number;
@@ -77,15 +82,39 @@ function KpiIcon({ name }: { name?: string }) {
   return <Icon size={11} className="text-text-muted/70 shrink-0" />;
 }
 
+/* ── Delta chip compacto ── */
+function DeltaChip({ delta }: { delta: number | null | undefined }) {
+  if (delta == null) return null;
+  const isPos = delta > 0;
+  const isNeg = delta < 0;
+  if (!isPos && !isNeg) {
+    return (
+      <span className="text-[10px] px-1 py-0.5 rounded bg-bg-elevated text-text-muted leading-none">
+        —
+      </span>
+    );
+  }
+  const color = isPos
+    ? "bg-success/15 text-success"
+    : "bg-danger/15 text-danger";
+  const sign = isPos ? "+" : "";
+  return (
+    <span className={`text-[10px] px-1 py-0.5 rounded leading-none tabular-nums ${color}`}>
+      {sign}{delta.toFixed(1)}%
+    </span>
+  );
+}
+
 /* ── Mini-stat (cada KPI dentro do card) ── */
-function MiniStat({ kpi }: { kpi: ProviderKPI }) {
+function MiniStat({ kpi }: { kpi: ProviderKPIRuntime }) {
   return (
     <div className="flex flex-col items-center min-w-[64px]">
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 flex-wrap justify-center">
         <KpiIcon name={kpi.icon} />
         <p className="text-[13px] font-semibold text-text-primary tabular-nums leading-tight">
           {kpi.value}
         </p>
+        <DeltaChip delta={kpi.deltaPercent} />
       </div>
       <p className="text-[10px] text-text-muted mt-0.5 whitespace-nowrap">{kpi.label}</p>
     </div>
@@ -182,7 +211,9 @@ export function ProviderSummaryRow({ summary, index }: ProviderSummaryRowProps) 
 
   /* ── Conectado com dados ── */
   // Preferimos monthlyKpis; fallback para kpis legados
-  const displayKpis = summary.monthlyKpis.length > 0 ? summary.monthlyKpis : summary.kpis;
+  const displayKpis = (
+    summary.monthlyKpis.length > 0 ? summary.monthlyKpis : summary.kpis
+  ) as ProviderKPIRuntime[];
 
   return (
     <Link href={`/analytics/${summary.provider}`}>

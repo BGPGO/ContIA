@@ -14,6 +14,9 @@ import {
   Play,
   Share2,
   DollarSign,
+  Heart,
+  MessageCircle,
+  Bookmark,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -32,6 +35,7 @@ import { ContentTypePerformance } from "@/components/insights/ContentTypePerform
 import { AnomalyBadge } from "@/components/insights/AnomalyBadge";
 import { EmptyState } from "@/components/insights/EmptyState";
 import { StrategicInsightsCard } from "@/components/insights/StrategicInsightsCard";
+import { SectionHeader } from "@/components/insights/SectionHeader";
 
 /* ── Componentes analytics ── */
 import { BreakdownPie } from "@/components/analytics/BreakdownPie";
@@ -111,30 +115,6 @@ function getProviderTitle(provider: string, meta: { displayName: string } | unde
     default:
       return meta ? `Analytics — ${meta.displayName}` : "Analytics";
   }
-}
-
-/* ── Seção helper ── */
-function SectionHeader({
-  title,
-  subtitle,
-}: {
-  title: string;
-  subtitle?: string;
-}) {
-  return (
-    <div className="mb-4">
-      <div className="flex items-center gap-3 mb-1">
-        <div className="h-px flex-1 bg-border/60" />
-        <h2 className="text-[13px] font-semibold text-text-muted uppercase tracking-widest whitespace-nowrap">
-          {title}
-        </h2>
-        <div className="h-px flex-1 bg-border/60" />
-      </div>
-      {subtitle && (
-        <p className="text-center text-[12px] text-text-muted/70 mt-1">{subtitle}</p>
-      )}
-    </div>
-  );
 }
 
 /* ── Skeleton de loading ── */
@@ -421,6 +401,102 @@ function CampaignHighlightCard({
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ── Top 3 posts em destaque (cards visuais) ── */
+
+function TopPostsHighlight({ posts }: { posts: PostsTableRow[] }) {
+  if (posts.length === 0) {
+    return (
+      <div className="bg-bg-card border border-border rounded-xl p-6 flex items-center justify-center text-[13px] text-text-muted">
+        Top posts aparecem aqui quando houver dados
+      </div>
+    );
+  }
+
+  const top3 = [...posts]
+    .sort((a, b) => {
+      const engA = a.metrics.likes + a.metrics.comments + a.metrics.saves + a.metrics.shares;
+      const engB = b.metrics.likes + b.metrics.comments + b.metrics.saves + b.metrics.shares;
+      return engB - engA;
+    })
+    .slice(0, 3);
+
+  function formatNum(n: number): string {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+    return String(n);
+  }
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {top3.map((post) => {
+        const totalEng = post.metrics.likes + post.metrics.comments + post.metrics.saves + post.metrics.shares;
+        const captionPreview = post.caption.length > 60 ? post.caption.slice(0, 60) + "…" : post.caption;
+        return (
+          <a
+            key={post.id}
+            href={`#post-${post.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group block bg-bg-card border border-border rounded-xl overflow-hidden hover:border-border-light transition-all duration-200"
+            onClick={(e) => e.preventDefault()}
+          >
+            {/* Thumbnail 16:9 */}
+            <div className="relative aspect-video bg-bg-elevated overflow-hidden">
+              {post.thumbnail ? (
+                <img
+                  src={post.thumbnail}
+                  alt=""
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  loading="lazy"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Heart size={28} className="text-text-muted/30" />
+                </div>
+              )}
+
+              {/* Engagement badge — canto superior direito */}
+              <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/70 backdrop-blur-sm rounded-full px-2 py-1">
+                <Heart size={10} className="text-red-400 fill-red-400" />
+                <span className="text-[11px] font-semibold text-white tabular-nums">
+                  {formatNum(totalEng)}
+                </span>
+              </div>
+
+              {/* Caption overlay — canto inferior */}
+              {captionPreview && (
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-3 pt-6 pb-2">
+                  <p className="text-[11px] text-white/90 leading-snug line-clamp-2">
+                    {captionPreview}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Mini stats */}
+            <div className="flex items-center justify-around px-3 py-2.5 border-t border-border/60">
+              <div className="flex items-center gap-1">
+                <Heart size={11} className="text-red-400" />
+                <span className="text-[11px] text-text-muted tabular-nums">{formatNum(post.metrics.likes)}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <MessageCircle size={11} className="text-blue-400" />
+                <span className="text-[11px] text-text-muted tabular-nums">{formatNum(post.metrics.comments)}</span>
+              </div>
+              {post.metrics.reach > 0 && (
+                <div className="flex items-center gap-1">
+                  <Bookmark size={11} className="text-text-muted" />
+                  <span className="text-[11px] text-text-muted tabular-nums">{formatNum(post.metrics.reach)}</span>
+                </div>
+              )}
+            </div>
+          </a>
+        );
+      })}
     </div>
   );
 }
@@ -815,12 +891,28 @@ function ProviderAnalyticsContent() {
             </motion.div>
           )}
 
-          {/* Empty state global */}
-          {data.kpis.length === 0 && !crmAdvanced && (
-            <EmptyState
-              title="Sem dados no periodo"
-              description="Nenhum dado de CRM encontrado para o periodo selecionado. Tente expandir o intervalo de datas."
-            />
+          {/* Empty state CRM específico */}
+          {(!crmAdvanced || (crmAdvanced.funnel.length === 0)) && data.kpis.length === 0 && (
+            <motion.div {...sectionAnim(0.1)}>
+              <div className="bg-bg-card border border-border rounded-xl p-6 flex flex-col items-center gap-3 text-center">
+                <div className="w-10 h-10 rounded-xl bg-bg-elevated flex items-center justify-center">
+                  <Cable size={18} className="text-text-muted" />
+                </div>
+                <div>
+                  <p className="text-[14px] font-semibold text-text-primary mb-1">
+                    Sem dados do CRM ainda
+                  </p>
+                  <p className="text-[13px] text-text-muted leading-relaxed max-w-md">
+                    O ContIA puxa dados do CRM diariamente. Se acabou de conectar, espere o proximo sync
+                    (4h BRT) ou dispare manualmente em{" "}
+                    <a href="/conexoes" className="text-accent hover:underline">
+                      Conexoes &gt; CRM &gt; Sincronizar agora
+                    </a>
+                    .
+                  </p>
+                </div>
+              </div>
+            </motion.div>
           )}
         </>
       )}
@@ -1110,17 +1202,70 @@ function ProviderAnalyticsContent() {
                   As mais usadas e que geraram engajamento
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {data.topHashtags.slice(0, 15).map((tag) => (
-                  <span
-                    key={tag.tag}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-bg-elevated text-[12px] text-text-secondary border border-border/50"
-                  >
-                    <span className="text-accent font-medium">{tag.tag}</span>
-                    <span className="text-text-muted">({tag.count})</span>
-                  </span>
-                ))}
-              </div>
+              {(() => {
+                /* Enriquecer com dados do captionAnalysis quando disponível */
+                const captionTags = data.instagramAdvanced?.captionAnalysis?.topHashtags ?? [];
+                const captionMap = new Map(captionTags.map((t) => [t.tag, t]));
+                const maxCount = Math.max(...data.topHashtags.map((t) => t.count), 1);
+                /* Tags presentes em posts de alto engajamento (top 25%) */
+                const topEng = [...postsTableRows]
+                  .sort((a, b) => {
+                    const ea = a.metrics.likes + a.metrics.comments + a.metrics.saves + a.metrics.shares;
+                    const eb = b.metrics.likes + b.metrics.comments + b.metrics.saves + b.metrics.shares;
+                    return eb - ea;
+                  })
+                  .slice(0, Math.max(1, Math.ceil(postsTableRows.length * 0.25)));
+                const topEngCaptions = new Set(topEng.map((p) => p.caption.toLowerCase()));
+                const isTopEng = (tag: string) =>
+                  Array.from(topEngCaptions).some((c) => c.includes(tag.toLowerCase()));
+
+                return (
+                  <div className="space-y-2">
+                    {data.topHashtags.slice(0, 15).map((tag) => {
+                      const pct = (tag.count / maxCount) * 100;
+                      const enriched = captionMap.get(tag.tag);
+                      const topEngaged = isTopEng(tag.tag);
+
+                      return (
+                        <div
+                          key={tag.tag}
+                          className="group relative"
+                          title={
+                            enriched
+                              ? `Usada ${tag.count}x — engagement médio ${(enriched.avgEngagement * 100).toFixed(2)}%`
+                              : `Usada ${tag.count}x`
+                          }
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-accent font-medium text-[12px] w-40 shrink-0 truncate">
+                              {tag.tag}
+                            </span>
+                            <div className="flex-1 relative h-5 bg-bg-elevated rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all ${topEngaged ? "bg-success/60" : "bg-border"}`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <span className="text-[11px] text-text-muted tabular-nums w-10 text-right shrink-0">
+                              {tag.count}×
+                            </span>
+                            {topEngaged && (
+                              <span className="text-[9px] font-semibold text-success bg-success/10 border border-success/20 px-1.5 py-0.5 rounded-full shrink-0">
+                                top
+                              </span>
+                            )}
+                          </div>
+                          {enriched && (
+                            <p className="text-[10px] text-text-muted mt-0.5 pl-44 hidden group-hover:block">
+                              Eng. médio: {(enriched.avgEngagement * 100).toFixed(2)}%
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </motion.div>
           )}
 
@@ -1172,17 +1317,29 @@ function ProviderAnalyticsContent() {
               </div>
             </motion.div>
           ) : postsTableRows.length > 0 ? (
-            <motion.div {...sectionAnim(0.4)}>
-              <SectionHeader
-                title="Top Posts"
-                subtitle="Publicacoes do periodo ordenadas por data, curtidas ou taxa de engajamento"
-              />
-              <PostsTable
-                posts={postsTableRows}
-                limit={10}
-                emptyMessage="Nenhum post no periodo selecionado"
-              />
-            </motion.div>
+            <>
+              {/* Posts em destaque — Top 3 cards */}
+              <motion.div {...sectionAnim(0.38)}>
+                <SectionHeader
+                  title="Posts em Destaque"
+                  subtitle="Os 3 posts com maior engajamento no periodo"
+                />
+                <TopPostsHighlight posts={postsTableRows} />
+              </motion.div>
+
+              {/* Tabela completa */}
+              <motion.div {...sectionAnim(0.4)}>
+                <SectionHeader
+                  title="Top Posts"
+                  subtitle="Publicacoes do periodo ordenadas por data, curtidas ou taxa de engajamento"
+                />
+                <PostsTable
+                  posts={postsTableRows}
+                  limit={10}
+                  emptyMessage="Nenhum post no periodo selecionado"
+                />
+              </motion.div>
+            </>
           ) : (
             !loading && (
               <motion.div {...sectionAnim(0.4)}>

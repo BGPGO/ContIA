@@ -1431,44 +1431,57 @@ export async function GET(
       ...computeDelta(pageEngagedUsers, prevSnapMetrics.page_engaged_users ?? 0),
       icon: "heart",
     });
+    // Calcular totais do período anterior a partir de prevContentItems
+    const prevContentItemsRes = await dbClient
+      .from("content_items")
+      .select("metrics")
+      .eq("empresa_id", empresaId)
+      .eq("provider", "facebook")
+      .gte("published_at", prevStartISO)
+      .lte("published_at", prevEndISO);
+    const prevContentItemsFb = prevContentItemsRes.data ?? [];
+
+    let prevTotalReactions = 0;
+    let prevTotalComments = 0;
+    let prevTotalShares = 0;
+    for (const item of prevContentItemsFb) {
+      const m = item.metrics as Record<string, number>;
+      prevTotalReactions += m.reactions ?? m.likes ?? m.like_count ?? 0;
+      prevTotalComments += m.comments ?? m.comments_count ?? 0;
+      prevTotalShares += m.shares ?? m.share_count ?? 0;
+    }
+    const prevPostsCount = prevContentItemsFb.length;
+
     fbKpis.push({
       key: "posts_count",
       label: "Posts Publicados",
       value: contentItems.length,
-      previousValue: 0,
-      delta: 0,
-      deltaPercent: 0,
-      trend: "flat",
+      previousValue: prevPostsCount,
+      ...computeDelta(contentItems.length, prevPostsCount),
       icon: "file",
     });
     fbKpis.push({
       key: "reactions",
       label: "Reações",
       value: totalReactions,
-      previousValue: 0,
-      delta: 0,
-      deltaPercent: 0,
-      trend: "flat",
+      previousValue: prevTotalReactions,
+      ...computeDelta(totalReactions, prevTotalReactions),
       icon: "heart",
     });
     fbKpis.push({
       key: "comments",
       label: "Comentários",
       value: totalComments,
-      previousValue: 0,
-      delta: 0,
-      deltaPercent: 0,
-      trend: "flat",
+      previousValue: prevTotalComments,
+      ...computeDelta(totalComments, prevTotalComments),
       icon: "message",
     });
     fbKpis.push({
       key: "shares",
       label: "Compartilhamentos",
       value: totalShares,
-      previousValue: 0,
-      delta: 0,
-      deltaPercent: 0,
-      trend: "flat",
+      previousValue: prevTotalShares,
+      ...computeDelta(totalShares, prevTotalShares),
       icon: "share",
     });
 
@@ -1549,7 +1562,8 @@ export async function GET(
     const won     = m0.deals_won  ?? m0.funnel_won    ?? 0;
     const revenue = m0.pipeline_value ?? m0.funnel_revenue ?? 0;
     const convRate = m0.conversion_rate ?? m0.funnel_conversion_rate ?? 0;
-    const avgTicket = won > 0 ? Math.round(revenue / won) : 0;
+    // null quando won=0 para evitar divisão por zero (NaN/Infinity → 0 silencioso)
+    const avgTicket: number | null = won > 0 ? Math.round(revenue / won) : null;
 
     // Email
     const emailCampaigns = m0.email_campaigns ?? 0;
@@ -1593,6 +1607,17 @@ export async function GET(
       greatpages: { leads: gpLeads, landingPages: gpLPs },
     };
 
+    // Para CRM: gerar insights genéricos e filtrar "freq_low" (postagem é irrelevante p/ CRM)
+    const crmInsightsSummary = computeInsightsSummary({
+      posts,
+      kpis,
+      periodStart,
+      periodEnd,
+    });
+    crmInsightsSummary.insights = crmInsightsSummary.insights.filter(
+      (i) => i.id !== "freq_low"
+    );
+
     return NextResponse.json({
       provider,
       connected: true,
@@ -1607,12 +1632,7 @@ export async function GET(
       topPages: null,
       campaigns: null,
       crmAdvanced,
-      insightsSummary: computeInsightsSummary({
-        posts,
-        kpis,
-        periodStart,
-        periodEnd,
-      }),
+      insightsSummary: crmInsightsSummary,
     });
   }
 

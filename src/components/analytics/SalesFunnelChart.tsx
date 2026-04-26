@@ -20,11 +20,13 @@ function FunnelBar({
   maxCount,
   tooltipInfo,
   index,
+  isBottleneck,
 }: {
   stage: CrmFunnelStage;
   maxCount: number;
   tooltipInfo: TooltipInfo;
   index: number;
+  isBottleneck: boolean;
 }) {
   const widthPct = maxCount > 0 ? Math.max(8, (stage.count / maxCount) * 100) : 8;
 
@@ -33,12 +35,19 @@ function FunnelBar({
       initial={{ opacity: 0, x: -16 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.35, delay: index * 0.05 }}
-      className="flex items-center gap-3 group"
+      className={`flex items-center gap-3 group rounded-lg pr-1 ${isBottleneck ? "border-l-4 border-danger pl-2" : "pl-0"}`}
     >
       {/* Label */}
-      <span className="w-44 shrink-0 text-[12px] text-text-secondary text-right truncate">
-        {stage.label}
-      </span>
+      <div className="w-44 shrink-0 flex flex-col items-end gap-0.5">
+        <span className="text-[12px] text-text-secondary text-right truncate max-w-full">
+          {stage.label}
+        </span>
+        {isBottleneck && (
+          <span className="text-[9px] font-semibold text-danger bg-danger/10 border border-danger/20 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+            Maior perda: {tooltipInfo.dropPct != null ? `${tooltipInfo.dropPct.toFixed(0)}% drop` : "—"}
+          </span>
+        )}
+      </div>
 
       {/* Bar + count */}
       <div className="relative flex-1 flex items-center gap-2">
@@ -104,6 +113,17 @@ export function SalesFunnelChart({ funnel, title = "Funil de Vendas" }: SalesFun
     return { label: stage.label, count: stage.count, pct, dropPct };
   });
 
+  /* Encontrar o gargalo: stage com maior dropPct (excluindo o primeiro) */
+  let bottleneckIdx = -1;
+  let maxDrop = -Infinity;
+  for (let i = 0; i < tooltipInfos.length; i++) {
+    const d = tooltipInfos[i].dropPct;
+    if (d !== null && d > maxDrop) {
+      maxDrop = d;
+      bottleneckIdx = i;
+    }
+  }
+
   return (
     <div className="bg-bg-card border border-border rounded-xl p-5">
       <div className="mb-5">
@@ -121,6 +141,7 @@ export function SalesFunnelChart({ funnel, title = "Funil de Vendas" }: SalesFun
             maxCount={maxCount}
             tooltipInfo={tooltipInfos[idx]}
             index={idx}
+            isBottleneck={idx === bottleneckIdx && maxDrop > 10}
           />
         ))}
       </div>

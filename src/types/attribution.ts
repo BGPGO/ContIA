@@ -31,7 +31,8 @@ export interface AttributionTotals {
   /** Total de leads CRM no período */
   leads: number;
   dealsWon: number;
-  dealsLost: number;
+  /** Opcional — CRM attribution endpoint ainda não expõe este valor */
+  dealsLost?: number;
   /** R$ — receita de deals won */
   revenue: number;
   /** spend / dealsWon — null quando dealsWon = 0 */

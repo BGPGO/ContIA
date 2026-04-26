@@ -16,6 +16,8 @@ import {
   Camera,
   Globe,
   BarChart3,
+  ExternalLink,
+  Plug,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -24,8 +26,9 @@ import { usePeriodSelector } from "@/hooks/usePeriodSelector";
 import { useAttribution } from "@/hooks/useAttribution";
 import { PeriodSelector } from "@/components/insights/PeriodSelector";
 import { StrategicInsightsCard } from "@/components/insights/StrategicInsightsCard";
+import { SectionHeader } from "@/components/insights/SectionHeader";
 
-import type { ChannelROI } from "@/types/attribution";
+import type { ChannelROI, CampaignAttribution } from "@/types/attribution";
 
 /* ── Imports dos componentes Delta (Wave 2) ───────────────────────── */
 import { SankeyAttribution } from "@/components/analytics/SankeyAttribution";
@@ -63,7 +66,7 @@ function PageSkeleton() {
       {/* Header skeleton */}
       <div className="h-10 bg-bg-elevated rounded-xl w-2/3" />
       {/* Hero cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-3">
         {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="h-28 bg-bg-elevated rounded-xl" />
         ))}
@@ -232,27 +235,9 @@ function ChannelROICard({ channel, isBest }: ChannelROICardProps) {
   );
 }
 
-/* ── Section Header ──────────────────────────────────────────────── */
+/* ── Empty States ────────────────────────────────────────────────── */
 
-function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
-  return (
-    <div className="mb-4">
-      <div className="flex items-center gap-3 mb-1">
-        <div className="h-px flex-1 bg-border/60" />
-        <h2 className="text-[13px] font-semibold text-text-muted uppercase tracking-widest whitespace-nowrap">
-          {title}
-        </h2>
-        <div className="h-px flex-1 bg-border/60" />
-      </div>
-      {subtitle && (
-        <p className="text-center text-[12px] text-text-muted/70 mt-1">{subtitle}</p>
-      )}
-    </div>
-  );
-}
-
-/* ── Empty State ─────────────────────────────────────────────────── */
-
+/** Estado vazio completo: sem leads E sem spend */
 function EmptyState() {
   return (
     <motion.div
@@ -278,6 +263,58 @@ function EmptyState() {
   );
 }
 
+/** Tem leads mas sem gasto: falta conectar Meta Ads */
+function EmptyStateNoSpend() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.97 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.3 }}
+      className="flex flex-col items-center justify-center py-16 text-center px-4 rounded-xl bg-bg-card border border-border"
+    >
+      <div className="w-14 h-14 rounded-2xl bg-bg-elevated flex items-center justify-center mb-4">
+        <Plug className="w-7 h-7 text-text-muted" />
+      </div>
+      <p className="text-[16px] font-semibold text-text-primary mb-1">Leads detectados, gasto não rastreado</p>
+      <p className="text-[13px] text-text-muted max-w-sm leading-relaxed mb-6">
+        Conecte o Meta Ads para cruzar investimento com leads do CRM e ver ROAS, CAC e atribuição real.
+      </p>
+      <Link
+        href="/conexoes"
+        className="px-4 py-2 rounded-xl bg-accent text-bg-primary text-[13px] font-semibold hover:opacity-90 transition-opacity"
+      >
+        Conectar Meta Ads
+      </Link>
+    </motion.div>
+  );
+}
+
+/** Tem gasto mas sem leads: falta CRM + UTMs */
+function EmptyStateNoLeads() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.97 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.3 }}
+      className="flex flex-col items-center justify-center py-16 text-center px-4 rounded-xl bg-bg-card border border-border"
+    >
+      <div className="w-14 h-14 rounded-2xl bg-bg-elevated flex items-center justify-center mb-4">
+        <Users className="w-7 h-7 text-text-muted" />
+      </div>
+      <p className="text-[16px] font-semibold text-text-primary mb-1">Gasto detectado, leads não rastreados</p>
+      <p className="text-[13px] text-text-muted max-w-sm leading-relaxed mb-6">
+        Conecte o CRM e configure UTMs nos anúncios para ver quais campanhas geram leads e deals reais.
+      </p>
+      <Link
+        href="/setup"
+        className="px-4 py-2 rounded-xl bg-accent text-bg-primary text-[13px] font-semibold hover:opacity-90 transition-opacity"
+      >
+        Configurar UTMs
+      </Link>
+    </motion.div>
+  );
+}
+
 /* ── Match Rate Warning ───────────────────────────────────────────── */
 
 function MatchRateWarning({ matchRate }: { matchRate: number }) {
@@ -293,6 +330,96 @@ function MatchRateWarning({ matchRate }: { matchRate: number }) {
         Apenas <strong>{fmtPct(matchRate)}</strong> das campanhas Meta estão linkadas com
         leads do CRM via UTM. Configure UTMs nos anúncios para ter atribuição completa.
       </p>
+    </motion.div>
+  );
+}
+
+/* ── Mega-card: Campanha #1 ──────────────────────────────────────── */
+
+interface TopCampaignCardProps {
+  campaign: CampaignAttribution;
+}
+
+function TopCampaignCard({ campaign }: TopCampaignCardProps) {
+  const metaUrl = campaign.metaCampaignId
+    ? `https://business.facebook.com/adsmanager/manage/campaigns?selected_campaign_ids=${campaign.metaCampaignId}`
+    : null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="relative overflow-hidden rounded-xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/8 via-bg-card to-bg-card p-5"
+    >
+      {/* Subtle glow background */}
+      <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-emerald-500/8 blur-2xl pointer-events-none" />
+
+      <div className="relative flex flex-col sm:flex-row sm:items-center gap-4">
+        {/* Badge + título */}
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center shrink-0">
+            <Trophy className="w-5 h-5 text-emerald-400" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider mb-0.5">
+              Campanha de melhor performance
+            </p>
+            <p
+              className="text-[15px] font-bold text-text-primary truncate max-w-[420px]"
+              title={campaign.campaignName}
+            >
+              {campaign.campaignName}
+            </p>
+          </div>
+        </div>
+
+        {/* KPIs inline */}
+        <div className="flex flex-wrap items-center gap-4 shrink-0">
+          {campaign.roas !== null && (
+            <div className="flex flex-col items-center">
+              <span className="text-[18px] font-bold text-emerald-400 leading-none">
+                {campaign.roas.toFixed(1)}x
+              </span>
+              <span className="text-[10px] text-text-muted mt-0.5">ROAS</span>
+            </div>
+          )}
+          {campaign.cac !== null && (
+            <div className="flex flex-col items-center">
+              <span className="text-[18px] font-bold text-text-primary leading-none">
+                {fmtBRL(campaign.cac)}
+              </span>
+              <span className="text-[10px] text-text-muted mt-0.5">CAC</span>
+            </div>
+          )}
+          <div className="flex flex-col items-center">
+            <span className="text-[18px] font-bold text-text-primary leading-none">
+              {fmtNum(campaign.crmDealsWon)}
+            </span>
+            <span className="text-[10px] text-text-muted mt-0.5">Deals</span>
+          </div>
+          {campaign.crmRevenue > 0 && (
+            <div className="flex flex-col items-center">
+              <span className="text-[18px] font-bold text-text-primary leading-none">
+                {fmtBRL(campaign.crmRevenue)}
+              </span>
+              <span className="text-[10px] text-text-muted mt-0.5">Receita</span>
+            </div>
+          )}
+
+          {/* CTA */}
+          {metaUrl && (
+            <a
+              href={metaUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[12px] font-semibold hover:bg-emerald-500/25 transition-all duration-200"
+            >
+              Ver no Meta Ads
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          )}
+        </div>
+      </div>
     </motion.div>
   );
 }
@@ -328,6 +455,15 @@ function IntegradoPage() {
   }, [data]);
 
   const bestChannelSource = sortedChannels[0]?.source ?? null;
+
+  /* ── Campanha de melhor ROAS (para mega-card) ── */
+  const topCampaign = useMemo<CampaignAttribution | null>(() => {
+    if (!data) return null;
+    const candidates = data.campaignAttribution
+      .filter((c) => c.matched && c.roas !== null)
+      .sort((a, b) => (b.roas ?? 0) - (a.roas ?? 0));
+    return candidates[0] ?? null;
+  }, [data]);
 
   /* ── Delta KPIs for hero cards ── */
   const prevPeriodStart = toISODate(previousRange.start);
@@ -384,10 +520,17 @@ function IntegradoPage() {
 
   const totals = data?.totals;
 
+  /* ── Empty state logic ── */
+  const hasLeads = (totals?.leads ?? 0) > 0;
+  const hasSpend = (totals?.spend ?? 0) > 0;
+  const isEmpty = !hasLeads && !hasSpend;
+  const onlyLeads = hasLeads && !hasSpend;
+  const onlySpend = !hasLeads && hasSpend;
+
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6 max-w-[1600px] mx-auto">
 
-      {/* ── HEADER ── */}
+      {/* ── 1. HEADER ── */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -427,7 +570,7 @@ function IntegradoPage() {
         </div>
       </motion.div>
 
-      {/* ── MATCH RATE WARNING ── */}
+      {/* ── 2. MATCH RATE WARNING ── */}
       {totals && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -438,8 +581,19 @@ function IntegradoPage() {
         </motion.div>
       )}
 
-      {/* ── EMPTY STATE ── */}
-      {data && totals && totals.leads === 0 && (
+      {/* ── 3. MEGA-CARD CAMPANHA #1 ── */}
+      {topCampaign && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.5 * 0.07 }}
+        >
+          <TopCampaignCard campaign={topCampaign} />
+        </motion.div>
+      )}
+
+      {/* ── EMPTY STATES ── */}
+      {data && totals && isEmpty && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -448,8 +602,26 @@ function IntegradoPage() {
           <EmptyState />
         </motion.div>
       )}
+      {data && totals && onlyLeads && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1 * 0.07 }}
+        >
+          <EmptyStateNoSpend />
+        </motion.div>
+      )}
+      {data && totals && onlySpend && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1 * 0.07 }}
+        >
+          <EmptyStateNoLeads />
+        </motion.div>
+      )}
 
-      {/* ── STRATEGIC INSIGHTS ── */}
+      {/* ── 4. STRATEGIC INSIGHTS ── */}
       {data && data.insights.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -464,20 +636,21 @@ function IntegradoPage() {
         </motion.div>
       )}
 
-      {/* ── HERO TOTALS ── */}
+      {/* ── 5. HERO KPIs (6 cards) ── */}
       {totals && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 3 * 0.07 }}
-          className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3"
+          className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-3"
         >
+          {/* Investimento — gasto maior é neutro (não é bom nem ruim por si só) */}
           <HeroCard
             icon={<DollarSign className="w-4 h-4" />}
             label="Investimento"
             value={fmtBRL(totals.spend)}
             delta={calcDelta(totals.spend, prevData?.totals.spend)}
-            deltaPositive={isPositiveDelta(totals.spend, prevData?.totals.spend) === false ? null : null}
+            deltaPositive={null} // gasto maior não é bom nem ruim — sempre cinza neutro
             accent="default"
           />
           <HeroCard
@@ -536,7 +709,7 @@ function IntegradoPage() {
         </motion.div>
       )}
 
-      {/* ── SEÇÃO 1: JORNADA DO LEAD ── */}
+      {/* ── 6. CAMPANHAS (subiu — conteúdo mais importante) ── */}
       {data && (
         <motion.section
           initial={{ opacity: 0, y: 10 }}
@@ -544,18 +717,14 @@ function IntegradoPage() {
           transition={{ delay: 4 * 0.07 }}
         >
           <SectionHeader
-            title="Jornada do Lead"
-            subtitle="Como leads percorrem do canal até virarem deals"
+            title="Performance por Campanha"
+            subtitle="Spend Meta vs Leads CRM vs Receita real"
           />
-          <SankeyAttribution
-            channelROI={data.channelROI}
-            funnel={data.funnelEndToEnd}
-            totalRevenue={data.totals.revenue}
-          />
+          <CrossChannelROITable campaigns={data.campaignAttribution} />
         </motion.section>
       )}
 
-      {/* ── SEÇÃO 2: FUNIL END-TO-END ── */}
+      {/* ── 7. FUNIL END-TO-END ── */}
       {data && (
         <motion.section
           initial={{ opacity: 0, y: 10 }}
@@ -573,7 +742,7 @@ function IntegradoPage() {
         </motion.section>
       )}
 
-      {/* ── SEÇÃO 3: ROI POR CANAL ── */}
+      {/* ── 8. ROI POR CANAL ── */}
       {data && sortedChannels.length > 0 && (
         <motion.section
           initial={{ opacity: 0, y: 10 }}
@@ -596,7 +765,7 @@ function IntegradoPage() {
         </motion.section>
       )}
 
-      {/* ── SEÇÃO 4: CAMPANHAS ── */}
+      {/* ── 9. FLUXO DE CANAIS (ex-Sankey — rebrand honesto) ── */}
       {data && (
         <motion.section
           initial={{ opacity: 0, y: 10 }}
@@ -604,14 +773,19 @@ function IntegradoPage() {
           transition={{ delay: 7 * 0.07 }}
         >
           <SectionHeader
-            title="Performance por Campanha"
-            subtitle="Spend Meta vs Leads CRM vs Receita real"
+            title="Fluxo de Canais"
+            subtitle="Como cada canal alimenta as etapas do funil até o resultado"
           />
-          <CrossChannelROITable campaigns={data.campaignAttribution} />
+          <SankeyAttribution
+            channelROI={data.channelROI}
+            funnel={data.funnelEndToEnd}
+            totalRevenue={data.totals.revenue}
+            title="Fluxo de Canais"
+          />
         </motion.section>
       )}
 
-      {/* ── SEÇÃO 5: CRIATIVOS ── */}
+      {/* ── 10. CRIATIVOS ── */}
       {data && (
         <motion.section
           initial={{ opacity: 0, y: 10 }}

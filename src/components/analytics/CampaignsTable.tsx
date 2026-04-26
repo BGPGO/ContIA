@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { ArrowUpDown, ChevronLeft, ChevronRight, Megaphone } from "lucide-react";
+import { ArrowUpDown, ChevronLeft, ChevronRight, Megaphone, PauseCircle } from "lucide-react";
 import type { AdCampaignSummary } from "@/types/analytics";
 
 /* ── Props ── */
@@ -248,6 +248,7 @@ export function CampaignsTable({
                   onToggle={toggleSort}
                 />
               </th>
+              <th className="px-3 py-2.5 w-[110px]" />
             </tr>
           </thead>
           <tbody>
@@ -303,6 +304,21 @@ export function CampaignsTable({
                       >
                         {campaign.roas.toFixed(2)}×
                       </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2.5 text-right">
+                    {campaign.roas !== null && campaign.roas < 1 && campaign.spend > 100 && (
+                      <a
+                        href={`https://business.facebook.com/adsmanager/manage/campaigns?selected_campaign_ids=${campaign.campaignId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 text-[10px] font-medium hover:bg-red-500/20 transition-colors whitespace-nowrap"
+                        title="Abrir no Meta Ads Manager para pausar esta campanha"
+                      >
+                        <PauseCircle size={11} />
+                        Pausar no Meta
+                      </a>
                     )}
                   </td>
                 </tr>

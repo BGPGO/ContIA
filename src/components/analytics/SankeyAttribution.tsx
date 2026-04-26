@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useLayoutEffect, useCallback } from "react";
 import { motion } from "motion/react";
 import { GitMerge } from "lucide-react";
 import type { ChannelROI, FunnelEndToEndStage } from "@/types/attribution";
@@ -72,59 +72,133 @@ interface ColumnItem {
   sublabel?: string;
 }
 
+/* ── SVG Bezier connector overlay ── */
+
+interface ConnectorPath {
+  d: string;
+  color: string;
+  strokeWidth: number;
+  fromId: string; // ID do item da coluna de origem
+}
+
+interface ColRect {
+  id: string;
+  top: number;   // relativo ao container
+  height: number;
+  color: string;
+  count: number;
+}
+
+function buildPaths(
+  leftRects: ColRect[],
+  rightRects: ColRect[],
+  x1: number, // right edge da coluna esquerda
+  x2: number, // left edge da coluna direita
+  totalCount: number
+): ConnectorPath[] {
+  if (leftRects.length === 0 || rightRects.length === 0) return [];
+
+  const paths: ConnectorPath[] = [];
+
+  leftRects.forEach((lItem) => {
+    const lMid = lItem.top + lItem.height / 2;
+    const lPct = totalCount > 0 ? lItem.count / totalCount : 1 / leftRects.length;
+    const sw = Math.max(2, Math.min(16, lPct * 80));
+
+    rightRects.forEach((rItem) => {
+      const rMid = rItem.top + rItem.height / 2;
+      const cx = (x1 + x2) / 2;
+      const d = `M ${x1} ${lMid} C ${cx} ${lMid} ${cx} ${rMid} ${x2} ${rMid}`;
+      paths.push({
+        d,
+        color: lItem.color,
+        strokeWidth: sw,
+        fromId: lItem.id,
+      });
+    });
+  });
+
+  return paths;
+}
+
+/* ── FlowColumn with ref tracking ── */
+
+interface FlowColumnProps {
+  title: string;
+  items: ColumnItem[];
+  totalCount: number;
+  activeId: string | null;
+  onHover: (id: string | null) => void;
+  onRectsReady?: (rects: ColRect[]) => void;
+}
+
 function FlowColumn({
   title,
   items,
   totalCount,
   activeId,
   onHover,
-}: {
-  title: string;
-  items: ColumnItem[];
-  totalCount: number;
-  activeId: string | null;
-  onHover: (id: string | null) => void;
-}) {
+  onRectsReady,
+}: FlowColumnProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  useLayoutEffect(() => {
+    if (!onRectsReady || !containerRef.current) return;
+    const containerTop = containerRef.current.getBoundingClientRect().top;
+    const rects: ColRect[] = items.map((item, i) => {
+      const el = itemRefs.current[i];
+      if (!el) return { id: item.id, top: 0, height: 40, color: item.color, count: item.count };
+      const r = el.getBoundingClientRect();
+      return {
+        id: item.id,
+        top: r.top - containerTop,
+        height: r.height,
+        color: item.color,
+        count: item.count,
+      };
+    });
+    onRectsReady(rects);
+  });
+
   return (
-    <div className="flex flex-col gap-1.5">
-      <p className="text-[11px] font-medium text-text-muted uppercase tracking-wider mb-2 text-center">
+    <div ref={containerRef} className="flex flex-col gap-2">
+      <p className="text-[11px] font-medium text-text-muted uppercase tracking-wider mb-1 text-center">
         {title}
       </p>
       {items.map((item, i) => {
-        const pct = totalCount > 0 ? Math.max(8, (item.count / totalCount) * 100) : 8;
+        const pct = totalCount > 0 ? Math.max(12, (item.count / totalCount) * 100) : 12;
         const isActive = activeId === null || activeId === item.id;
         return (
           <motion.div
             key={item.id}
+            ref={(el) => { itemRefs.current[i] = el; }}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05, duration: 0.3 }}
             onMouseEnter={() => onHover(item.id)}
             onMouseLeave={() => onHover(null)}
-            className={`relative rounded-lg p-2.5 border cursor-default transition-all duration-200 ${
+            className={`relative rounded-lg p-3 border cursor-default transition-all duration-200 ${
               isActive
                 ? "border-border bg-bg-elevated"
                 : "border-border/30 bg-bg-elevated/30 opacity-40"
             }`}
           >
-            {/* Color bar */}
+            {/* Color accent bar (left) */}
             <div
               className="absolute left-0 top-0 bottom-0 rounded-l-lg"
-              style={{ width: 3, backgroundColor: item.color }}
+              style={{ width: 4, backgroundColor: item.color }}
             />
 
-            {/* Fill bar */}
+            {/* Fill bar (proportional) */}
             <div
-              className="absolute left-[3px] top-0 bottom-0 rounded-r-lg opacity-10"
-              style={{
-                width: `${pct}%`,
-                backgroundColor: item.color,
-              }}
+              className="absolute left-[4px] top-0 bottom-0 rounded-r-lg opacity-10"
+              style={{ width: `${pct}%`, backgroundColor: item.color }}
             />
 
-            <div className="relative flex items-center justify-between gap-2">
+            <div className="relative flex items-center justify-between gap-2 pl-1">
               <div className="flex flex-col min-w-0">
-                <span className="text-[12px] font-medium text-text-primary truncate">
+                <span className="text-[12px] font-semibold text-text-primary truncate">
                   {item.label}
                 </span>
                 {item.sublabel && (
@@ -132,7 +206,7 @@ function FlowColumn({
                 )}
               </div>
               <span
-                className="text-[12px] font-bold tabular-nums shrink-0"
+                className="text-[13px] font-bold tabular-nums shrink-0"
                 style={{ color: item.color }}
               >
                 {formatNum(item.count)}
@@ -145,35 +219,48 @@ function FlowColumn({
   );
 }
 
-/* ── Arrow connector ── */
-
-function FlowArrow() {
-  return (
-    <div className="flex items-center justify-center mt-8">
-      <div className="flex flex-col items-center gap-1">
-        {[0, 1, 2, 3, 4].map((i) => (
-          <div
-            key={i}
-            className="w-0.5 h-2 rounded-full bg-border/60"
-            style={{ opacity: 1 - i * 0.15 }}
-          />
-        ))}
-        <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-border/60" />
-      </div>
-    </div>
-  );
-}
-
 /* ── Main ── */
 
 export function SankeyAttribution({
   channelROI,
   funnel,
   totalRevenue,
-  title = "Fluxo de Atribuição Cross-Channel",
+  title = "Fluxo de Canais",
   emptyMessage = "Nenhum dado de atribuição no período",
 }: SankeyAttributionProps) {
   const [activeChannel, setActiveChannel] = useState<string | null>(null);
+
+  // Refs to SVG overlay dimensions
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const col1Ref = useRef<HTMLDivElement>(null);
+  const col2Ref = useRef<HTMLDivElement>(null);
+  const col3Ref = useRef<HTMLDivElement>(null);
+
+  const [leftRects, setLeftRects] = useState<ColRect[]>([]);
+  const [midRects, setMidRects] = useState<ColRect[]>([]);
+  const [rightRects, setRightRects] = useState<ColRect[]>([]);
+  const [svgDim, setSvgDim] = useState({ w: 0, h: 0 });
+  const [x1, setX1] = useState(0); // right edge col1
+  const [x2, setX2] = useState(0); // left edge col2
+  const [x3, setX3] = useState(0); // right edge col2
+  const [x4, setX4] = useState(0); // left edge col3
+
+  const updateLayout = useCallback(() => {
+    if (!wrapperRef.current || !col1Ref.current || !col2Ref.current || !col3Ref.current) return;
+    const wRect = wrapperRef.current.getBoundingClientRect();
+    const c1 = col1Ref.current.getBoundingClientRect();
+    const c2 = col2Ref.current.getBoundingClientRect();
+    const c3 = col3Ref.current.getBoundingClientRect();
+    setSvgDim({ w: wRect.width, h: wRect.height });
+    setX1(c1.right - wRect.left);
+    setX2(c2.left - wRect.left);
+    setX3(c2.right - wRect.left);
+    setX4(c3.left - wRect.left);
+  }, []);
+
+  useLayoutEffect(() => {
+    updateLayout();
+  });
 
   if (channelROI.length === 0 && funnel.length === 0) {
     return (
@@ -253,6 +340,11 @@ export function SankeyAttribution({
     });
   }
 
+  /* Build SVG paths */
+  const paths12 = buildPaths(leftRects, midRects, x1, x2, totalLeads);
+  const paths23 = buildPaths(midRects, rightRects, x3, x4, totalLeads);
+  const allPaths = [...paths12, ...paths23];
+
   return (
     <div className="bg-bg-card border border-border rounded-xl p-5">
       {/* Header */}
@@ -269,50 +361,100 @@ export function SankeyAttribution({
         </div>
       </div>
 
-      {/* 3-column flow */}
-      <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] gap-0 items-start">
-        {/* Column 1 */}
-        <FlowColumn
-          title="Canais de Entrada"
-          items={channelItems}
-          totalCount={totalLeads}
-          activeId={activeChannel}
-          onHover={setActiveChannel}
-        />
+      {/* 3-column flow com SVG overlay de conectores Bezier */}
+      <div ref={wrapperRef} className="relative">
+        {/* SVG overlay — paths Bezier entre colunas */}
+        {svgDim.w > 0 && (
+          <svg
+            className="absolute inset-0 pointer-events-none"
+            width={svgDim.w}
+            height={svgDim.h}
+            style={{ zIndex: 0 }}
+          >
+            {allPaths.map((p, i) => {
+              const isHighlighted =
+                activeChannel === null || p.fromId === activeChannel;
+              return (
+                <path
+                  key={i}
+                  d={p.d}
+                  fill="none"
+                  stroke={p.color}
+                  strokeWidth={p.strokeWidth}
+                  opacity={isHighlighted ? 0.22 : 0.05}
+                  strokeLinecap="round"
+                  style={{ transition: "opacity 0.2s" }}
+                />
+              );
+            })}
+          </svg>
+        )}
 
-        {/* Arrow 1→2 */}
-        <FlowArrow />
+        <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] gap-0 items-start relative z-10">
+          {/* Column 1 */}
+          <div ref={col1Ref}>
+            <FlowColumn
+              title="Canais de Entrada"
+              items={channelItems}
+              totalCount={totalLeads}
+              activeId={activeChannel}
+              onHover={setActiveChannel}
+              onRectsReady={setLeftRects}
+            />
+          </div>
 
-        {/* Column 2 */}
-        <FlowColumn
-          title="Estágios do Funil"
-          items={funnelItems}
-          totalCount={totalLeads}
-          activeId={null}
-          onHover={() => {}}
-        />
+          {/* Spacer 1→2 */}
+          <div className="w-8" />
 
-        {/* Arrow 2→3 */}
-        <FlowArrow />
+          {/* Column 2 */}
+          <div ref={col2Ref}>
+            <FlowColumn
+              title="Estágios do Funil"
+              items={funnelItems}
+              totalCount={totalLeads}
+              activeId={null}
+              onHover={() => {}}
+              onRectsReady={setMidRects}
+            />
+          </div>
 
-        {/* Column 3 */}
-        <FlowColumn
-          title="Resultado"
-          items={resultItems}
-          totalCount={totalLeads}
-          activeId={null}
-          onHover={() => {}}
-        />
+          {/* Spacer 2→3 */}
+          <div className="w-8" />
+
+          {/* Column 3 */}
+          <div ref={col3Ref}>
+            <FlowColumn
+              title="Resultado"
+              items={resultItems}
+              totalCount={totalLeads}
+              activeId={null}
+              onHover={() => {}}
+              onRectsReady={setRightRects}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Legend */}
-      {channelROI.length > 0 && (
+      {channelItems.length > 0 && (
         <div className="mt-5 pt-4 border-t border-border/60 flex flex-wrap gap-3">
           {channelItems.map((c) => (
-            <div key={c.id} className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: c.color }} />
-              <span className="text-[11px] text-text-muted">{c.label}</span>
-            </div>
+            <button
+              key={c.id}
+              className="flex items-center gap-1.5 group"
+              onMouseEnter={() => setActiveChannel(c.id)}
+              onMouseLeave={() => setActiveChannel(null)}
+            >
+              <div
+                className="w-2.5 h-2.5 rounded-full transition-transform duration-150 group-hover:scale-125"
+                style={{ backgroundColor: c.color }}
+              />
+              <span
+                className="text-[11px] text-text-muted group-hover:text-text-primary transition-colors duration-150"
+              >
+                {c.label}
+              </span>
+            </button>
           ))}
         </div>
       )}

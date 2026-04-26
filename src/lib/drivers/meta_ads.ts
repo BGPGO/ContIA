@@ -576,7 +576,7 @@ export const metaAdsDriver: ConnectionDriver = {
       provider_content_id: c.id,
       content_type: 'ad_campaign' as const,
       title: c.name,
-      caption: null,
+      caption: c.name, // popula caption com o nome da campanha para evitar título vazio na UI
       url: `https://business.facebook.com/adsmanager/manage/campaigns?act=${connection.provider_user_id}&selected_campaign_ids=${c.id}`,
       thumbnail_url: null,
       published_at: c.created_time,
