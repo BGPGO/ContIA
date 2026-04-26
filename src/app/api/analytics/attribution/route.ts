@@ -704,13 +704,37 @@ export async function GET(req: NextRequest) {
     "won",
   ];
 
-  // Mapeamento inicial (sem conversão cumulativa ainda)
-  const rawMapped: FunnelEndToEndStage[] = crmFunnel.map((stage) => ({
-    stage: toFunnelStage(stage.stage),
-    label: stage.label,
-    count: stage.count,
-    valueSum: stage.valueSum,
-    isLost: toFunnelStage(stage.stage) === "lost",
+  /**
+   * Label PT-BR limpo por FunnelStage. CRM retorna labels undefined/inconsistentes
+   * (ex: "LEAD" vs "Lead", undefined em todos), então normalizamos aqui.
+   */
+  const STAGE_LABEL_PT: Record<FunnelStage, string> = {
+    lead: "Lead",
+    contact_made: "Contato Feito",
+    meeting_scheduled: "Reunião Marcada",
+    meeting_held: "Reunião Realizada",
+    proposal_sent: "Proposta Enviada",
+    negotiation: "Negociação",
+    won: "Venda Fechada",
+    lost: "Perdido",
+  };
+
+  // Agregar contagens por FunnelStage (caso CRM tenha duplicados tipo "Lead" + "LEAD")
+  const stageCounts = new Map<FunnelStage, { count: number; valueSum?: number }>();
+  for (const stage of crmFunnel) {
+    const key = toFunnelStage(stage.stage);
+    const existing = stageCounts.get(key) ?? { count: 0, valueSum: 0 };
+    existing.count += stage.count;
+    if (stage.valueSum) existing.valueSum = (existing.valueSum ?? 0) + stage.valueSum;
+    stageCounts.set(key, existing);
+  }
+
+  const rawMapped: FunnelEndToEndStage[] = [...stageCounts.entries()].map(([key, val]) => ({
+    stage: key,
+    label: STAGE_LABEL_PT[key],
+    count: val.count,
+    valueSum: val.valueSum,
+    isLost: key === "lost",
   }));
 
   // Separar lost do fluxo principal
