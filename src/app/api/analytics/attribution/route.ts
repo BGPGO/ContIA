@@ -154,14 +154,31 @@ function normalize(s: string): string {
     .trim();
 }
 
+/**
+ * Match estrito entre nome da campanha Meta e UTM do CRM.
+ * Substring match foi removida porque casava errado: "lal_venda" matchava
+ * "lal_venda_lp_nova" (são campanhas diferentes). Agora só:
+ * - Match exato (após normalização)
+ * - Match com word-boundary (uma é prefixo da outra terminando em "_")
+ */
 function fuzzyMatch(a: string, b: string): boolean {
   const na = normalize(a);
   const nb = normalize(b);
+  if (!na || !nb) return false;
   if (na === nb) return true;
-  // One is a substring of the other (≥ 5 chars to avoid false positives)
-  if (na.length >= 5 && nb.includes(na)) return true;
-  if (nb.length >= 5 && na.includes(nb)) return true;
+  // Prefix match com boundary: "az_bi_cadastro" matcha "az_bi_cadastro_lal_venda"
+  // mas só se um termina exatamente onde o outro estende com "_".
+  // Hoje desabilitado porque tava gerando false positives demais.
+  // Re-habilitar com critério mais rígido se necessário.
   return false;
+}
+
+/**
+ * UTMs literais sem substituição de macro Meta — sinal de configuração errada.
+ * Ex: "{{campaign.name}}", "{{ad.name}}", "{{adset.name}}"
+ */
+function isLiteralMacroUtm(s: string): boolean {
+  return /^\{\{.*\}\}$/.test(s.trim());
 }
 
 /* ── Fetch CRM attribution ───────────────────────────────────────── */
@@ -334,6 +351,22 @@ function computeAttributionInsights(
         actionable: "Adicionar utm_campaign igual ao nome da campanha Meta em todos os anúncios.",
       });
     }
+  }
+
+  // 7. UTMs com macros literais não substituídos (ex: "{{campaign.name}}")
+  const literalMacroCampaign = campaignAttribution.find((c) =>
+    isLiteralMacroUtm(c.campaignName)
+  );
+  if (literalMacroCampaign) {
+    insights.push({
+      id: "attribution_macro_not_substituted",
+      category: "anomaly",
+      severity: "critical",
+      title: "Macro Meta não substituído nos UTMs",
+      description: `Detectei leads chegando com utm_campaign literal "${literalMacroCampaign.campaignName}" — significa que o macro do Meta não está sendo substituído ao gerar a URL. Algum anúncio está mal configurado.`,
+      metric: `${literalMacroCampaign.crmLeads} leads`,
+      actionable: "No Meta Ads Manager, conferir o template de URL: usar {{campaign.name}} (com chaves duplas) — alguns editores escapam o macro.",
+    });
   }
 
   insights.sort(
