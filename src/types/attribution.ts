@@ -125,6 +125,11 @@ export interface FunnelEndToEndStage {
   stage: FunnelStage;
   /** Label PT-BR para exibição */
   label: string;
+  /**
+   * Count CUMULATIVO — inclui todos que passaram POR este estágio em diante.
+   * Ex: "Proposta Enviada" conta todos que chegaram ao menos até proposta,
+   * incluindo os que foram para negociação e venda.
+   */
   count: number;
   /** R$ — preenchido apenas no estágio "won" */
   valueSum?: number;
@@ -132,6 +137,8 @@ export interface FunnelEndToEndStage {
   conversionFromPrev?: number;
   /** % de conversão em relação ao topo do funil / leads iniciais (0..1) */
   conversionFromTop?: number;
+  /** true apenas para o estágio "lost" — count NÃO é cumulativo */
+  isLost?: boolean;
 }
 
 /* ── Top IG Post ─────────────────────────────────────────────────── */

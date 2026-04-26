@@ -19,7 +19,7 @@ export const FUNNEL_STAGE_LABELS: Record<FunnelStage, string> = {
   meeting_held: "Reunião Realizada",
   proposal_sent: "Proposta Enviada",
   negotiation: "Negociação",
-  won: "Ganho",
+  won: "Venda",
   lost: "Perdido",
 };
 

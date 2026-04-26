@@ -15,6 +15,12 @@ import type {
   PostingFrequency,
   GrowthMetrics,
 } from "../report-aggregator";
+import type {
+  AttributionTotals,
+  ChannelROI,
+  CampaignAttribution,
+  FunnelEndToEndStage,
+} from "@/types/attribution";
 
 /* ── Types internos ──────────────────────────────────────────────────────── */
 
@@ -53,6 +59,12 @@ export interface PromptDataInput {
   engagementBreakdown?: EngagementBreakdown;
   postingFrequency?: PostingFrequency;
   growthMetrics?: GrowthMetrics;
+
+  // Attribution cross-channel (v3)
+  attributionTotals?: AttributionTotals;
+  channelROI?: ChannelROI[];
+  campaignAttribution?: CampaignAttribution[];
+  funnelEndToEnd?: FunnelEndToEndStage[];
 }
 
 /* ── System prompt compartilhado ─────────────────────────────────────────── */
@@ -70,6 +82,82 @@ REGRAS:
 - Responda APENAS com JSON valido, sem markdown, sem code blocks`;
 
 /* ── Helpers para formatar dados enriquecidos ────────────────────────────── */
+
+function formatCrossChannelAttribution(
+  totals?: AttributionTotals,
+  channelROI?: ChannelROI[],
+  campaigns?: CampaignAttribution[],
+  funnel?: FunnelEndToEndStage[]
+): string {
+  if (!totals && !channelROI && !campaigns && !funnel) return "";
+
+  const lines: string[] = ["\n## ATRIBUICAO CROSS-CHANNEL (CRM + Meta Ads)"];
+
+  if (totals) {
+    const roasStr = totals.roas !== null ? `${totals.roas.toFixed(2)}x` : "N/D";
+    const cacStr = totals.cac !== null ? `R$${totals.cac.toFixed(0)}` : "N/D";
+    const ticketStr = totals.avgTicket !== null ? `R$${totals.avgTicket.toFixed(0)}` : "N/D";
+    const matchPct = (totals.matchRate * 100).toFixed(0);
+    const funnelRate =
+      totals.leads > 0
+        ? ((totals.dealsWon / totals.leads) * 100).toFixed(1)
+        : "0.0";
+
+    lines.push("### Totais do Periodo");
+    lines.push(`  - Investimento Meta Ads: R$${totals.spend.toFixed(0)}`);
+    lines.push(`  - Leads CRM: ${totals.leads}`);
+    lines.push(`  - Vendas: ${totals.dealsWon}`);
+    lines.push(`  - Receita gerada: R$${totals.revenue.toFixed(0)}`);
+    lines.push(`  - ROAS real: ${roasStr}`);
+    lines.push(`  - CAC: ${cacStr}`);
+    lines.push(`  - Ticket medio: ${ticketStr}`);
+    lines.push(`  - Taxa lead→fechamento: ${funnelRate}% (${totals.dealsWon}/${totals.leads})`);
+    lines.push(`  - Match rate leads rastreados: ${matchPct}% dos leads com UTM cruzam com campanha Meta`);
+    lines.push(`  - Ciclo medio lead→venda: ${totals.avgLeadToWon_days.toFixed(0)} dias`);
+  }
+
+  if (channelROI && channelROI.length > 0) {
+    lines.push("### ROI por Canal");
+    const sorted = [...channelROI].sort((a, b) => b.leads - a.leads).slice(0, 6);
+    for (const ch of sorted) {
+      const roasTxt = ch.roas !== null ? ` ROAS ${ch.roas.toFixed(2)}x` : "";
+      const convTxt = `conv ${(ch.conversionRate * 100).toFixed(1)}%`;
+      lines.push(
+        `  - ${ch.source}: ${ch.leads} leads, ${ch.dealsWon} vendas, R$${ch.revenue.toFixed(0)} receita,${roasTxt} ${convTxt}`
+      );
+    }
+  }
+
+  if (campaigns && campaigns.length > 0) {
+    const top = campaigns
+      .filter((c) => c.matched)
+      .sort((a, b) => (b.roas ?? -1) - (a.roas ?? -1))
+      .slice(0, 5);
+    if (top.length > 0) {
+      lines.push("### Top Campanhas por ROAS");
+      for (const c of top) {
+        const roasTxt = c.roas !== null ? `ROAS ${c.roas.toFixed(2)}x` : "sem receita";
+        lines.push(
+          `  - ${c.campaignName}: ${c.crmLeads} leads, ${c.crmDealsWon} vendas, R$${c.spend.toFixed(0)} gasto, ${roasTxt}`
+        );
+      }
+    }
+  }
+
+  if (funnel && funnel.length > 0) {
+    lines.push("### Funil Cumulativo");
+    for (const stage of funnel) {
+      const convTopTxt =
+        stage.conversionFromTop !== undefined
+          ? ` (${(stage.conversionFromTop * 100).toFixed(1)}% do topo)`
+          : "";
+      const lostTxt = stage.isLost ? " [PERDIDOS — nao cumulativo]" : "";
+      lines.push(`  - ${stage.label}: ${stage.count}${convTopTxt}${lostTxt}`);
+    }
+  }
+
+  return lines.join("\n");
+}
 
 function formatContentPerformance(perf: ContentPerformance | undefined): string {
   if (!perf) return "";
@@ -188,6 +276,7 @@ ${formatCaptionAnalysis(input.captionAnalysis)}
 ${formatEngagementBreakdown(input.engagementBreakdown)}
 ${formatPostingFrequency(input.postingFrequency)}
 ${formatGrowthMetrics(input.growthMetrics)}
+${formatCrossChannelAttribution(input.attributionTotals, input.channelROI, input.campaignAttribution, input.funnelEndToEnd)}
 
 ## REGRAS DE ANALISE (nivel especialista em marketing digital)
 
@@ -208,6 +297,8 @@ ${formatGrowthMetrics(input.growthMetrics)}
 8. RATIO LIKES/COMMENTS: Se > 50, audiencia passiva — sugerir mais CTAs conversacionais, perguntas, enquetes.
 
 9. RECOMENDACOES CONCRETAS: Cada recomendacao deve ter EXEMPLO pratico. Ex: "Poste 3 Reels/semana sobre [tema do melhor post] as 18h com CTA de pergunta no caption"
+
+10. ATRIBUICAO CROSS-CHANNEL (se dados disponiveis): Relate qual canal gerou mais leads, qual campanha teve melhor ROAS, como o funil se comportou (lead→contato→proposta→venda) e o que o match rate indica sobre a qualidade do tracking UTM. Fraseie como gestor: "Voce investiu R$X em Meta Ads e gerou Y leads, dos quais Z viraram vendas (ROAS Wx)."
 
 ## FORMATO DE RESPOSTA (JSON)
 {
@@ -263,6 +354,7 @@ ${formatCaptionAnalysis(input.captionAnalysis)}
 ${formatEngagementBreakdown(input.engagementBreakdown)}
 ${formatPostingFrequency(input.postingFrequency)}
 ${formatGrowthMetrics(input.growthMetrics)}
+${formatCrossChannelAttribution(input.attributionTotals, input.channelROI, input.campaignAttribution, input.funnelEndToEnd)}
 
 ## TIPO DE INSIGHTS ESPERADOS
 
@@ -284,6 +376,9 @@ Gere insights que um gestor de marketing vai achar UTEIS e NAO OBVIOS:
 - "Nenhum post com CTA no periodo — oportunidade perdida de direcionar trafego"
 - "Media de X hashtags por post — acima de 15 pode parecer spam, abaixo de 5 perde descoberta"
 - "Saves muito baixos (media X) — conteudo pode nao estar gerando valor percebido de 'guardar para depois'"
+- "ROAS de X — abaixo de 1x significa que cada R$1 investido retorna menos que R$1 (prejuizo)" (se dados attribution disponiveis)
+- "Match rate de X% — mais da metade dos leads chegam sem UTM rastreavel, prejudicando a atribuicao" (se matchRate < 50%)
+- "Funil: X leads entraram mas apenas Y viraram vendas (Z%) — gargalo pode estar em [etapa com maior queda]" (se dados funil disponiveis)
 
 ## FORMATO DE RESPOSTA (JSON)
 {

@@ -204,7 +204,7 @@ function ChannelROICard({ channel, isBest }: ChannelROICardProps) {
         </div>
         <div className="flex flex-col gap-0.5">
           <span className="text-[16px] font-bold text-text-primary">{fmtNum(channel.dealsWon)}</span>
-          <span className="text-[10px] text-text-muted">Deals</span>
+          <span className="text-[10px] text-text-muted">Vendas</span>
         </div>
         <div className="flex flex-col gap-0.5">
           <span className="text-[14px] font-bold text-text-primary">{fmtBRL(channel.revenue)}</span>
@@ -395,7 +395,7 @@ function TopCampaignCard({ campaign }: TopCampaignCardProps) {
             <span className="text-[18px] font-bold text-text-primary leading-none">
               {fmtNum(campaign.crmDealsWon)}
             </span>
-            <span className="text-[10px] text-text-muted mt-0.5">Deals</span>
+            <span className="text-[10px] text-text-muted mt-0.5">Vendas</span>
           </div>
           {campaign.crmRevenue > 0 && (
             <div className="flex flex-col items-center">
@@ -662,7 +662,7 @@ function IntegradoPage() {
           />
           <HeroCard
             icon={<Trophy className="w-4 h-4" />}
-            label="Deals Ganhos"
+            label="Vendas"
             value={fmtNum(totals.dealsWon)}
             delta={calcDelta(totals.dealsWon, prevData?.totals.dealsWon)}
             deltaPositive={isPositiveDelta(totals.dealsWon, prevData?.totals.dealsWon)}
@@ -733,7 +733,7 @@ function IntegradoPage() {
         >
           <SectionHeader
             title="Funil End-to-End"
-            subtitle="Da impressão Meta ao deal fechado no CRM"
+            subtitle="Do lead inicial até a venda fechada"
           />
           <EndToEndFunnel
             stages={data.funnelEndToEnd}

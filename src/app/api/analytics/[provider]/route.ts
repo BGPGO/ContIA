@@ -949,7 +949,7 @@ export async function GET(
     // pipeline_value e conversion_rate são de ESTADO (último snapshot).
     for (const cfg of [
       { key: "leads_new", label: "Leads Novos", icon: "user_plus", suffix: undefined, agg: "sum" as const },
-      { key: "deals_won", label: "Deals Fechados", icon: "dollar", suffix: undefined, agg: "sum" as const },
+      { key: "deals_won", label: "Vendas", icon: "dollar", suffix: undefined, agg: "sum" as const },
       { key: "pipeline_value", label: "Pipeline", icon: "dollar", suffix: "R$", agg: "latest" as const },
       { key: "conversion_rate", label: "Conversao", icon: "trending", suffix: "%", agg: "latest" as const },
     ]) {
@@ -1523,15 +1523,57 @@ export async function GET(
       { stage: "funnel_stage_aguardando_dados",       label: "Aguardando Dados",       color: "#d946ef" },
       { stage: "funnel_stage_proposta_enviada",       label: "Proposta Enviada",       color: "#f59e0b" },
       { stage: "funnel_stage_aguardando_assinatura",  label: "Aguardando Assinatura",  color: "#f97316" },
-      { stage: "funnel_stage_ganho_fechado",          label: "Ganho Fechado",          color: "#22c55e" },
+      { stage: "funnel_stage_ganho_fechado",          label: "Venda Fechada",          color: "#22c55e" },
     ];
 
-    const funnel: CrmFunnelStage[] = FUNNEL_STAGES.map(({ stage, label, color }) => ({
+    // Estágios do funil — mapeados a partir do snapshot mais recente
+    const rawFunnel: CrmFunnelStage[] = FUNNEL_STAGES.map(({ stage, label, color }) => ({
       stage,
       label,
       count: m0[stage] ?? 0,
       color,
     }));
+
+    // Estágio "Perdido" — separado do funil principal
+    const lostStage: CrmFunnelStage | null = (() => {
+      const lostKey = "funnel_stage_perdido";
+      const lostCount = m0[lostKey] ?? 0;
+      if (lostCount === 0) return null;
+      return { stage: lostKey, label: "Perdido", count: lostCount, color: "#ef4444" };
+    })();
+
+    // Transformação cumulativa: cada estágio acumula os que estão nele E além
+    // Ordem semântica do funil (entrada → fechamento):
+    const STAGE_ORDER = [
+      "funnel_stage_lead",
+      "funnel_stage_contato_feito",
+      "funnel_stage_marcar_reunião",
+      "funnel_stage_reunião_agendada",
+      "funnel_stage_aguardando_dados",
+      "funnel_stage_proposta_enviada",
+      "funnel_stage_aguardando_assinatura",
+      "funnel_stage_ganho_fechado",
+    ];
+
+    const ordered = STAGE_ORDER
+      .map((s) => rawFunnel.find((f) => f.stage === s))
+      .filter((f): f is CrmFunnelStage => f !== undefined);
+
+    // Acumular do fim para o início
+    let acc = 0;
+    for (let i = ordered.length - 1; i >= 0; i--) {
+      acc += ordered[i].count;
+      ordered[i] = { ...ordered[i], count: acc };
+    }
+
+    // Reassemblar: stages ordenados + qualquer stage extra fora do STAGE_ORDER
+    const knownStageSet = new Set(STAGE_ORDER);
+    const extraStages = rawFunnel.filter((f) => !knownStageSet.has(f.stage));
+
+    // funnel final: pirâmide cumulativa + extras (sem "perdido")
+    const funnel: CrmFunnelStage[] = [...ordered, ...extraStages];
+
+    // lostStage é usado abaixo em crmAdvanced
 
     // Origens dos leads
     const ORIGIN_LABELS: Record<string, string> = {
@@ -1586,6 +1628,7 @@ export async function GET(
 
     const crmAdvanced: CrmAdvanced = {
       funnel,
+      lostStage,
       leadsByOrigin,
       leadsByTemperature: { hot, warm, cold },
       conversion: { rate: convRate, won, revenue, avgTicket },

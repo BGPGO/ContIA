@@ -829,9 +829,9 @@ function ProviderAnalyticsContent() {
             <motion.div {...sectionAnim(0.15)}>
               <SectionHeader
                 title="Funil de Vendas"
-                subtitle="Distribuicao de leads por etapa — da captacao ao fechamento"
+                subtitle="Quantos leads passaram por cada etapa"
               />
-              <SalesFunnelChart funnel={crmAdvanced.funnel} />
+              <SalesFunnelChart funnel={crmAdvanced.funnel} lostStage={crmAdvanced.lostStage} />
             </motion.div>
           )}
 

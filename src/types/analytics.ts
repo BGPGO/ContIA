@@ -313,6 +313,8 @@ export interface CrmLeadOrigin {
 
 export interface CrmAdvanced {
   funnel: CrmFunnelStage[];
+  /** Leads marcados como Perdido — exibidos separadamente, fora da pirâmide cumulativa */
+  lostStage: CrmFunnelStage | null;
   leadsByOrigin: CrmLeadOrigin[];
   leadsByTemperature: { hot: number; warm: number; cold: number };
   conversion: {

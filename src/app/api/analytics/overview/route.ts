@@ -717,7 +717,7 @@ export async function GET(req: NextRequest) {
             icon: "user-plus",
           });
           monthlyKpis.push({
-            label: "Deals fechados",
+            label: "Vendas",
             value: monthDeals.toString(),
             raw: monthDeals,
             icon: "handshake",

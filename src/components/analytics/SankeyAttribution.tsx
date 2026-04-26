@@ -222,7 +222,7 @@ export function SankeyAttribution({
   if (wonStage && wonStage.count > 0) {
     resultItems.push({
       id: "won",
-      label: "Ganhos",
+      label: "Vendas",
       count: wonStage.count,
       color: "#10b981",
       sublabel: wonStage.valueSum != null ? formatBRL(wonStage.valueSum) : formatBRL(totalRevenue),

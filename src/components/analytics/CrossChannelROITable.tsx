@@ -205,7 +205,7 @@ export function CrossChannelROITable({
                 <SortBtn label="Leads CRM" colKey="crmLeads" current={sortKey} dir={sortDir} onToggle={toggleSort} />
               </th>
               <th className={thClass}>
-                <SortBtn label="Deals" colKey="crmDealsWon" current={sortKey} dir={sortDir} onToggle={toggleSort} />
+                <SortBtn label="Vendas" colKey="crmDealsWon" current={sortKey} dir={sortDir} onToggle={toggleSort} />
               </th>
               <th className={thClass}>
                 <SortBtn label="Revenue" colKey="crmRevenue" current={sortKey} dir={sortDir} onToggle={toggleSort} />

@@ -37,6 +37,12 @@ import type {
   ReportType,
   Comparison,
 } from "@/types/reports";
+import type {
+  AttributionTotals,
+  ChannelROI,
+  CampaignAttribution,
+  FunnelEndToEndStage,
+} from "@/types/attribution";
 
 /* ── ReportInput ─────────────────────────────────────────────────────────── */
 
@@ -57,6 +63,12 @@ export interface ReportInput {
   empresaDna?: Record<string, unknown>;
   reportType: ReportType;
   language?: "pt-BR";
+
+  // Attribution cross-channel — opcional; populado quando "crm" ou "meta_ads" em providers
+  attributionTotals?: AttributionTotals;
+  channelROI?: ChannelROI[];
+  campaignAttribution?: CampaignAttribution[];
+  funnelEndToEnd?: FunnelEndToEndStage[];
 }
 
 /* ── Cache (Supabase ai_analyses) ────────────────────────────────────────── */
@@ -241,6 +253,12 @@ function buildPromptData(
     engagementBreakdown: enriched.engagementBreakdown,
     postingFrequency: enriched.postingFrequency,
     growthMetrics: enriched.growthMetrics,
+
+    // Attribution cross-channel (v3)
+    attributionTotals: input.attributionTotals,
+    channelROI: input.channelROI,
+    campaignAttribution: input.campaignAttribution,
+    funnelEndToEnd: input.funnelEndToEnd,
   };
 }
 

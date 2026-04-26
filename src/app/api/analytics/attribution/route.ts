@@ -11,7 +11,9 @@
  *   period_start YYYY-MM-DD
  *   period_end   YYYY-MM-DD
  *
- * Auth: sessão Supabase (cookie). Usa admin client para leitura de dados.
+ * Auth: sessão Supabase (cookie) OU Bearer SUPABASE_SERVICE_ROLE_KEY (uso
+ * interno server-to-server, ex: /api/reports/generate). Usa admin client
+ * para leitura de dados em ambos os casos.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -394,13 +396,27 @@ export async function GET(req: NextRequest) {
   }
 
   // ── Auth ──────────────────────────────────────────────────────────
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Aceita 2 formas:
+  // 1. Sessao Supabase via cookie (uso normal pelo frontend)
+  // 2. Bearer SUPABASE_SERVICE_ROLE_KEY (uso interno server-to-server,
+  //    ex: /api/reports/generate chamando este endpoint)
+  const authHeader = req.headers.get("authorization") ?? "";
+  const bearerToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const isInternalCall =
+    bearerToken.length > 0 &&
+    serviceRoleKey.length > 0 &&
+    bearerToken === serviceRoleKey;
 
-  if (!user) {
-    return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
+  if (!isInternalCall) {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
+    }
   }
 
   // ── Admin client para queries (bypass RLS com auth já validado) ───
@@ -677,30 +693,66 @@ export async function GET(req: NextRequest) {
     return map[raw.toLowerCase().trim()] ?? "lead";
   }
 
-  const topFunnelCount = crmFunnel.length > 0 ? (crmFunnel[0]?.count ?? 0) : 0;
+  // ── Ordem semântica canônica do funil (exclui "lost" — tratado separado) ──
+  const STAGE_ORDER: FunnelStage[] = [
+    "lead",
+    "contact_made",
+    "meeting_scheduled",
+    "meeting_held",
+    "proposal_sent",
+    "negotiation",
+    "won",
+  ];
 
-  const funnelEndToEnd: FunnelEndToEndStage[] = crmFunnel.map((stage, idx) => {
-    const prevCount =
-      idx > 0 ? (crmFunnel[idx - 1]?.count ?? 0) : 0;
-    // Retorna fração 0..1 — componentes (EndToEndFunnel, Sankey) multiplicam por 100 internamente
-    const conversionFromPrev =
-      idx > 0 && prevCount > 0
-        ? Math.round((stage.count / prevCount) * 10000) / 10000
-        : undefined;
-    const conversionFromTop =
-      topFunnelCount > 0
-        ? Math.round((stage.count / topFunnelCount) * 10000) / 10000
-        : undefined;
+  // Mapeamento inicial (sem conversão cumulativa ainda)
+  const rawMapped: FunnelEndToEndStage[] = crmFunnel.map((stage) => ({
+    stage: toFunnelStage(stage.stage),
+    label: stage.label,
+    count: stage.count,
+    valueSum: stage.valueSum,
+    isLost: toFunnelStage(stage.stage) === "lost",
+  }));
 
-    return {
-      stage: toFunnelStage(stage.stage),
-      label: stage.label,
-      count: stage.count,
-      valueSum: stage.valueSum,
-      conversionFromPrev,
-      conversionFromTop,
+  // Separar lost do fluxo principal
+  const lostEntry = rawMapped.find((s) => s.isLost);
+  const mainEntries = rawMapped.filter((s) => !s.isLost);
+
+  // Ordenar main entries na ordem canônica do funil
+  const orderedMain: FunnelEndToEndStage[] = STAGE_ORDER
+    .map((stageKey) => mainEntries.find((s) => s.stage === stageKey))
+    .filter((s): s is FunnelEndToEndStage => s !== undefined);
+
+  // ── Transformação cumulativa: do fim pra frente ───────────────────
+  // Cada estágio acumula TODOS que passaram por ele em diante
+  // Exemplo: quem está em "won" JÁ passou por lead → contact_made → ... → won
+  let acc = 0;
+  for (let i = orderedMain.length - 1; i >= 0; i--) {
+    acc += orderedMain[i].count;
+    orderedMain[i] = { ...orderedMain[i], count: acc };
+  }
+
+  // Recalcular taxas de conversão com base nos counts cumulativos
+  const topCumCount = orderedMain[0]?.count ?? 0;
+  for (let i = 0; i < orderedMain.length; i++) {
+    const curr = orderedMain[i];
+    const prev = orderedMain[i - 1];
+    orderedMain[i] = {
+      ...curr,
+      conversionFromPrev:
+        i > 0 && (prev?.count ?? 0) > 0
+          ? Math.round((curr.count / (prev?.count ?? 1)) * 10000) / 10000
+          : undefined,
+      conversionFromTop:
+        topCumCount > 0
+          ? Math.round((curr.count / topCumCount) * 10000) / 10000
+          : undefined,
     };
-  });
+  }
+
+  // Montar resultado: main (ordenado + cumulativo) + lost no final (sem acúmulo)
+  const funnelEndToEnd: FunnelEndToEndStage[] = lostEntry
+    ? [...orderedMain, { ...lostEntry, isLost: true }]
+    : orderedMain;
 
   // ── totals ────────────────────────────────────────────────────────
   // (totalMetaSpend ja foi calculado no bloco de channelROI acima)

@@ -17,6 +17,7 @@ import { generateReportPDF } from "@/lib/reports/pdf-generator";
 import { uploadReportPdf, buildPdfPath } from "@/lib/reports/storage";
 import type { ProviderKey } from "@/types/providers";
 import type { ReportType } from "@/types/reports";
+import type { AttributionData } from "@/types/attribution";
 import { fetchInstagramLive, persistInstagramSnapshot } from "@/lib/analytics/instagram-fetcher";
 
 /* ── Input validation ────────────────────────────────────────────────────── */
@@ -466,7 +467,49 @@ export async function POST(req: NextRequest) {
       aggregatedByProvider: enrichedData.aggregated,
     };
 
-    // 11. Gerar analise IA
+    // 11. Buscar dados de atribuicao cross-channel se providers inclui crm ou meta_ads
+    let attributionData: AttributionData | null = null;
+    const needsAttribution =
+      providers.includes("crm" as ProviderKey) ||
+      providers.includes("meta_ads" as ProviderKey);
+
+    if (needsAttribution) {
+      try {
+        // Chama o proprio endpoint de attribution do ContIA (reutiliza toda a logica de
+        // canonicalChannel, match rate por leads, funil cumulativo, etc.)
+        const attrUrl = new URL(
+          `/api/analytics/attribution?empresa_id=${empresa.id}&period_start=${pStart.toISOString().split("T")[0]}&period_end=${pEnd.toISOString().split("T")[0]}`,
+          // Em servidor Next.js precisamos de URL absoluta — usar variavel de ambiente ou fallback localhost
+          process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
+        );
+
+        // O endpoint /api/analytics/attribution aceita Bearer SUPABASE_SERVICE_ROLE_KEY
+        // como auth interno server-to-server (alem da sessao via cookie).
+        const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+        if (!serviceRoleKey) {
+          console.warn("[reports/generate] SUPABASE_SERVICE_ROLE_KEY ausente — relatorio segue sem attribution");
+        }
+        const attrRes = await fetch(attrUrl.toString(), {
+          headers: {
+            "Authorization": `Bearer ${serviceRoleKey}`,
+            "Cookie": "",
+          },
+          signal: AbortSignal.timeout(10000),
+        });
+
+        if (attrRes.ok) {
+          attributionData = (await attrRes.json()) as AttributionData;
+          console.log("[reports/generate] Attribution data carregada para relatorio");
+        } else {
+          console.warn("[reports/generate] Attribution endpoint retornou", attrRes.status, "— seguindo sem dados de atribuicao");
+        }
+      } catch (attrErr) {
+        // Nao critico — relatorio segue sem dados de atribuicao
+        console.warn("[reports/generate] Falha ao buscar attribution:", attrErr instanceof Error ? attrErr.message : attrErr);
+      }
+    }
+
+    // 11b. Gerar analise IA
     const reportInput: ReportInput = {
       empresaId: empresa.id,
       periodStart: pStart,
@@ -481,6 +524,11 @@ export async function POST(req: NextRequest) {
       empresaName: empresa.nome,
       empresaDna: dnaRow?.dna_sintetizado ?? undefined,
       reportType: reportType as ReportType,
+      // Attribution cross-channel (v3) — undefined quando nao disponivel
+      attributionTotals: attributionData?.totals ?? undefined,
+      channelROI: attributionData?.channelROI ?? undefined,
+      campaignAttribution: attributionData?.campaignAttribution ?? undefined,
+      funnelEndToEnd: attributionData?.funnelEndToEnd ?? undefined,
     };
 
     const analysis = await generateReportAnalysis(reportInput);
