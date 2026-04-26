@@ -337,19 +337,19 @@ function computeAttributionInsights(
     });
   }
 
-  // 6. Match rate baixo — < 50% das campanhas Meta ATIVAS linkadas com CRM
-  // (totalMetaCampaigns aqui ja e o numero de campanhas ATIVAS — vem de input)
+  // 6. Match rate baixo — < 60% das campanhas rastreaveis cruzadas com Meta
+  // totalMetaCampaigns aqui = trackableTotal (campanhas CRM com utm valida no periodo)
   if (totalMetaCampaigns > 0) {
     const matchRate = matchedCount / totalMetaCampaigns;
-    if (matchRate < 0.5) {
+    if (matchRate < 0.6) {
       insights.push({
         id: "attribution_low_match_rate",
         category: "anomaly",
         severity: "warning",
-        title: "Rastreamento UTM incompleto",
-        description: `Apenas ${(matchRate * 100).toFixed(0)}% das campanhas Meta ativas (${matchedCount}/${totalMetaCampaigns}) foram cruzadas com leads do CRM. Algumas podem ser awareness sem CTA, ou ter UTM mal configurado.`,
+        title: "Rastreamento UTM parcial",
+        description: `${matchedCount} de ${totalMetaCampaigns} campanhas com UTM válido bateram com campanhas Meta. Algumas podem ser de campanhas paradas antes do período, ou tem UTM divergente do nome no Ads Manager.`,
         metric: `${(matchRate * 100).toFixed(0)}% match`,
-        actionable: "Confira no Ads Manager se as campanhas com spend tem UTM no template de URL.",
+        actionable: "Confira no Ads Manager se o template de URL usa {{campaign.name}} sem espaços/caracteres especiais.",
       });
     }
   }
@@ -716,23 +716,41 @@ export async function GET(req: NextRequest) {
     );
   }, 0);
 
-  // matchedCount: campanhas CRM que foram linkadas com uma campanha Meta
-  const matchedCount = campaignAttribution.filter(
+  /**
+   * Match rate semantica: das campanhas CRM RASTREÁVEIS no período, quantas
+   * cruzaram com Meta? Ignora "lixo" no denominador:
+   *  - "(sem campanha)" — leads sem UTM
+   *  - "{{campaign.name}}" — macro Meta nao substituido
+   *  - "link-bio", "manychat", etc — labels manuais nao-Meta
+   *
+   * Numerador e denominador agora sao SOBRE O PERIODO (consistencia temporal).
+   * Antes: numerador=periodo, denominador=lifetime → confundia.
+   */
+  function isTrackable(name: string): boolean {
+    if (!name) return false;
+    if (name.startsWith("(") || name.startsWith("{{")) return false;
+    // labels manuais que nao vem de campanha Meta
+    const lower = name.toLowerCase();
+    if (lower === "link-bio" || lower === "manychat" || lower === "organic") return false;
+    return true;
+  }
+
+  const trackableCampaigns = campaignAttribution.filter((c) =>
+    isTrackable(c.campaignName)
+  );
+  const matchedCount = trackableCampaigns.filter(
     (c) => c.matched && c.metaCampaignId !== null
   ).length;
+  const trackableTotal = trackableCampaigns.length;
 
-  // Denominador: apenas campanhas Meta ATIVAS no período (com spend > 0).
-  // Antes incluia todas (50, com 37 paradas) — match rate vinha 16% mesmo
-  // com tracking funcionando bem em 8 de 13 ativas (= 62%). Confunde o user.
+  const matchRateFinal =
+    trackableTotal > 0 ? matchedCount / trackableTotal : 0;
+
+  // Denominador antigo (campanhas Meta ativas lifetime) — mantido pra debug
   const activeMetaCampaigns = metaCampaigns.filter((c) => {
     const m = c.metrics as Record<string, number>;
     return (m.spend ?? 0) > 0;
   }).length;
-
-  const matchRateFinal =
-    activeMetaCampaigns > 0
-      ? matchedCount / activeMetaCampaigns
-      : 0;
 
   const totals: AttributionTotals = {
     spend: totalMetaSpend,
@@ -783,14 +801,14 @@ export async function GET(req: NextRequest) {
     .slice(0, 5);
 
   // ── insights ──────────────────────────────────────────────────────
-  // totalMetaCampaigns = ATIVAS (com spend > 0). Campanhas paradas/teste antigas
-  // distorciam o match rate (50 total, mas 37 sem nem uma chance de gerar lead)
+  // totalMetaCampaigns = trackableTotal (UTMs validos no periodo).
+  // Mantemos o nome do campo pra compat, mas semanticamente eh "rastreavel" agora.
   const insights = computeAttributionInsights({
     campaignAttribution,
     channelROI,
     totals,
     matchedCount,
-    totalMetaCampaigns: activeMetaCampaigns,
+    totalMetaCampaigns: trackableTotal,
   });
 
   // ── Response ──────────────────────────────────────────────────────
