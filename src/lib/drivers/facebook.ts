@@ -224,33 +224,56 @@ export const facebookDriver: ConnectionDriver = {
     const userToken = longToken.access_token
 
     // 3. Listar Pages administradas pelo usuário
-    const pages = await listPages(userToken)
-    if (pages.length === 0) {
-      // Debug: inspecionar o token pra entender que scopes foram concedidos
-      try {
-        const debug = await debugToken(userToken, appId, appSecret)
-        console.log('[FB Driver] Token concedeu scopes:', debug.scopes, 'granular:', debug.granular_scopes)
-        const hasPagesScope = debug.scopes.includes('pages_show_list')
-        const granularPages = debug.granular_scopes?.find((g) => g.scope === 'pages_show_list')
+    let pages = await listPages(userToken)
 
-        if (!hasPagesScope) {
-          throw new Error(
-            'Permissão pages_show_list não foi concedida. Reconecte autorizando todas as permissões pedidas.'
-          )
-        }
-        if (granularPages && (!granularPages.target_ids || granularPages.target_ids.length === 0)) {
-          throw new Error(
-            'Você precisa selecionar pelo menos uma Página no diálogo de autorização do Facebook. Reconecte e marque a página da Bertuzzi.'
-          )
-        }
-      } catch (err) {
-        if (err instanceof Error && err.message !== 'Nenhuma Facebook Page encontrada. Você precisa ser administrador de pelo menos uma página.') {
-          throw err
+    // Fallback: Pages em Business Manager não aparecem em /me/accounts sem business_management
+    // mas o user concedeu pages_show_list por Page específica (granular_scopes).
+    // Buscar cada Page por ID retornado em target_ids.
+    if (pages.length === 0) {
+      const debug = await debugToken(userToken, appId, appSecret)
+      console.log('[FB Driver] Token concedeu scopes:', debug.scopes, 'granular:', debug.granular_scopes)
+
+      const hasPagesScope = debug.scopes.includes('pages_show_list')
+      if (!hasPagesScope) {
+        throw new Error(
+          'Permissão pages_show_list não foi concedida. Reconecte autorizando todas as permissões pedidas.'
+        )
+      }
+
+      const granularPages = debug.granular_scopes?.find((g) => g.scope === 'pages_show_list')
+      const pageIds = granularPages?.target_ids ?? []
+
+      if (pageIds.length === 0) {
+        throw new Error(
+          'Você precisa selecionar pelo menos uma Página no diálogo de autorização do Facebook. Clique "Edit access" e marque a página.'
+        )
+      }
+
+      // Buscar cada Page direto pelo ID (funciona mesmo em Business Manager)
+      console.log(`[FB Driver] Buscando ${pageIds.length} pages por ID via Business fallback`)
+      const fetchedPages: FBPage[] = []
+      for (const pageId of pageIds) {
+        try {
+          const page = await fbFetch<FBPage>(`/${pageId}`, {
+            access_token: userToken,
+            fields: 'id,name,username,picture,fan_count,followers_count,access_token',
+          })
+          if (page?.access_token) {
+            fetchedPages.push(page)
+          } else {
+            console.warn(`[FB Driver] Page ${pageId} sem access_token retornado — pode ser que user não seja admin`)
+          }
+        } catch (err) {
+          console.warn(`[FB Driver] Falha ao buscar Page ${pageId}:`, err instanceof Error ? err.message : err)
         }
       }
-      throw new Error(
-        'Nenhuma Facebook Page retornada. Você precisa ser admin de uma página E selecioná-la no diálogo de autorização.'
-      )
+
+      if (fetchedPages.length === 0) {
+        throw new Error(
+          'Página selecionada não retornou access_token. Você precisa ser ADMIN da página (não Editor/Analista). Confira em facebook.com/settings?tab=pages.'
+        )
+      }
+      pages = fetchedPages
     }
 
     // 4. Usar a primeira page (interface poderá implementar picker posteriormente)

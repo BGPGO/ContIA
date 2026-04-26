@@ -18,6 +18,9 @@ export async function middleware(request: NextRequest) {
     path.startsWith("/conexoes") ||
     path.startsWith("/invite/") ||
     path.startsWith("/api/instagram") ||
+    path.startsWith("/api/facebook") ||
+    path.startsWith("/api/meta-ads") ||
+    path.startsWith("/api/cron/") ||
     path.startsWith("/api/psd-templates") ||
     path.startsWith("/api/video") ||
     path.startsWith("/api/invites/")
