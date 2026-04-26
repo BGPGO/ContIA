@@ -160,16 +160,10 @@ function PyramidSlice({
           background: "linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 60%)",
         }}
       />
-      {/* Conteúdo da fatia */}
-      <div className="relative flex items-center gap-2 px-4 z-10 select-none">
-        <span className="text-white font-bold text-[14px] tabular-nums drop-shadow">
+      {/* Conteúdo da fatia — apenas o número grande, label fica fora */}
+      <div className="relative flex items-center justify-center px-3 z-10 select-none">
+        <span className="text-white font-bold text-[14px] tabular-nums drop-shadow whitespace-nowrap">
           {stage.count.toLocaleString("pt-BR")}
-        </span>
-        {stage.stage === "won" && (
-          <Trophy size={13} className="text-white/80 shrink-0" />
-        )}
-        <span className="text-white/75 text-[11px] font-medium hidden sm:inline truncate max-w-[120px]">
-          {stage.label}
         </span>
       </div>
     </div>
@@ -336,30 +330,67 @@ export function EndToEndFunnel({
         )}
       </div>
 
-      {/* ── Desktop: pirâmide invertida centrada ── */}
-      <div className="hidden sm:flex flex-col items-center gap-0 py-2">
+      {/* ── Desktop: pirâmide invertida + labels laterais sempre visíveis ── */}
+      <div className="hidden sm:flex flex-col items-stretch gap-0 py-2">
         {mainStages.map((stage, idx) => {
           const { fill } = stageGradient(idx, total);
-          // Largura proporcional ao count cumulativo
-          // Primeiro estágio = 100%, último = min 12%
           const pct = Math.max(12, (stage.count / topCount) * 100);
+          const pctOfTop = topCount > 0 ? (stage.count / topCount) * 100 : 0;
+          const isWon = stage.stage === "won";
 
           return (
-            <div key={stage.stage} className="w-full flex flex-col items-center">
-              <PyramidSlice
-                stage={stage}
-                widthPct={pct}
-                color={fill}
-                index={idx}
-                isFirst={idx === 0}
-                isLast={idx === total - 1}
-                onHover={handleHover}
-              />
+            <div key={stage.stage} className="w-full flex flex-col">
+              {/* Linha: label esquerda | fatia centrada | métrica direita */}
+              <div className="flex items-stretch gap-3">
+                {/* Label esquerda — sempre visível */}
+                <div className="w-[160px] shrink-0 flex flex-col justify-center text-right">
+                  <p className="text-[12.5px] font-semibold text-text-primary leading-tight truncate flex items-center justify-end gap-1.5">
+                    {isWon && <Trophy size={12} className="text-emerald-400 shrink-0" />}
+                    {stage.label}
+                  </p>
+                  <p className="text-[10px] text-text-muted tabular-nums mt-0.5">
+                    {pctOfTop.toFixed(1)}% do topo
+                  </p>
+                </div>
+
+                {/* Fatia da pirâmide — centralizada */}
+                <div className="flex-1 flex justify-center items-center">
+                  <PyramidSlice
+                    stage={stage}
+                    widthPct={pct}
+                    color={fill}
+                    index={idx}
+                    isFirst={idx === 0}
+                    isLast={idx === total - 1}
+                    onHover={handleHover}
+                  />
+                </div>
+
+                {/* Métrica direita — só pra última (Venda) com receita */}
+                <div className="w-[160px] shrink-0 flex flex-col justify-center">
+                  {isWon && totalRevenue > 0 ? (
+                    <>
+                      <p className="text-[10px] text-text-muted">Receita gerada</p>
+                      <p className="text-[12.5px] font-bold text-emerald-400 tabular-nums">
+                        {formatBRL(totalRevenue)}
+                      </p>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+
+              {/* Conversão entre etapas (logo abaixo) */}
               {idx < total - 1 && (
-                <ConversionArrow
-                  conversionFromPrev={mainStages[idx + 1]?.conversionFromPrev}
-                  index={idx}
-                />
+                <div className="flex items-stretch gap-3">
+                  <div className="w-[160px] shrink-0" />
+                  <div className="flex-1 flex justify-center">
+                    <ConversionArrow
+                      conversionFromPrev={mainStages[idx + 1]?.conversionFromPrev}
+                      index={idx}
+                    />
+                  </div>
+                  <div className="w-[160px] shrink-0" />
+                </div>
               )}
             </div>
           );
