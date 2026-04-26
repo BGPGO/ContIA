@@ -4,11 +4,6 @@ import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Scissors,
-  Upload,
-  Link2,
-  CheckCircle2,
-  Loader2,
-  FileVideo,
   ArrowLeft,
   AlertCircle,
   Sparkles,
@@ -18,16 +13,21 @@ import {
   Film,
   Trash2,
   Clock,
+  RefreshCw,
 } from "lucide-react";
 import { useEmpresa } from "@/hooks/useEmpresa";
 import { useVideoProject } from "@/hooks/useVideoProject";
+import { useVideoJob } from "@/hooks/useVideoJob";
 import { useVideoHistory } from "@/hooks/useVideoHistory";
+import { UploadTUSPanel } from "@/components/video/UploadTUSPanel";
+import { JobStatusPanel } from "@/components/video/JobStatusPanel";
 import { VideoPlayer } from "@/components/video/VideoPlayer";
 import { ChatPanel } from "@/components/video/ChatPanel";
 import { CutsPanel } from "@/components/video/CutsPanel";
 import { SubtitleStylePanel } from "@/components/video/SubtitleStylePanel";
 import { TranscriptionPanel } from "@/components/video/TranscriptionPanel";
 import type { VideoCut, SubtitleStyle } from "@/types/video";
+import type { VideoCutV2 } from "@/types/video-pipeline";
 import { DEFAULT_SUBTITLE_STYLE } from "@/types/video";
 import type { CaptionStyle, Keyword, WordTimestamp } from '@/types/captions';
 import { captionStyleToLegacySubtitleStyle } from '@/types/captions';
@@ -37,34 +37,32 @@ import { createClient } from '@/lib/supabase/client';
 import { renderCutInBrowser, downloadBlobAsFile, getBrowserRenderCapabilities } from '@/lib/captions/browser-render';
 import { RenderProgressModal } from '@/components/video/RenderProgressModal';
 
-/* ── Processing step labels ── */
-const processingSteps = [
-  "Enviando video...",
-  "Transcrevendo audio...",
-  "Analisando conteudo com IA...",
-];
-
 type RightPanelTab = "chat" | "transcricao" | "estilo";
+
+/**
+ * Which main view to show:
+ *  1 = upload
+ *  2 = processing (job in flight)
+ *  3 = editor (job ready)
+ */
+type AppStep = 1 | 2 | 3;
 
 export default function CortesPage() {
   const { empresa } = useEmpresa();
   const {
     project,
-    status,
-    progress,
-    processingStep,
     cuts,
     edits,
-    upload,
-    uploadFromUrl,
-    process,
     acceptCut,
     removeCut,
     adjustCut,
     toggleEdit,
     reset,
     loadFromHistory,
+    loadFromProjectId,
   } = useVideoProject();
+
+  const job = useVideoJob();
 
   const {
     projects: historyProjects,
@@ -73,8 +71,10 @@ export default function CortesPage() {
     deleteProject: deleteHistoryProject,
   } = useVideoHistory(empresa?.id);
 
-  const [urlInput, setUrlInput] = useState("");
-  const [dragActive, setDragActive] = useState(false);
+  /* ── Supabase client (shared for cuts polling + keyword persistence) ── */
+  const supabaseClient = useMemo(() => createClient(), []);
+
+  const [step, setStep] = useState<AppStep>(1);
   const [activeCut, setActiveCut] = useState<VideoCut | null>(null);
   const [showExportToast, setShowExportToast] = useState(false);
   const [activeTab, setActiveTab] = useState<RightPanelTab>("chat");
@@ -84,7 +84,6 @@ export default function CortesPage() {
   const [keywords, setKeywords] = useState<Keyword[]>([]);
   const [keywordsLoading, setKeywordsLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const videoSeekRef = useRef<((time: number) => void) | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   /* ── Render state ── */
@@ -101,69 +100,90 @@ export default function CortesPage() {
   const renderAbortRef = useRef<AbortController | null>(null);
   const [renderingIndex, setRenderingIndex] = useState<number | null>(null);
 
+  /* ── Re-render state ── */
+  const [reRenderLoading, setReRenderLoading] = useState(false);
+  const [reRenderMessage, setReRenderMessage] = useState<string | null>(null);
+
+  /* ── Cuts from DB (V2 pipeline with rendered_url) ── */
+  const [cutsV2, setCutsV2] = useState<VideoCutV2[] | null>(null);
+  const cutsPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const subtitlesEnabled = edits.find((e) => e.type === "subtitle")?.enabled ?? true;
 
-  /* ── Step: determine which view to show ── */
-  const step =
-    status === "idle"
-      ? 1
-      : status === "uploading" || status === "processing"
-      ? 2
-      : 3;
+  // Track the projectId being processed so the ready-effect can use it
+  const [trackingProjectId, setTrackingProjectId] = useState<string | null>(null);
 
-  /* ── File upload handler ── */
-  const handleFile = useCallback(
-    async (file: File) => {
-      if (!empresa) return;
-      if (!file.type.startsWith("video/")) return;
-      await upload(file, empresa.id);
+  /* ── Upload complete: start job tracking & move to step 2 ── */
+  const handleUploadCompleteStable = useCallback(
+    (projectId: string) => {
+      setTrackingProjectId(projectId);
+      job.startTracking(projectId);
+      setStep(2);
     },
-    [empresa, upload]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [job.startTracking]
   );
 
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setDragActive(false);
-      const file = e.dataTransfer.files[0];
-      if (file) handleFile(file);
-    },
-    [handleFile]
-  );
+  /* ── When job becomes ready → fetch full project + move to editor ── */
+  useEffect(() => {
+    if (job.isReady && trackingProjectId && step === 2) {
+      void loadFromProjectId(trackingProjectId).then(() => {
+        setStep(3);
+      });
+    }
+  }, [job.isReady, trackingProjectId, step, loadFromProjectId]);
 
-  const handleUrlSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!empresa || !urlInput.trim()) return;
-      await uploadFromUrl(urlInput.trim(), empresa.id);
-    },
-    [empresa, urlInput, uploadFromUrl]
-  );
-
-  /* ── Subtitle style update (from AI or panel) ── */
-  const handleSubtitleStyleUpdate = useCallback(
-    (partial: Partial<SubtitleStyle>) => {
-      setSubtitleStyle((prev) => ({ ...prev, ...partial }));
-    },
-    []
-  );
-
-  /* ── Transcription segment edit ── */
-  const handleUpdateSegment = useCallback(
-    (index: number, text: string) => {
-      // Note: This updates project in local state only.
-      // The useVideoProject hook doesn't expose setProject directly,
-      // but transcription is used from the project object.
-      // For now we update via a workaround — the segments are passed by reference.
-      if (project && project.transcription[index]) {
-        project.transcription[index] = {
-          ...project.transcription[index],
-          text,
-        };
+  /* ── Poll cuts from DB while job is rendering (to show per-cut progress) ── */
+  const fetchCutsV2 = useCallback(async (projectId: string) => {
+    try {
+      const { data, error } = await supabaseClient
+        .from("video_projects")
+        .select("cuts")
+        .eq("id", projectId)
+        .single();
+      if (!error && data && Array.isArray(data.cuts) && (data.cuts as unknown[]).length > 0) {
+        setCutsV2(data.cuts as VideoCutV2[]);
       }
-    },
-    [project]
-  );
+    } catch {
+      /* silent fail — polling will retry */
+    }
+  }, [supabaseClient]);
+
+  useEffect(() => {
+    const pid = trackingProjectId ?? project?.id ?? null;
+    if (!pid) return;
+
+    if (job.status === "rendering") {
+      // Start polling cuts every 5s
+      if (!cutsPollingRef.current) {
+        void fetchCutsV2(pid);
+        cutsPollingRef.current = setInterval(() => {
+          void fetchCutsV2(pid);
+        }, 5000);
+      }
+    } else {
+      // Stop polling when not rendering
+      if (cutsPollingRef.current) {
+        clearInterval(cutsPollingRef.current);
+        cutsPollingRef.current = null;
+      }
+    }
+
+    return () => {
+      if (cutsPollingRef.current) {
+        clearInterval(cutsPollingRef.current);
+        cutsPollingRef.current = null;
+      }
+    };
+  }, [job.status, trackingProjectId, project?.id, fetchCutsV2]);
+
+  /* ── When project loads in step 3, fetch V2 cuts if available ── */
+  useEffect(() => {
+    if (step === 3 && project?.id) {
+      void fetchCutsV2(project.id);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, project?.id]);
 
   /* ── Load caption styles from API ── */
   useEffect(() => {
@@ -177,11 +197,32 @@ export default function CortesPage() {
           setCaptionStyles(json.styles);
         }
       } catch {
-        /* ignore — galeria fica vazia silenciosamente */
+        /* ignore */
       }
     })();
     return () => { cancelled = true; };
   }, []);
+
+  /* ── Subtitle style update ── */
+  const handleSubtitleStyleUpdate = useCallback(
+    (partial: Partial<SubtitleStyle>) => {
+      setSubtitleStyle((prev) => ({ ...prev, ...partial }));
+    },
+    []
+  );
+
+  /* ── Transcription segment edit ── */
+  const handleUpdateSegment = useCallback(
+    (index: number, text: string) => {
+      if (project && project.transcription[index]) {
+        project.transcription[index] = {
+          ...project.transcription[index],
+          text,
+        };
+      }
+    },
+    [project]
+  );
 
   /* ── Select caption style from gallery ── */
   const handleSelectCaptionStyle = useCallback((cs: CaptionStyle) => {
@@ -189,7 +230,7 @@ export default function CortesPage() {
     setSubtitleStyle(captionStyleToLegacySubtitleStyle(cs));
   }, []);
 
-  /* ── Regenerate keywords via GPT-4o-mini ── */
+  /* ── Regenerate keywords ── */
   const handleRegenerateKeywords = useCallback(async () => {
     if (!project?.transcription) return;
     setKeywordsLoading(true);
@@ -226,16 +267,11 @@ export default function CortesPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.id]);
 
-  /* ── Persist keywords to Supabase (fire-and-forget) ──
-     Persiste também lista vazia (ex: usuário removeu todas as palavras).
-     Só pula o primeiro efeito após (re)carregar um projeto para não
-     sobrescrever o valor recém-carregado com o state inicial ([]).  */
-  const supabaseClient = useMemo(() => createClient(), []);
+  /* ── Persist keywords to Supabase ── */
   const lastPersistedProjectId = useRef<string | null>(null);
   useEffect(() => {
     if (!project?.id) return;
     if (lastPersistedProjectId.current !== project.id) {
-      // Primeira execução para este projeto — ignora (é hidratação do load).
       lastPersistedProjectId.current = project.id;
       return;
     }
@@ -246,11 +282,35 @@ export default function CortesPage() {
       .then(() => {}, () => {});
   }, [keywords, project?.id, supabaseClient]);
 
-  /* ── Export toast (stub para onExportAll) ── */
+  /* ── Export toast ── */
   const showExportMessage = () => {
     setShowExportToast(true);
     setTimeout(() => setShowExportToast(false), 3000);
   };
+
+  /* ── Reset: go back to upload ── */
+  const handleReset = useCallback(() => {
+    job.stopTracking();
+    reset();
+    setStep(1);
+    setTrackingProjectId(null);
+    setCutsV2(null);
+    setReRenderMessage(null);
+    if (cutsPollingRef.current) {
+      clearInterval(cutsPollingRef.current);
+      cutsPollingRef.current = null;
+    }
+    refetchHistory();
+  }, [job, reset, refetchHistory]);
+
+  /* ── Load from history ── */
+  const handleLoadFromHistory = useCallback(
+    (item: Parameters<typeof loadFromHistory>[0]) => {
+      loadFromHistory(item);
+      setStep(3);
+    },
+    [loadFromHistory]
+  );
 
   /* ── Render cut in browser ── */
   const handleRenderCut = useCallback(async (index: number) => {
@@ -277,7 +337,7 @@ export default function CortesPage() {
 
     const videoUrl = project?.videoUrl;
     if (!videoUrl) {
-      setRenderState({ open: true, progress: 0, message: '', status: 'error', error: 'Vídeo não disponível. Re-faça o upload.' });
+      setRenderState({ open: true, progress: 0, message: '', status: 'error', error: 'Vídeo não disponível.' });
       return;
     }
 
@@ -347,6 +407,29 @@ export default function CortesPage() {
     setRenderState(prev => ({ ...prev, open: false }));
   }, []);
 
+  /* ── Re-render all clips with new caption style ── */
+  const handleReRenderAll = useCallback(async () => {
+    if (!project?.id || !selectedCaptionStyle) return;
+    setReRenderLoading(true);
+    setReRenderMessage(null);
+    try {
+      const res = await fetch("/api/video/rerender-clips", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project_id: project.id,
+          caption_style_id: selectedCaptionStyle.id,
+        }),
+      });
+      const json = await res.json() as { message?: string };
+      setReRenderMessage(json.message ?? "Solicitação enviada.");
+    } catch {
+      setReRenderMessage("Erro ao solicitar re-renderização. Tente novamente.");
+    } finally {
+      setReRenderLoading(false);
+    }
+  }, [project?.id, selectedCaptionStyle]);
+
   /* ── No empresa selected ── */
   if (!empresa) {
     return (
@@ -354,7 +437,7 @@ export default function CortesPage() {
         <div className="text-center space-y-3">
           <AlertCircle className="w-10 h-10 text-text-muted mx-auto" />
           <p className="text-text-secondary text-sm">
-            Selecione uma empresa para comecar
+            Selecione uma empresa para começar
           </p>
         </div>
       </div>
@@ -413,7 +496,7 @@ export default function CortesPage() {
                           initial={{ opacity: 0, x: -8 }}
                           animate={{ opacity: 1, x: 0 }}
                           className="flex items-center gap-3 bg-bg-card border border-border rounded-xl px-4 py-3 group hover:border-secondary/40 transition-all cursor-pointer"
-                          onClick={() => loadFromHistory(item)}
+                          onClick={() => handleLoadFromHistory(item)}
                         >
                           <div className="w-8 h-8 rounded-lg bg-secondary/10 border border-secondary/20 flex items-center justify-center shrink-0">
                             <Film className="w-4 h-4 text-secondary-light" />
@@ -450,7 +533,7 @@ export default function CortesPage() {
                 <div className="flex items-center gap-3">
                   <div className="flex-1 h-px bg-border" />
                   <span className="text-xs text-text-muted font-medium uppercase tracking-wide">
-                    Novo Video
+                    Novo Vídeo
                   </span>
                   <div className="flex-1 h-px bg-border" />
                 </div>
@@ -466,103 +549,18 @@ export default function CortesPage() {
                 </span>
               </div>
               <h1 className="text-2xl md:text-3xl font-bold text-text-primary">
-                Cortes & Edicao de Video
+                Cortes & Edição de Vídeo
               </h1>
               <p className="text-text-secondary text-sm md:text-base max-w-md mx-auto">
-                Envie um video e deixe a IA ajudar a criar cortes virais e editar
+                Envie um vídeo e deixe a IA ajudar a criar cortes virais e editar
               </p>
             </div>
 
-            {/* Drag & drop zone */}
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragActive(true);
-              }}
-              onDragLeave={() => setDragActive(false)}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className={`relative border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all duration-300 ${
-                dragActive
-                  ? "border-accent bg-accent/5 scale-[1.02]"
-                  : "border-border hover:border-secondary/40 hover:bg-bg-card/30"
-              }`}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="video/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleFile(file);
-                }}
-              />
-              <div className="space-y-4">
-                <div
-                  className={`w-16 h-16 mx-auto rounded-2xl flex items-center justify-center transition-colors ${
-                    dragActive
-                      ? "bg-accent/20"
-                      : "bg-bg-card border border-border"
-                  }`}
-                >
-                  <Upload
-                    className={`w-7 h-7 ${
-                      dragActive ? "text-accent" : "text-text-muted"
-                    }`}
-                  />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-text-primary mb-1">
-                    Arraste e solte seu video aqui
-                  </p>
-                  <p className="text-xs text-text-muted">
-                    ou clique para selecionar
-                  </p>
-                </div>
-                <div className="flex items-center justify-center gap-3 text-[11px] text-text-muted">
-                  <span className="flex items-center gap-1">
-                    <FileVideo className="w-3 h-3" />
-                    MP4, MOV, WebM
-                  </span>
-                  <span className="w-1 h-1 rounded-full bg-text-muted/40" />
-                  <span>Ate 500MB</span>
-                </div>
-              </div>
-            </div>
-
-            {/* OR divider */}
-            <div className="flex items-center gap-4">
-              <div className="flex-1 h-px bg-border" />
-              <span className="text-xs text-text-muted font-medium">OU</span>
-              <div className="flex-1 h-px bg-border" />
-            </div>
-
-            {/* URL input */}
-            <form onSubmit={handleUrlSubmit} className="space-y-2">
-              <div className="flex gap-2">
-                <div className="flex-1 flex items-center gap-2 bg-bg-input border border-border rounded-xl px-4 py-3 focus-within:border-accent/40 transition-colors">
-                  <Link2 className="w-4 h-4 text-text-muted shrink-0" />
-                  <input
-                    type="url"
-                    value={urlInput}
-                    onChange={(e) => setUrlInput(e.target.value)}
-                    placeholder="Cole uma URL (YouTube, Instagram, TikTok...)"
-                    className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-muted outline-none"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={!urlInput.trim()}
-                  className="px-6 py-3 rounded-xl bg-secondary text-white text-sm font-medium hover:bg-secondary/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                >
-                  Importar
-                </button>
-              </div>
-              <p className="text-[11px] text-text-muted text-center">
-                YouTube, Instagram, TikTok e mais
-              </p>
-            </form>
+            {/* TUS Upload panel */}
+            <UploadTUSPanel
+              empresaId={empresa.id}
+              onUploadComplete={handleUploadCompleteStable}
+            />
           </motion.div>
         )}
 
@@ -576,78 +574,9 @@ export default function CortesPage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.4 }}
-            className="max-w-lg mx-auto space-y-8 pt-16"
+            className="max-w-lg mx-auto pt-16"
           >
-            <div className="text-center space-y-3">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-                className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-secondary/20 to-accent/20 flex items-center justify-center border border-secondary/20"
-              >
-                <Sparkles className="w-7 h-7 text-secondary-light" />
-              </motion.div>
-              <h2 className="text-xl font-bold text-text-primary">
-                Processando video...
-              </h2>
-              <p className="text-sm text-text-secondary">
-                {project?.originalFileName}
-              </p>
-            </div>
-
-            {/* Progress bar */}
-            <div className="space-y-2">
-              <div className="h-2 bg-bg-card rounded-full overflow-hidden">
-                <motion.div
-                  className="h-full bg-gradient-to-r from-secondary to-accent rounded-full"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progress}%` }}
-                  transition={{ duration: 0.5 }}
-                />
-              </div>
-              <p className="text-xs text-text-muted text-right">{progress}%</p>
-            </div>
-
-            {/* Steps */}
-            <div className="space-y-3">
-              {processingSteps.map((label, i) => {
-                const done = processingStep > i;
-                const active = processingStep === i;
-                return (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, x: -12 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.15, duration: 0.3 }}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${
-                      done
-                        ? "bg-success/5 border-success/20"
-                        : active
-                        ? "bg-secondary/5 border-secondary/20"
-                        : "bg-bg-card/50 border-border"
-                    }`}
-                  >
-                    {done ? (
-                      <CheckCircle2 className="w-5 h-5 text-success shrink-0" />
-                    ) : active ? (
-                      <Loader2 className="w-5 h-5 text-secondary-light shrink-0 animate-spin" />
-                    ) : (
-                      <div className="w-5 h-5 rounded-full border-2 border-border shrink-0" />
-                    )}
-                    <span
-                      className={`text-sm ${
-                        done
-                          ? "text-success"
-                          : active
-                          ? "text-text-primary font-medium"
-                          : "text-text-muted"
-                      }`}
-                    >
-                      {label}
-                    </span>
-                  </motion.div>
-                );
-              })}
-            </div>
+            <JobStatusPanel job={job} />
           </motion.div>
         )}
 
@@ -666,11 +595,11 @@ export default function CortesPage() {
             {/* Top bar */}
             <div className="flex items-center gap-3">
               <button
-                onClick={() => { reset(); refetchHistory(); }}
+                onClick={handleReset}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-card border border-border text-xs text-text-secondary hover:text-text-primary hover:border-border-light transition-all"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
-                Novo video
+                Novo vídeo
               </button>
               <div className="flex-1 min-w-0">
                 <h1 className="text-lg font-semibold text-text-primary truncate">
@@ -743,7 +672,7 @@ export default function CortesPage() {
                   {(
                     [
                       { key: "chat", label: "Chat", icon: MessageSquare },
-                      { key: "transcricao", label: "Transcricao", icon: FileText },
+                      { key: "transcricao", label: "Transcrição", icon: FileText },
                       { key: "estilo", label: "Estilo", icon: Palette },
                     ] as const
                   ).map((tab) => (
@@ -784,8 +713,6 @@ export default function CortesPage() {
                       segments={project.transcription}
                       currentTime={currentTime}
                       onSeek={(time) => {
-                        // The VideoPlayer listens to activeCut for seeking.
-                        // We create a temporary "seek cut" to trigger it.
                         setActiveCut({
                           id: "seek-temp",
                           title: "seek",
@@ -794,7 +721,6 @@ export default function CortesPage() {
                           description: "",
                           accepted: false,
                         });
-                        // Clear after a tick so it doesn't lock playback
                         setTimeout(() => setActiveCut(null), 100);
                       }}
                       onUpdateSegment={handleUpdateSegment}
@@ -815,6 +741,36 @@ export default function CortesPage() {
                         />
                       </section>
 
+                      {/* Re-render button */}
+                      {selectedCaptionStyle && project && (
+                        <section className="border border-border rounded-xl p-3 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <RefreshCw className="w-4 h-4 text-secondary-light" />
+                            <span className="text-sm font-medium text-text-primary">Aplicar estilo</span>
+                          </div>
+                          <p className="text-[11px] text-text-muted">
+                            Estilo selecionado: <strong className="text-text-secondary">{selectedCaptionStyle.name}</strong>
+                          </p>
+                          {reRenderMessage && (
+                            <p className="text-[11px] text-accent bg-accent/10 rounded-lg px-2 py-1.5">
+                              {reRenderMessage}
+                            </p>
+                          )}
+                          <button
+                            onClick={() => void handleReRenderAll()}
+                            disabled={reRenderLoading}
+                            className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-secondary/15 text-secondary-light text-[12px] font-medium hover:bg-secondary/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {reRenderLoading ? (
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <RefreshCw className="w-3.5 h-3.5" />
+                            )}
+                            Aplicar e re-renderizar todos
+                          </button>
+                        </section>
+                      )}
+
                       <section>
                         <KeywordEditor
                           keywords={keywords}
@@ -834,17 +790,46 @@ export default function CortesPage() {
               </div>
             </div>
 
-            {/* Cuts panel */}
-            <CutsPanel
-              cuts={cuts}
-              onPreview={(cut) => setActiveCut(cut)}
-              onEdit={(index) => {
-                setActiveCut(cuts[index]);
-              }}
-              onRender={handleRenderCut}
-              onExportAll={showExportMessage}
-              renderingIndex={renderingIndex}
-            />
+            {/* Cuts panel — use V2 cuts (with rendered_url) if available, else legacy */}
+            {(cutsV2 && cutsV2.length > 0 ? cutsV2 : cuts).length > 0 && (
+              <CutsPanel
+                cuts={cutsV2 && cutsV2.length > 0 ? cutsV2 : cuts}
+                onPreview={(cut) => {
+                  // Normalise to VideoCut shape for the player (uses startTime/endTime)
+                  if ("start_time" in cut) {
+                    setActiveCut({
+                      id: cut.id,
+                      title: cut.title,
+                      startTime: cut.start_time,
+                      endTime: cut.end_time,
+                      description: cut.reason ?? "",
+                      accepted: false,
+                    });
+                  } else {
+                    setActiveCut(cut as VideoCut);
+                  }
+                }}
+                onEdit={(index) => {
+                  const c = cutsV2 && cutsV2.length > 0 ? cutsV2[index] : cuts[index];
+                  if (!c) return;
+                  if ("start_time" in c) {
+                    setActiveCut({
+                      id: c.id,
+                      title: c.title,
+                      startTime: c.start_time,
+                      endTime: c.end_time,
+                      description: c.reason ?? "",
+                      accepted: false,
+                    });
+                  } else {
+                    setActiveCut(c as VideoCut);
+                  }
+                }}
+                onRender={handleRenderCut}
+                onExportAll={showExportMessage}
+                renderingIndex={renderingIndex}
+              />
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -872,11 +857,14 @@ export default function CortesPage() {
           >
             <Sparkles className="w-4 h-4 text-secondary-light" />
             <span className="text-sm text-text-primary">
-              Exportacao em breve! Estamos finalizando essa funcionalidade.
+              {selectedCaptionStyle
+                ? "Exportação em breve! Estamos finalizando essa funcionalidade."
+                : "Selecione um estilo de legenda antes de renderizar."}
             </span>
           </motion.div>
         )}
       </AnimatePresence>
+
     </div>
   );
 }

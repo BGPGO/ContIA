@@ -3,6 +3,12 @@
 // de legenda viral queimada diretamente no browser via Canvas + MediaRecorder.
 // Zero servidor, zero dependências npm adicionais.
 
+/**
+ * @deprecated
+ * Render client-side via Canvas + MediaRecorder.
+ * Substituído pelo render server-side em `src/lib/video/clip-renderer.ts` (Wave 5).
+ * Mantido apenas pra preview rápido no browser. Não usar pra export final.
+ */
 import type { CaptionStyle, WordTimestamp, Keyword } from '@/types/captions';
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type {
   VideoProject,
@@ -13,28 +13,6 @@ import type {
 } from "@/types/video";
 
 /* ── DB persistence helpers ── */
-
-async function persistProject(proj: VideoProject): Promise<void> {
-  try {
-    const supabase = createClient();
-    const { error } = await supabase.from("video_projects").upsert({
-      id: proj.id,
-      empresa_id: proj.empresaId,
-      title: proj.title,
-      status: proj.status,
-      transcription: proj.transcription,
-      cut_suggestions: proj.cuts,
-      edits: proj.edits,
-      gemini_analysis: proj.analysis ?? {},
-      duration_seconds: proj.duration,
-      word_timestamps: proj.wordTimestamps ?? [],
-      updated_at: new Date().toISOString(),
-    });
-    if (error) console.warn("[useVideoProject] upsert error:", error.message);
-  } catch (err) {
-    console.warn("[useVideoProject] persist failed:", err);
-  }
-}
 
 async function updateProjectEdits(
   id: string,
@@ -66,271 +44,11 @@ async function updateProjectCuts(
   }
 }
 
-function generateId() {
-  return Math.random().toString(36).substring(2, 15);
-}
-
 export function useVideoProject() {
   const [project, setProject] = useState<VideoProject | null>(null);
+  // status here is only used for the editor step (analyzed / editing).
+  // Upload + processing status is now owned by useVideoJob.
   const [status, setStatus] = useState<VideoProjectStatus>("idle");
-  const [progress, setProgress] = useState(0);
-  const [processingStep, setProcessingStep] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const processingRef = useRef(false);
-  const videoFileRef = useRef<File | null>(null);
-
-  const upload = useCallback(
-    async (file: File, empresaId: string) => {
-      setStatus("uploading");
-      setProgress(0);
-      setError(null);
-
-      // Store file ref for processing
-      videoFileRef.current = file;
-
-      // Create local video URL for preview
-      const videoUrl = URL.createObjectURL(file);
-
-      // Get video duration
-      const video = document.createElement("video");
-      video.preload = "metadata";
-      video.src = videoUrl;
-
-      const duration = await new Promise<number>((resolve) => {
-        video.onloadedmetadata = () => resolve(video.duration);
-        setTimeout(() => resolve(120), 3000);
-      });
-
-      setProgress(50);
-
-      // Try uploading to server API
-      let projectId: string | null = null;
-      try {
-        const formData = new FormData();
-        formData.append("video", file);
-        formData.append("empresa_id", empresaId);
-        formData.append("title", file.name.replace(/\.[^/.]+$/, ""));
-
-        const res = await fetch("/api/video/upload", { method: "POST", body: formData });
-        if (res.ok) {
-          const data = await res.json();
-          projectId = data.project_id;
-        }
-      } catch {
-        // If upload API fails, continue with local-only mode
-        console.warn("Video upload API unavailable, using local mode");
-      }
-
-      const newProject: VideoProject = {
-        id: projectId || generateId(),
-        empresaId,
-        title: file.name.replace(/\.[^/.]+$/, ""),
-        videoUrl,
-        originalFileName: file.name,
-        duration,
-        transcription: [],
-        aiSummary: "",
-        cuts: [],
-        edits: [],
-        status: "uploading",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      setProject(newProject);
-      setProgress(100);
-
-      // Auto-start processing
-      setTimeout(() => processProject(newProject, file), 300);
-
-      return newProject;
-    },
-    []
-  );
-
-  const processProject = useCallback(
-    async (proj: VideoProject, file?: File) => {
-      if (processingRef.current) return;
-      processingRef.current = true;
-      videoFileRef.current = file || videoFileRef.current;
-
-      setStatus("processing");
-      setProcessingStep(0);
-      setProgress(10);
-
-      try {
-        // Step 1: Sending to transcription
-        setProcessingStep(0);
-        setProgress(15);
-
-        let transcription: TranscriptionSegment[] = [];
-        let wordTimestamps: WordTimestamp[] = [];
-        let aiSummary = "";
-
-        // Try real Whisper transcription if we have the file
-        if (videoFileRef.current) {
-          try {
-            setProcessingStep(1);
-            setProgress(30);
-
-            const formData = new FormData();
-            formData.append("video", videoFileRef.current);
-
-            const res = await fetch("/api/video/transcribe", {
-              method: "POST",
-              body: formData,
-            });
-
-            if (res.ok) {
-              const data = await res.json();
-              transcription = (data.segments || []).map((s: { id?: string; start: number; end: number; text: string }, i: number) => ({
-                id: s.id || `seg-${i}`,
-                start: s.start,
-                end: s.end,
-                text: s.text,
-              }));
-              wordTimestamps = (data.words || []).map((w: { word: string; start: number; end: number }) => ({
-                word: w.word,
-                start: w.start,
-                end: w.end,
-              })) as WordTimestamp[];
-              aiSummary = `Transcrição real com ${transcription.length} segmentos. ${data.text?.substring(0, 200)}...`;
-              console.log(`[process] Whisper OK: ${transcription.length} segments, ${wordTimestamps.length} words`);
-            } else {
-              const err = await res.json().catch(() => ({}));
-              console.warn("[process] Whisper failed:", err.error || res.status);
-            }
-          } catch (err) {
-            console.warn("[process] Whisper unavailable:", err);
-          }
-        }
-
-        setProcessingStep(2);
-        setProgress(70);
-
-        // Fallback to mock if transcription failed
-        if (transcription.length === 0) {
-          console.warn("[process] Using mock transcription");
-          transcription = generateLocalTranscription(proj.duration);
-          wordTimestamps = generateLocalWordTimestamps(transcription);
-          aiSummary = `Video "${proj.title}" com ${Math.round(proj.duration)}s. Transcrição automática não disponível — usando legendas de exemplo.`;
-        }
-
-        // Step 3: AI-powered cut analysis
-        setProcessingStep(2);
-        setProgress(80);
-
-        let cuts: VideoCut[] = [];
-        let videoAnalysis: VideoAnalysis | null = null;
-
-        try {
-          const analyzeRes = await fetch("/api/video/analyze-cuts", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              transcription: transcription.map(s => ({ start: s.start, end: s.end, text: s.text })),
-              duration: proj.duration,
-              title: proj.title,
-            }),
-          });
-
-          if (analyzeRes.ok) {
-            videoAnalysis = await analyzeRes.json();
-            if (videoAnalysis?.cuts) {
-              cuts = videoAnalysis.cuts.map((c: any, i: number) => ({
-                id: `cut-${i}`,
-                title: c.title,
-                startTime: c.startTime,
-                endTime: c.endTime,
-                description: c.description,
-                accepted: false,
-              }));
-            }
-            if (videoAnalysis?.summary) {
-              aiSummary = videoAnalysis.summary;
-            }
-            console.log(`[process] AI analysis OK: ${cuts.length} cuts, type: ${videoAnalysis?.type}`);
-          }
-        } catch (err) {
-          console.warn("[process] AI analysis failed:", err);
-        }
-
-        // Fallback cuts if AI analysis failed
-        if (cuts.length === 0) {
-          cuts = generateSmartCuts(transcription);
-        }
-
-        setProcessingStep(3);
-        setProgress(100);
-
-        const updated: VideoProject = {
-          ...proj,
-          transcription,
-          wordTimestamps,
-          aiSummary,
-          cuts,
-          analysis: videoAnalysis,
-          edits: [
-            { type: "subtitle", enabled: true, config: {} },
-            { type: "logo", enabled: false, config: { position: "bottom-right" } },
-          ],
-          status: "analyzed",
-          updatedAt: new Date().toISOString(),
-        };
-
-        setProject(updated);
-        setStatus("analyzed");
-
-        // Persist to DB (fire-and-forget)
-        void persistProject(updated);
-      } catch (err) {
-        console.error("Processing error:", err);
-        setError(err instanceof Error ? err.message : "Erro ao processar vídeo");
-        setStatus("idle");
-      } finally {
-        processingRef.current = false;
-      }
-    },
-    []
-  );
-
-  const uploadFromUrl = useCallback(
-    async (url: string, empresaId: string) => {
-      setStatus("uploading");
-      setProgress(0);
-      setError(null);
-
-      const newProject: VideoProject = {
-        id: generateId(),
-        empresaId,
-        title: "Video importado",
-        videoUrl: url,
-        originalFileName: url.split("/").pop() || "video",
-        duration: 120,
-        transcription: [],
-        aiSummary: "",
-        cuts: [],
-        edits: [],
-        status: "uploading",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      setProject(newProject);
-      setProgress(100);
-
-      setTimeout(() => processProject(newProject), 300);
-
-      return newProject;
-    },
-    []
-  );
-
-  // Keep process() for backward compat (page might call it)
-  const process = useCallback(async () => {
-    if (!project) return;
-    await processProject(project);
-  }, [project, processProject]);
 
   const acceptCut = useCallback(
     (cut: VideoCut) => {
@@ -377,32 +95,30 @@ export function useVideoProject() {
   const toggleEdit = useCallback(
     (type: VideoEdit["type"], enabled: boolean) => {
       if (!project) return;
+      const updatedEdits = project.edits.map((e) =>
+        e.type === type ? { ...e, enabled } : e
+      );
       setProject({
         ...project,
-        edits: project.edits.map((e) =>
-          e.type === type ? { ...e, enabled } : e
-        ),
+        edits: updatedEdits,
         updatedAt: new Date().toISOString(),
       });
+      void updateProjectEdits(project.id, updatedEdits);
     },
     [project]
   );
 
   const reset = useCallback(() => {
-    if (project?.videoUrl?.startsWith("blob:")) {
-      URL.revokeObjectURL(project.videoUrl);
-    }
     setProject(null);
     setStatus("idle");
-    setProgress(0);
-    setProcessingStep(0);
-    setError(null);
-    processingRef.current = false;
-  }, [project]);
+  }, []);
 
   /**
    * Load a project from DB history (no re-processing needed).
-   * videoUrl will be empty — the video file is not kept locally.
+   *
+   * Supports both new (cuts column) and legacy (cut_suggestions column)
+   * schemas: if cuts is empty but cut_suggestions has data, uses cut_suggestions
+   * as fallback.
    */
   const loadFromHistory = useCallback(
     (item: {
@@ -410,29 +126,38 @@ export function useVideoProject() {
       title: string;
       status: string;
       duration_seconds: number | null;
+      /** Legacy column — still read for fallback */
       cut_suggestions: unknown;
+      /** New column (pipeline v2) */
+      cuts?: unknown;
       transcription: unknown;
       edits: unknown;
       gemini_analysis: unknown;
       word_timestamps?: unknown;
       keywords?: unknown;
+      video_url?: string | null;
       created_at: string;
       updated_at: string;
     }) => {
+      // Prefer new `cuts` column; fall back to legacy `cut_suggestions`
+      const newCuts = Array.isArray(item.cuts) && item.cuts.length > 0
+        ? (item.cuts as VideoCut[])
+        : Array.isArray(item.cut_suggestions)
+        ? (item.cut_suggestions as VideoCut[])
+        : [];
+
       const restored: VideoProject = {
         id: item.id,
         empresaId: "",
         title: item.title,
-        videoUrl: "",
+        videoUrl: item.video_url ?? "",
         originalFileName: item.title,
         duration: item.duration_seconds ?? 0,
         transcription: Array.isArray(item.transcription)
           ? (item.transcription as TranscriptionSegment[])
           : [],
         aiSummary: "",
-        cuts: Array.isArray(item.cut_suggestions)
-          ? (item.cut_suggestions as VideoCut[])
-          : [],
+        cuts: newCuts,
         edits: Array.isArray(item.edits)
           ? (item.edits as VideoEdit[])
           : [
@@ -453,106 +178,104 @@ export function useVideoProject() {
     []
   );
 
+  /**
+   * Load a project by ID from the DB — used after TUS upload + job completion.
+   * Fetches the latest data so editor has real transcription + cuts.
+   *
+   * NOTE: a tabela `video_projects` não possui coluna `video_url`. O bruto
+   * fica em Storage (`videos/<storage_path>`), bucket privado. Geramos uma
+   * signed URL on-demand (24h) para o `<VideoPlayer>` conseguir tocar.
+   */
+  const loadFromProjectId = useCallback(async (projectId: string) => {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("video_projects")
+        .select(
+          "id, empresa_id, title, original_url, storage_path, duration_seconds, transcription, edits, gemini_analysis, word_timestamps, cuts, cut_suggestions, created_at, updated_at"
+        )
+        .eq("id", projectId)
+        .single();
+
+      if (error || !data) {
+        console.warn("[useVideoProject] loadFromProjectId failed:", error?.message);
+        return;
+      }
+
+      // Same new/legacy cuts fallback
+      const newCuts = Array.isArray(data.cuts) && (data.cuts as unknown[]).length > 0
+        ? (data.cuts as VideoCut[])
+        : Array.isArray(data.cut_suggestions)
+        ? (data.cut_suggestions as VideoCut[])
+        : [];
+
+      // Gerar signed URL para o vídeo bruto (bucket `videos` é privado).
+      // Fallback para `original_url` (texto livre, ex.: nome do arquivo) se
+      // não existir storage_path — não toca, mas evita videoUrl vazio total.
+      let videoUrl = "";
+      const storagePath = (data.storage_path as string | null) ?? null;
+      if (storagePath) {
+        const { data: signedUrlData, error: signedErr } = await supabase.storage
+          .from("videos")
+          .createSignedUrl(storagePath, 60 * 60 * 24); // 24h
+        if (signedErr) {
+          console.warn(
+            "[useVideoProject] createSignedUrl failed:",
+            signedErr.message
+          );
+        } else if (signedUrlData?.signedUrl) {
+          videoUrl = signedUrlData.signedUrl;
+        }
+      } else if (typeof data.original_url === "string") {
+        // Fallback legacy (alguns projetos antigos guardavam URL no original_url)
+        videoUrl = data.original_url;
+      }
+
+      const restored: VideoProject = {
+        id: data.id as string,
+        empresaId: (data.empresa_id as string) ?? "",
+        title: data.title as string,
+        videoUrl,
+        originalFileName: (data.title as string) ?? "",
+        duration: (data.duration_seconds as number) ?? 0,
+        transcription: Array.isArray(data.transcription)
+          ? (data.transcription as TranscriptionSegment[])
+          : [],
+        aiSummary: "",
+        cuts: newCuts,
+        edits: Array.isArray(data.edits)
+          ? (data.edits as VideoEdit[])
+          : [
+              { type: "subtitle", enabled: true, config: {} },
+              { type: "logo", enabled: false, config: { position: "bottom-right" } },
+            ],
+        analysis: (data.gemini_analysis as VideoAnalysis) ?? null,
+        wordTimestamps: Array.isArray(data.word_timestamps)
+          ? (data.word_timestamps as WordTimestamp[])
+          : [],
+        status: "analyzed",
+        createdAt: data.created_at as string,
+        updatedAt: data.updated_at as string,
+      };
+
+      setProject(restored);
+      setStatus("analyzed");
+    } catch (err) {
+      console.warn("[useVideoProject] loadFromProjectId exception:", err);
+    }
+  }, []);
+
   return {
     project,
     status,
-    progress,
-    processingStep,
-    error,
-    analysis: project?.analysis ?? null,
     cuts: project?.cuts ?? [],
     edits: project?.edits ?? [],
-    upload,
-    uploadFromUrl,
-    process,
     acceptCut,
     removeCut,
     adjustCut,
     toggleEdit,
     reset,
     loadFromHistory,
+    loadFromProjectId,
   };
-}
-
-/* ── Local fallback helpers ── */
-
-function generateLocalTranscription(duration: number): TranscriptionSegment[] {
-  const segments: TranscriptionSegment[] = [];
-  const phrases = [
-    "Olá, bem-vindos ao nosso conteúdo de hoje.",
-    "Vamos falar sobre estratégias que realmente funcionam.",
-    "O primeiro ponto importante é entender o seu público.",
-    "Quando você conhece quem te assiste, tudo muda.",
-    "Vamos para a segunda dica que é super valiosa.",
-    "Consistência é a chave de todo crescimento.",
-    "Poste todos os dias, mesmo que seja simples.",
-    "Agora, o terceiro ponto que vai mudar o jogo.",
-    "Engajamento é mais importante que visualizações.",
-    "Responda comentários, faça perguntas, crie conexão.",
-    "Para finalizar, lembre-se: autenticidade vende.",
-    "Se gostou, compartilha com alguém que precisa ouvir isso.",
-  ];
-
-  const segDuration = Math.min(duration / phrases.length, 8);
-  for (let i = 0; i < phrases.length && i * segDuration < duration; i++) {
-    segments.push({
-      id: generateId(),
-      start: i * segDuration,
-      end: Math.min((i + 1) * segDuration, duration),
-      text: phrases[i],
-    });
-  }
-  return segments;
-}
-
-/**
- * Generates uniform word-level timestamps from mock transcription segments.
- * Each segment's words are evenly distributed across the segment's time span.
- */
-function generateLocalWordTimestamps(segments: TranscriptionSegment[]): WordTimestamp[] {
-  const result: WordTimestamp[] = [];
-  for (const seg of segments) {
-    const words = seg.text.split(/\s+/).filter((w) => w.length > 0);
-    if (words.length === 0) continue;
-    const segDuration = seg.end - seg.start;
-    const wordDuration = segDuration / words.length;
-    words.forEach((word, i) => {
-      result.push({
-        word,
-        start: seg.start + i * wordDuration,
-        end: seg.start + (i + 1) * wordDuration,
-      });
-    });
-  }
-  return result;
-}
-
-function generateSmartCuts(transcription: TranscriptionSegment[]): VideoCut[] {
-  if (transcription.length < 4) return [];
-  return [
-    {
-      id: generateId(),
-      title: "Hook Inicial",
-      startTime: transcription[0].start,
-      endTime: transcription[Math.min(2, transcription.length - 1)].end,
-      description: "Abertura com gancho para prender a audiência",
-      accepted: false,
-    },
-    {
-      id: generateId(),
-      title: "Momento Principal",
-      startTime: transcription[Math.floor(transcription.length * 0.3)].start,
-      endTime: transcription[Math.min(Math.floor(transcription.length * 0.5), transcription.length - 1)].end,
-      description: "O ponto mais forte do vídeo",
-      accepted: false,
-    },
-    {
-      id: generateId(),
-      title: "CTA Final",
-      startTime: transcription[Math.max(0, transcription.length - 3)].start,
-      endTime: transcription[transcription.length - 1].end,
-      description: "Chamada para ação no final",
-      accepted: false,
-    },
-  ];
 }

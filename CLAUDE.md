@@ -116,6 +116,80 @@ Tabelas: `empresas`, `posts`, `concorrentes`, `concorrente_plataformas`
 - Commits: Conventional Commits em português
 - Estilo: Tailwind CSS com variáveis CSS customizadas no globals.css
 
+## Cortes de Vídeo (Pipeline Async)
+
+### Contexto
+Módulo de cortes automáticos de podcasts. Volume esperado: **4 podcasts/mês**, duração média 2h.
+
+### Stack
+Next.js 16 + Supabase + Whisper OpenAI + Gemini 2.5 Flash + Claude Sonnet 4.6 + FFmpeg (server-side)
+
+### Fluxo end-to-end
+1. **Upload TUS direto** → cliente faz upload via `tus-js-client` para o Supabase Storage bucket `videos`
+2. **`POST /api/video/start-job`** → cria registro em `video_jobs`, dispara processamento in-process
+3. **Job runner** (`src/lib/video/job-runner.ts`) executa em background:
+   - Extrai áudio com FFmpeg (`audio-extractor.ts`)
+   - Divide em chunks e transcreve em paralelo via Whisper OpenAI (`whisper-chunked.ts`)
+   - Gemini 2.5 Flash detecta momentos de corte (`cut-detector.ts`)
+   - Claude Sonnet 4.6 refina e valida os cortes (`cut-refiner.ts`)
+   - FFmpeg renderiza clipes com legendas ASS queimadas server-side (`clip-renderer.ts`)
+   - Faz upload dos clipes para o bucket `cuts` (`clip-uploader.ts`)
+4. **`GET /api/video/job-status/[id]`** → polling do progresso pelo frontend
+5. **`POST /api/video/upload-url`** → cria registro `video_projects` (status='uploading') e devolve signed URL TUS para iniciar upload
+
+### Rotas ativas
+| Rota | Método | Descrição |
+|------|--------|-----------|
+| `/api/video/upload-url` | POST | Cria registro do projeto e devolve signed URL TUS para upload direto |
+| `/api/video/start-job` | POST | Inicia job de processamento assíncrono |
+| `/api/video/job-status/[id]` | GET | Polling de status e progresso do job |
+| `/api/video/chat` | POST | Chat com agente de vídeo (stateful) |
+| `/api/video/chat-simple` | POST | Chat stateless com vídeo |
+| `/api/video/keywords/extract` | POST | Extrai keywords para captions |
+| `/api/video/styles` | GET | Lista estilos de legenda disponíveis |
+| `/api/admin/cleanup-video-tmp` | POST | Remove dirs órfãos `/var/tmp/video-job-*` > 24h |
+
+### Tabelas Supabase
+- `video_projects` — projetos de vídeo (estendida com metadados do podcast)
+- `video_jobs` — jobs de processamento (status, progresso, resultado, erros)
+
+### Buckets Supabase
+- `videos` — vídeos raw enviados pelo usuário
+- `cuts` — clipes finais renderizados com legenda
+
+### Limites
+- Upload máximo: **5 GB**
+- Duração máxima: **2h30**
+- Máximo de cortes por podcast: **10**
+
+### Custo estimado por podcast de 2h
+| Serviço | Custo |
+|---------|-------|
+| Whisper OpenAI | ~$0.72 |
+| Gemini 2.5 Flash | ~$0.10 |
+| Claude Sonnet 4.6 | ~$0.05 |
+| **Total** | **~$0.87** |
+
+Tempo de processamento end-to-end: **12–18 min**.
+
+### Cron de limpeza (recomendado)
+Chamar `POST /api/admin/cleanup-video-tmp` **1x por dia** com o header:
+```
+x-cleanup-secret: <valor de CLEANUP_SECRET>
+```
+Configurar via Coolify Scheduled Tasks ou GitHub Actions (cron `0 3 * * *`).
+
+### Variáveis de ambiente necessárias
+| Variável | Uso |
+|----------|-----|
+| `OPENAI_API_KEY` | Transcrição Whisper |
+| `GEMINI_API_KEY` | Detecção de cortes (Gemini 2.5 Flash) |
+| `ANTHROPIC_API_KEY` | Refinamento de cortes (Claude Sonnet 4.6) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Acesso ao Storage (bypass RLS) |
+| `CLEANUP_SECRET` | Autenticação do endpoint de cleanup |
+
+---
+
 ## Próximos Passos
 
 - [ ] Conectar APIs reais de redes sociais (Meta, LinkedIn) para Analytics

@@ -30,6 +30,7 @@ WORKDIR /app
 
 # Chromium para Puppeteer (geração de PDF e criativos)
 # font-noto-emoji: renderiza emojis Unicode (📢 🚀 💰 etc) nos criativos
+# ffmpeg: pipeline de cortes de vídeo (extract audio, chunk, render clips)
 RUN apk add --no-cache \
     chromium \
     nss \
@@ -37,7 +38,8 @@ RUN apk add --no-cache \
     harfbuzz \
     ca-certificates \
     ttf-freefont \
-    font-noto-emoji
+    font-noto-emoji \
+    ffmpeg
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1

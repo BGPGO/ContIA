@@ -1,3 +1,9 @@
+/**
+ * @deprecated
+ * Modal de progresso do render client-side (browser-render.ts).
+ * Substituído pelo JobStatusPanel + render server-side (Wave 5).
+ * Mantido só pra fallback de cortes legacy sem rendered_url.
+ */
 'use client';
 
 import React from 'react';
