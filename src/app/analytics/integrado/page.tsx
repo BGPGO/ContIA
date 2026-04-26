@@ -318,7 +318,7 @@ function EmptyStateNoLeads() {
 /* ── Match Rate Warning ───────────────────────────────────────────── */
 
 function MatchRateWarning({ matchRate }: { matchRate: number }) {
-  if (matchRate >= 0.5) return null;
+  if (matchRate >= 0.7) return null;
   return (
     <motion.div
       initial={{ opacity: 0, y: -8 }}
@@ -327,8 +327,8 @@ function MatchRateWarning({ matchRate }: { matchRate: number }) {
     >
       <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
       <p className="text-[13px] text-amber-300 leading-relaxed">
-        Apenas <strong>{fmtPct(matchRate)}</strong> das campanhas Meta estão linkadas com
-        leads do CRM via UTM. Configure UTMs nos anúncios para ter atribuição completa.
+        <strong>{fmtPct(matchRate)}</strong> dos leads chegaram com UTM rastreável e
+        cruzando com campanhas Meta. Acima de 70% indica tracking saudável.
       </p>
     </motion.div>
   );

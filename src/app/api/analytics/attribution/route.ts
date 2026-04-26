@@ -337,19 +337,19 @@ function computeAttributionInsights(
     });
   }
 
-  // 6. Match rate baixo — < 60% das campanhas rastreaveis cruzadas com Meta
-  // totalMetaCampaigns aqui = trackableTotal (campanhas CRM com utm valida no periodo)
+  // 6. Match rate baixo de LEADS (matchedCount/totalMetaCampaigns aqui = leadsMatched/leadsWithValidUtm)
   if (totalMetaCampaigns > 0) {
     const matchRate = matchedCount / totalMetaCampaigns;
-    if (matchRate < 0.6) {
+    const unmatched = totalMetaCampaigns - matchedCount;
+    if (matchRate < 0.7) {
       insights.push({
         id: "attribution_low_match_rate",
         category: "anomaly",
         severity: "warning",
-        title: "Rastreamento UTM parcial",
-        description: `${matchedCount} de ${totalMetaCampaigns} campanhas com UTM válido bateram com campanhas Meta. Algumas podem ser de campanhas paradas antes do período, ou tem UTM divergente do nome no Ads Manager.`,
-        metric: `${(matchRate * 100).toFixed(0)}% match`,
-        actionable: "Confira no Ads Manager se o template de URL usa {{campaign.name}} sem espaços/caracteres especiais.",
+        title: "Leads chegando sem campanha Meta correspondente",
+        description: `${unmatched} de ${totalMetaCampaigns} leads vieram com UTM mas o nome não bate com nenhuma campanha Meta — pode ser campanha pausada antes do período ou UTM divergente do nome no Ads Manager.`,
+        metric: `${(matchRate * 100).toFixed(0)}% rastreados`,
+        actionable: "Confira no Ads Manager se o template de URL usa {{campaign.name}} sem caracteres especiais que diferem do nome real.",
       });
     }
   }
@@ -729,25 +729,43 @@ export async function GET(req: NextRequest) {
   function isTrackable(name: string): boolean {
     if (!name) return false;
     if (name.startsWith("(") || name.startsWith("{{")) return false;
-    // labels manuais que nao vem de campanha Meta
     const lower = name.toLowerCase();
     if (lower === "link-bio" || lower === "manychat" || lower === "organic") return false;
     return true;
   }
 
   /**
-   * Trackable = nome valido E teve atividade no periodo (spend Meta > 0 OU
-   * leads CRM > 0). Campanhas Meta paradas sem leads sao "ruido" — nao tem
-   * como ter match e distorcem o denominador. Antes elas entravam, gerando
-   * matchRate de 9.8% (5/51) — agora ficam fora.
+   * Match rate baseado em LEADS (não campanhas) — pondera por volume.
+   *
+   * Por que leads e nao campanhas:
+   * - 1 campanha grande com 113 leads matched + 1 campanha pequena sem match
+   *   davam 50% no calculo por campanha, mesmo com 113/116 leads bem rastreados.
+   * - Por leads: 113/116 = 97% — reflete a realidade.
+   *
+   * Numerador: leads cuja utm_campaign cruza com alguma campanha Meta
+   * Denominador: leads com utm_campaign valido (exclui null e "(sem campanha)" e "{{macro}}")
    */
-  const trackableCampaigns = campaignAttribution.filter(
-    (c) => isTrackable(c.campaignName) && (c.spend > 0 || c.crmLeads > 0)
+  const allLeads = (crmData.leads ?? []) as CrmLeadItem[];
+  const matchedCampaignNames = new Set(
+    campaignAttribution
+      .filter((c) => c.matched && c.metaCampaignId !== null)
+      .map((c) => normalize(c.campaignName))
   );
-  const matchedCount = trackableCampaigns.filter(
-    (c) => c.matched && c.metaCampaignId !== null
-  ).length;
-  const trackableTotal = trackableCampaigns.length;
+
+  let leadsWithValidUtm = 0;
+  let leadsMatched = 0;
+  for (const lead of allLeads) {
+    const utmCampaign = (lead.firstTouch?.utm_campaign ?? lead.utm_campaign ?? "").trim();
+    if (!utmCampaign || !isTrackable(utmCampaign)) continue;
+    leadsWithValidUtm++;
+    if (matchedCampaignNames.has(normalize(utmCampaign))) {
+      leadsMatched++;
+    }
+  }
+
+  // Backward-compat com input do computeAttributionInsights (que usa campanhas)
+  const matchedCount = leadsMatched;
+  const trackableTotal = leadsWithValidUtm;
 
   const matchRateFinal =
     trackableTotal > 0 ? matchedCount / trackableTotal : 0;
