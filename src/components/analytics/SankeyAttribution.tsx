@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useLayoutEffect, useCallback } from "react";
+import { useState } from "react";
 import { motion } from "motion/react";
 import { GitMerge } from "lucide-react";
 import type { ChannelROI, FunnelEndToEndStage } from "@/types/attribution";
@@ -81,47 +81,7 @@ interface ConnectorPath {
   fromId: string; // ID do item da coluna de origem
 }
 
-interface ColRect {
-  id: string;
-  top: number;   // relativo ao container
-  height: number;
-  color: string;
-  count: number;
-}
-
-function buildPaths(
-  leftRects: ColRect[],
-  rightRects: ColRect[],
-  x1: number, // right edge da coluna esquerda
-  x2: number, // left edge da coluna direita
-  totalCount: number
-): ConnectorPath[] {
-  if (leftRects.length === 0 || rightRects.length === 0) return [];
-
-  const paths: ConnectorPath[] = [];
-
-  leftRects.forEach((lItem) => {
-    const lMid = lItem.top + lItem.height / 2;
-    const lPct = totalCount > 0 ? lItem.count / totalCount : 1 / leftRects.length;
-    const sw = Math.max(2, Math.min(16, lPct * 80));
-
-    rightRects.forEach((rItem) => {
-      const rMid = rItem.top + rItem.height / 2;
-      const cx = (x1 + x2) / 2;
-      const d = `M ${x1} ${lMid} C ${cx} ${lMid} ${cx} ${rMid} ${x2} ${rMid}`;
-      paths.push({
-        d,
-        color: lItem.color,
-        strokeWidth: sw,
-        fromId: lItem.id,
-      });
-    });
-  });
-
-  return paths;
-}
-
-/* ── FlowColumn with ref tracking ── */
+/* ── FlowColumn (sem tracking de refs — versao simples sem SVG overlay) ── */
 
 interface FlowColumnProps {
   title: string;
@@ -129,7 +89,6 @@ interface FlowColumnProps {
   totalCount: number;
   activeId: string | null;
   onHover: (id: string | null) => void;
-  onRectsReady?: (rects: ColRect[]) => void;
 }
 
 function FlowColumn({
@@ -138,31 +97,9 @@ function FlowColumn({
   totalCount,
   activeId,
   onHover,
-  onRectsReady,
 }: FlowColumnProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
-
-  useLayoutEffect(() => {
-    if (!onRectsReady || !containerRef.current) return;
-    const containerTop = containerRef.current.getBoundingClientRect().top;
-    const rects: ColRect[] = items.map((item, i) => {
-      const el = itemRefs.current[i];
-      if (!el) return { id: item.id, top: 0, height: 40, color: item.color, count: item.count };
-      const r = el.getBoundingClientRect();
-      return {
-        id: item.id,
-        top: r.top - containerTop,
-        height: r.height,
-        color: item.color,
-        count: item.count,
-      };
-    });
-    onRectsReady(rects);
-  });
-
   return (
-    <div ref={containerRef} className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2">
       <p className="text-[11px] font-medium text-text-muted uppercase tracking-wider mb-1 text-center">
         {title}
       </p>
@@ -172,7 +109,6 @@ function FlowColumn({
         return (
           <motion.div
             key={item.id}
-            ref={(el) => { itemRefs.current[i] = el; }}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05, duration: 0.3 }}
@@ -230,41 +166,10 @@ export function SankeyAttribution({
 }: SankeyAttributionProps) {
   const [activeChannel, setActiveChannel] = useState<string | null>(null);
 
-  // Refs to SVG overlay dimensions
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const col1Ref = useRef<HTMLDivElement>(null);
-  const col2Ref = useRef<HTMLDivElement>(null);
-  const col3Ref = useRef<HTMLDivElement>(null);
-
-  const [leftRects, setLeftRects] = useState<ColRect[]>([]);
-  const [midRects, setMidRects] = useState<ColRect[]>([]);
-  const [rightRects, setRightRects] = useState<ColRect[]>([]);
-  const [svgDim, setSvgDim] = useState({ w: 0, h: 0 });
-  const [x1, setX1] = useState(0); // right edge col1
-  const [x2, setX2] = useState(0); // left edge col2
-  const [x3, setX3] = useState(0); // right edge col2
-  const [x4, setX4] = useState(0); // left edge col3
-
-  const updateLayout = useCallback(() => {
-    if (!wrapperRef.current || !col1Ref.current || !col2Ref.current || !col3Ref.current) return;
-    const wRect = wrapperRef.current.getBoundingClientRect();
-    const c1 = col1Ref.current.getBoundingClientRect();
-    const c2 = col2Ref.current.getBoundingClientRect();
-    const c3 = col3Ref.current.getBoundingClientRect();
-    setSvgDim({ w: wRect.width, h: wRect.height });
-    setX1(c1.right - wRect.left);
-    setX2(c2.left - wRect.left);
-    setX3(c2.right - wRect.left);
-    setX4(c3.left - wRect.left);
-  }, []);
-
-  // Recalcula só quando o NÚMERO de items muda (data carregou) ou em resize.
-  // Antes era sem deps → setState dispara re-render → re-roda effect → loop infinito (React #185)
-  useLayoutEffect(() => {
-    updateLayout();
-    window.addEventListener("resize", updateLayout);
-    return () => window.removeEventListener("resize", updateLayout);
-  }, [updateLayout, channelROI.length, funnel.length]);
+  // NOTA: versao anterior tentava desenhar SVG paths Bezier conectando colunas
+  // via useLayoutEffect + getBoundingClientRect, mas gerava loop infinito de
+  // setState (React #185). Removido pra estabilizar — visual fica como 3 colunas
+  // com setas CSS simples entre elas. Reimplementar como ResizeObserver no futuro.
 
   if (channelROI.length === 0 && funnel.length === 0) {
     return (
@@ -344,11 +249,6 @@ export function SankeyAttribution({
     });
   }
 
-  /* Build SVG paths */
-  const paths12 = buildPaths(leftRects, midRects, x1, x2, totalLeads);
-  const paths23 = buildPaths(midRects, rightRects, x3, x4, totalLeads);
-  const allPaths = [...paths12, ...paths23];
-
   return (
     <div className="bg-bg-card border border-border rounded-xl p-5">
       {/* Header */}
@@ -365,78 +265,38 @@ export function SankeyAttribution({
         </div>
       </div>
 
-      {/* 3-column flow com SVG overlay de conectores Bezier */}
-      <div ref={wrapperRef} className="relative">
-        {/* SVG overlay — paths Bezier entre colunas */}
-        {svgDim.w > 0 && (
-          <svg
-            className="absolute inset-0 pointer-events-none"
-            width={svgDim.w}
-            height={svgDim.h}
-            style={{ zIndex: 0 }}
-          >
-            {allPaths.map((p, i) => {
-              const isHighlighted =
-                activeChannel === null || p.fromId === activeChannel;
-              return (
-                <path
-                  key={i}
-                  d={p.d}
-                  fill="none"
-                  stroke={p.color}
-                  strokeWidth={p.strokeWidth}
-                  opacity={isHighlighted ? 0.22 : 0.05}
-                  strokeLinecap="round"
-                  style={{ transition: "opacity 0.2s" }}
-                />
-              );
-            })}
-          </svg>
-        )}
+      {/* 3-column flow */}
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr_auto_1fr] gap-3 items-start">
+        {/* Column 1 */}
+        <FlowColumn
+          title="Canais de Entrada"
+          items={channelItems}
+          totalCount={totalLeads}
+          activeId={activeChannel}
+          onHover={setActiveChannel}
+        />
 
-        <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] gap-0 items-start relative z-10">
-          {/* Column 1 */}
-          <div ref={col1Ref}>
-            <FlowColumn
-              title="Canais de Entrada"
-              items={channelItems}
-              totalCount={totalLeads}
-              activeId={activeChannel}
-              onHover={setActiveChannel}
-              onRectsReady={setLeftRects}
-            />
-          </div>
+        <div className="hidden md:flex items-center justify-center text-text-muted/40 text-2xl">→</div>
 
-          {/* Spacer 1→2 */}
-          <div className="w-8" />
+        {/* Column 2 */}
+        <FlowColumn
+          title="Estágios do Funil"
+          items={funnelItems}
+          totalCount={totalLeads}
+          activeId={null}
+          onHover={() => {}}
+        />
 
-          {/* Column 2 */}
-          <div ref={col2Ref}>
-            <FlowColumn
-              title="Estágios do Funil"
-              items={funnelItems}
-              totalCount={totalLeads}
-              activeId={null}
-              onHover={() => {}}
-              onRectsReady={setMidRects}
-            />
-          </div>
+        <div className="hidden md:flex items-center justify-center text-text-muted/40 text-2xl">→</div>
 
-          {/* Spacer 2→3 */}
-          <div className="w-8" />
-
-          {/* Column 3 */}
-          <div ref={col3Ref}>
-            <FlowColumn
-              title="Resultado"
-              items={resultItems}
-              totalCount={totalLeads}
-              activeId={null}
-              onHover={() => {}}
-              onRectsReady={setRightRects}
-            />
-          </div>
-        </div>
+        {/* Column 3 */}
+        <FlowColumn
+          title="Resultado"
+          items={resultItems}
+          totalCount={totalLeads}
+          activeId={null}
+          onHover={() => {}}
+        />
       </div>
 
       {/* Legend */}
