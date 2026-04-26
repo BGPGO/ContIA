@@ -258,9 +258,13 @@ export function SankeyAttribution({
     setX4(c3.left - wRect.left);
   }, []);
 
+  // Recalcula só quando o NÚMERO de items muda (data carregou) ou em resize.
+  // Antes era sem deps → setState dispara re-render → re-roda effect → loop infinito (React #185)
   useLayoutEffect(() => {
     updateLayout();
-  });
+    window.addEventListener("resize", updateLayout);
+    return () => window.removeEventListener("resize", updateLayout);
+  }, [updateLayout, channelROI.length, funnel.length]);
 
   if (channelROI.length === 0 && funnel.length === 0) {
     return (
