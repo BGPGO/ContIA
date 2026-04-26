@@ -735,8 +735,14 @@ export async function GET(req: NextRequest) {
     return true;
   }
 
-  const trackableCampaigns = campaignAttribution.filter((c) =>
-    isTrackable(c.campaignName)
+  /**
+   * Trackable = nome valido E teve atividade no periodo (spend Meta > 0 OU
+   * leads CRM > 0). Campanhas Meta paradas sem leads sao "ruido" — nao tem
+   * como ter match e distorcem o denominador. Antes elas entravam, gerando
+   * matchRate de 9.8% (5/51) — agora ficam fora.
+   */
+  const trackableCampaigns = campaignAttribution.filter(
+    (c) => isTrackable(c.campaignName) && (c.spend > 0 || c.crmLeads > 0)
   );
   const matchedCount = trackableCampaigns.filter(
     (c) => c.matched && c.metaCampaignId !== null
