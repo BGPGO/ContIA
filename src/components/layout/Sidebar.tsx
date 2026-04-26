@@ -31,6 +31,7 @@ import {
   Scissors,
   CheckCircle,
   ImageIcon,
+  GitMerge,
   type LucideIcon,
 } from "lucide-react";
 import { useEmpresa } from "@/hooks/useEmpresa";
@@ -77,6 +78,7 @@ const navSections: NavSection[] = [
     label: "Analisar",
     links: [
       { label: "Analytics", href: "/analytics", icon: BarChart3 },
+      { label: "Visao Integrada", href: "/analytics/integrado", icon: GitMerge },
       { label: "Inteligencia", href: "/insights", icon: Lightbulb },
       { label: "Comparativo", href: "/insights/comparar", icon: TrendingUp },
       { label: "Concorrentes", href: "/concorrentes", icon: Users },
@@ -125,6 +127,7 @@ const iconColorMap: Record<string, string> = {
   "/cortes": "text-[#34d399]",
   "/criativos": "text-[#ec4899]",
   "/analytics": "text-[#60a5fa]",
+  "/analytics/integrado": "text-[#4ecdc4]",
   "/insights": "text-[#4ecdc4]",
   "/insights/comparar": "text-[#34d399]",
   "/concorrentes": "text-[#f87171]",
