@@ -21,6 +21,7 @@ export async function middleware(request: NextRequest) {
     path.startsWith("/api/facebook") ||
     path.startsWith("/api/meta-ads") ||
     path.startsWith("/api/cron/") ||
+    path.startsWith("/api/internal/") ||
     path.startsWith("/api/psd-templates") ||
     path.startsWith("/api/video") ||
     path.startsWith("/api/invites/")
