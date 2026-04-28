@@ -2269,7 +2269,7 @@ export default function MarcaPage() {
         >
           <p className="text-xs text-text-muted flex items-center justify-center gap-1.5">
             <Sparkles size={10} className="text-accent-light" />
-            DNA da Marca por ContIA &middot; Inteligencia de Marca
+            DNA da Marca por GO Studio &middot; Inteligencia de Marca
           </p>
         </footer>
       )}

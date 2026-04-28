@@ -107,7 +107,7 @@ export function StepExport({
     subheadline: state.topic || undefined,
     body: getContent()?.slice(0, 200) || undefined,
     cta: result?.cta || state.visualCta || undefined,
-    brandName: "ContIA",
+    brandName: "GO Studio",
     brandColor: state.designBrandColor || "#4ecdc4",
     hashtags: result?.hashtags || state.visualHashtags || [],
   };

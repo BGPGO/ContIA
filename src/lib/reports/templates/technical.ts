@@ -358,12 +358,12 @@ export function renderTechnicalTemplate(report: Report, dna: BrandDna): string {
 
 <!-- CAPA -->
 <div class="cover">
-  <div class="cover-badge">Relatório Técnico Completo &bull; ContIA</div>
+  <div class="cover-badge">Relatório Técnico Completo &bull; GO Studio</div>
   <div class="cover-company">${escHtml(brandName)}</div>
   <div class="cover-title">Relatório ${escHtml(report.type.charAt(0).toUpperCase() + report.type.slice(1))}</div>
   <div class="cover-period">${periodStart} &rarr; ${periodEnd}</div>
   <div class="cover-divider"></div>
-  <div class="cover-meta">Gerado em ${generatedAt} &bull; ContIA 2.0</div>
+  <div class="cover-meta">Gerado em ${generatedAt} &bull; GO Studio</div>
   <div class="cover-type-tag">TECHNICAL</div>
 </div>
 
@@ -395,7 +395,7 @@ export function renderTechnicalTemplate(report: Report, dna: BrandDna): string {
   </table>
 
   <div class="page-footer">
-    <div class="footer-brand">ContIA 2.0 &bull; Relatório Técnico</div>
+    <div class="footer-brand">GO Studio &bull; Relatório Técnico</div>
     <div class="footer-page">2</div>
   </div>
 </div>
@@ -413,7 +413,7 @@ export function renderTechnicalTemplate(report: Report, dna: BrandDna): string {
   ${compTable}
 
   <div class="page-footer">
-    <div class="footer-brand">ContIA 2.0</div>
+    <div class="footer-brand">GO Studio</div>
     <div class="footer-page">3</div>
   </div>
 </div>
@@ -434,7 +434,7 @@ ${analysis?.insights?.length ? `
   </table>
 
   <div class="page-footer">
-    <div class="footer-brand">ContIA 2.0</div>
+    <div class="footer-brand">GO Studio</div>
     <div class="footer-page">4</div>
   </div>
 </div>` : ''}
@@ -448,7 +448,7 @@ ${providers.length > 0 ? `
   </div>
   ${providerSections}
   <div class="page-footer">
-    <div class="footer-brand">ContIA 2.0</div>
+    <div class="footer-brand">GO Studio</div>
     <div class="footer-page">5</div>
   </div>
 </div>` : ''}
@@ -469,7 +469,7 @@ ${analysis?.recommendations?.length ? `
   </table>
 
   <div class="page-footer">
-    <div class="footer-brand">ContIA 2.0</div>
+    <div class="footer-brand">GO Studio</div>
     <div class="footer-page">6</div>
   </div>
 </div>` : ''}
@@ -485,12 +485,12 @@ ${analysis?.recommendations?.length ? `
   <div class="appendix-box">${escHtml(appendixData)}</div>
 
   <div style="margin-top:14px;font-size:9px;color:#aaa;text-align:center">
-    Relatório gerado automaticamente pelo ContIA 2.0 &bull; ${generatedAt}<br>
+    Relatório gerado automaticamente pelo GO Studio &bull; ${generatedAt}<br>
     Os dados e análises são baseados nas integrações ativas no período selecionado.
   </div>
 
   <div class="page-footer">
-    <div class="footer-brand">ContIA 2.0 &bull; Fim do Relatório Técnico</div>
+    <div class="footer-brand">GO Studio &bull; Fim do Relatório Técnico</div>
     <div class="footer-page">7</div>
   </div>
 </div>

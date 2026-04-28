@@ -23,7 +23,7 @@ export function buildReportReadyEmail(data: ReportEmailData): {
     ? summaryPreview.slice(0, 200) + "..."
     : summaryPreview;
 
-  const subject = `Seu relatório "${reportName}" está pronto — ContIA`;
+  const subject = `Seu relatório "${reportName}" está pronto — GO Studio`;
 
   const html = `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -47,7 +47,7 @@ export function buildReportReadyEmail(data: ReportEmailData): {
                     <span style="color:white;font-size:18px;font-weight:bold;">C</span>
                   </td>
                   <td style="padding-left:10px;vertical-align:middle;">
-                    <span style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.5px;">ContIA</span>
+                    <span style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.5px;">GO Studio</span>
                     <span style="color:#4ecdc4;font-size:11px;font-weight:500;margin-left:6px;background:rgba(78,205,196,0.1);padding:2px 6px;border-radius:4px;">AI</span>
                   </td>
                 </tr>
@@ -149,7 +149,7 @@ export function buildReportReadyEmail(data: ReportEmailData): {
           <tr>
             <td style="padding:24px 0 8px 0;" align="center">
               <p style="margin:0 0 8px 0;color:#4a5080;font-size:12px;">
-                Este email foi enviado automaticamente pela plataforma ContIA.
+                Este email foi enviado automaticamente pela plataforma GO Studio.
               </p>
               <p style="margin:0;color:#4a5080;font-size:12px;">
                 Bertuzzi Patrimonial · <a href="mailto:contato@bertuzzipatrimonial.app.br" style="color:#4ecdc4;text-decoration:none;">contato@bertuzzipatrimonial.app.br</a>
@@ -173,7 +173,7 @@ Seu relatório "${reportName}" para ${empresaNome} (${periodLabel}) foi gerado c
 ${preview ? `Resumo: ${preview}\n\n` : ""}Ver relatório: ${reportUrl}
 ${pdfUrl ? `Baixar PDF: ${pdfUrl}` : ""}
 
-ContIA — Bertuzzipatrimonial.app.br
+GO Studio — Bertuzzipatrimonial.app.br
 `;
 
   return { subject, html, text };

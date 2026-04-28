@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
+import { GoStudioLogo } from "@/components/layout/GoStudioLogo";
 import { createClient } from "@/lib/supabase/client";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -102,11 +103,9 @@ export default function RegisterPage() {
         transition={{ duration: 0.4, ease: "easeOut" }}
         className="flex items-center gap-2.5 mb-8"
       >
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#4ecdc4] to-[#2db6a0] flex items-center justify-center">
-          <Sparkles className="w-4 h-4 text-white" />
-        </div>
+        <GoStudioLogo className="w-9 h-9" idSuffix="register" />
         <span className="text-lg font-semibold tracking-tight text-text-primary">
-          ContIA
+          GO Studio
         </span>
       </motion.div>
 
@@ -114,7 +113,7 @@ export default function RegisterPage() {
         Criar conta
       </h1>
       <p className="text-sm text-text-secondary mb-6">
-        Comece a usar o ContIA gratuitamente
+        Comece a usar o GO Studio gratuitamente
       </p>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">

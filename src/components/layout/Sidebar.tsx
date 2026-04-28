@@ -40,6 +40,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { EmpresaWizard } from "@/components/empresas/EmpresaWizard";
 import { RoleBadge } from "@/components/empresas/RoleBadge";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { GoStudioLogo } from "@/components/layout/GoStudioLogo";
 import type { Empresa } from "@/types";
 
 /* ── Types ── */
@@ -267,15 +268,13 @@ export function Sidebar() {
       <div className="relative px-5 h-16 flex items-center gap-3 border-b border-border/80">
         {/* Subtle gradient overlay on brand area */}
         <div className="absolute inset-0 bg-gradient-to-r from-[#4ecdc4]/[0.03] to-[#6c5ce7]/[0.03] pointer-events-none" />
-        <div className="relative w-8 h-8 rounded-xl bg-gradient-to-br from-[#4ecdc4] to-[#6c5ce7] flex items-center justify-center shadow-lg shadow-[#4ecdc4]/20">
-          <Sparkles className="w-4 h-4 text-white" />
-        </div>
+        <GoStudioLogo className="w-9 h-9 relative" idSuffix="sidebar" />
         <div className="flex flex-col">
           <span className="text-[15px] font-bold tracking-tight text-text-primary">
-            ContIA
+            GO Studio
           </span>
           <span className="text-[10px] font-medium text-text-muted tracking-wide">
-            Content Intelligence
+            Content Studio
           </span>
         </div>
         <div className="ml-auto flex items-center gap-1.5">
@@ -559,11 +558,9 @@ export function Sidebar() {
         >
           <Menu size={22} />
         </button>
-        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#4ecdc4] to-[#6c5ce7] flex items-center justify-center shadow-lg shadow-[#4ecdc4]/15">
-          <Sparkles className="w-3.5 h-3.5 text-white" />
-        </div>
+        <GoStudioLogo className="w-8 h-8" idSuffix="mobile" withSpark={false} />
         <span className="text-[14px] font-bold tracking-tight text-text-primary">
-          ContIA
+          GO Studio
         </span>
         {empresa && (
           <span className="ml-auto text-[11px] text-text-secondary truncate max-w-[140px] font-medium">

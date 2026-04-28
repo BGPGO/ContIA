@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Termos de Uso — ContIA",
+  title: "Termos de Uso — GO Studio",
   description:
-    "Termos e condições de uso da plataforma ContIA, operada pela BGP — Bertuzzi Patrimonial.",
+    "Termos e condições de uso da plataforma GO Studio, operada pela BGP — Bertuzzi Patrimonial.",
   alternates: {
     canonical: "https://contia.bertuzzipatrimonial.com.br/termos",
   },
@@ -41,7 +41,7 @@ export default function TermosPage() {
           Última atualização: <time dateTime="2026-04-15">15 de abril de 2026</time>
         </p>
         <p className="mt-4 text-[#8b8fb0] text-sm leading-relaxed">
-          Estes Termos de Uso regem o acesso e o uso da plataforma ContIA,
+          Estes Termos de Uso regem o acesso e o uso da plataforma GO Studio,
           operada pela <strong className="text-[#e8eaff]">BGP — Bertuzzi Patrimonial Gestão de Recursos Ltda</strong>.
           Leia com atenção antes de criar sua conta ou usar o serviço.
         </p>
@@ -81,7 +81,7 @@ export default function TermosPage() {
             1. Aceitação dos termos
           </h2>
           <p className="text-sm">
-            Ao criar uma conta, acessar ou usar qualquer funcionalidade do ContIA, você declara
+            Ao criar uma conta, acessar ou usar qualquer funcionalidade do GO Studio, você declara
             que leu, compreendeu e concorda com estes Termos de Uso e com a nossa{" "}
             <Link href="/privacidade" className="text-[#4ecdc4] hover:underline">
               Política de Privacidade
@@ -89,7 +89,7 @@ export default function TermosPage() {
             . Se você não concorda com qualquer disposição, não utilize a plataforma.
           </p>
           <p className="text-sm mt-3">
-            Ao conectar contas de redes sociais ao ContIA, você também declara estar ciente e
+            Ao conectar contas de redes sociais ao GO Studio, você também declara estar ciente e
             em conformidade com os Termos de Uso das respectivas plataformas (Meta, LinkedIn, Google/YouTube).
           </p>
         </section>
@@ -103,7 +103,7 @@ export default function TermosPage() {
             2. Descrição do serviço
           </h2>
           <p className="text-sm">
-            O ContIA é uma plataforma SaaS (<em>Software as a Service</em>) que oferece:
+            O GO Studio é uma plataforma SaaS (<em>Software as a Service</em>) que oferece:
           </p>
           <ul className="mt-3 space-y-2 text-sm">
             <li className="flex gap-3">
@@ -188,7 +188,7 @@ export default function TermosPage() {
             4. Uso permitido
           </h2>
           <p className="text-sm mb-3">
-            Você pode usar o ContIA para:
+            Você pode usar o GO Studio para:
           </p>
           <ul className="space-y-2 text-sm">
             <li className="flex gap-3">
@@ -230,7 +230,7 @@ export default function TermosPage() {
             5. Uso proibido
           </h2>
           <p className="text-sm mb-3">
-            É expressamente proibido usar o ContIA para:
+            É expressamente proibido usar o GO Studio para:
           </p>
           <ul className="space-y-2 text-sm">
             {[
@@ -268,7 +268,7 @@ export default function TermosPage() {
           </h2>
           <div className="space-y-3 text-sm">
             <p>
-              O ContIA utiliza modelos de inteligência artificial (incluindo GPT-4o da OpenAI e
+              O GO Studio utiliza modelos de inteligência artificial (incluindo GPT-4o da OpenAI e
               Gemini do Google) para auxiliar na criação de conteúdo. Ao usar estas funcionalidades,
               você entende e concorda que:
             </p>
@@ -307,14 +307,14 @@ export default function TermosPage() {
           <h3 className="text-base font-semibold text-[#e8eaff] mt-4 mb-2">7.1 Conteúdo do usuário</h3>
           <p className="text-sm">
             Todo conteúdo criado, carregado ou publicado por você por meio da plataforma permanece
-            de sua propriedade. Ao usar o ContIA, você concede à BGP uma licença limitada,
+            de sua propriedade. Ao usar o GO Studio, você concede à BGP uma licença limitada,
             não exclusiva e revogável para armazenar e processar esse conteúdo exclusivamente
             para a prestação dos serviços contratados. Essa licença termina ao encerrar sua conta.
           </p>
 
-          <h3 className="text-base font-semibold text-[#e8eaff] mt-5 mb-2">7.2 Plataforma ContIA</h3>
+          <h3 className="text-base font-semibold text-[#e8eaff] mt-5 mb-2">7.2 Plataforma GO Studio</h3>
           <p className="text-sm">
-            A plataforma ContIA, incluindo seu código-fonte, design, logotipos, marcas, interfaces,
+            A plataforma GO Studio, incluindo seu código-fonte, design, logotipos, marcas, interfaces,
             funcionalidades, documentação e tecnologias proprietárias, é de propriedade exclusiva
             da <strong className="text-[#e8eaff]">BGP — Bertuzzi Patrimonial</strong> e está protegida por leis de
             propriedade intelectual. É proibida qualquer reprodução, distribuição, modificação
@@ -339,7 +339,7 @@ export default function TermosPage() {
 
           <h3 className="text-base font-semibold text-[#e8eaff] mt-4 mb-2">8.1 Disponibilidade</h3>
           <p className="text-sm">
-            A BGP envidará esforços razoáveis para manter o ContIA disponível, mas{" "}
+            A BGP envidará esforços razoáveis para manter o GO Studio disponível, mas{" "}
             <strong className="text-[#e8eaff]">não garante disponibilidade ininterrupta de 100%</strong>.
             Manutenções programadas, falhas de infraestrutura de terceiros (ex: Supabase, Vercel, APIs de redes sociais)
             ou eventos fora do nosso controle podem causar indisponibilidade temporária.
@@ -347,7 +347,7 @@ export default function TermosPage() {
 
           <h3 className="text-base font-semibold text-[#e8eaff] mt-5 mb-2">8.2 Redes sociais de terceiros</h3>
           <p className="text-sm">
-            O ContIA depende das APIs de Meta, LinkedIn, Google e outras plataformas.
+            O GO Studio depende das APIs de Meta, LinkedIn, Google e outras plataformas.
             A BGP não é responsável por:
           </p>
           <ul className="mt-2 space-y-1.5 text-sm">

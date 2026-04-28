@@ -903,7 +903,7 @@ function ProviderAnalyticsContent() {
                     Sem dados do CRM ainda
                   </p>
                   <p className="text-[13px] text-text-muted leading-relaxed max-w-md">
-                    O ContIA puxa dados do CRM diariamente. Se acabou de conectar, espere o proximo sync
+                    O GO Studio puxa dados do CRM diariamente. Se acabou de conectar, espere o proximo sync
                     (4h BRT) ou dispare manualmente em{" "}
                     <a href="/conexoes" className="text-accent hover:underline">
                       Conexoes &gt; CRM &gt; Sincronizar agora

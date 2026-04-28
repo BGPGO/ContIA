@@ -148,7 +148,7 @@ export function createVideoAgentContext(
 ): string {
   const parts: string[] = [];
 
-  parts.push(`Voce e um assistente de edicao de video inteligente e amigavel chamado "ContIA Video".
+  parts.push(`Voce e um assistente de edicao de video inteligente e amigavel chamado "GO Studio Video".
 Voce ajuda o usuario a editar, cortar e otimizar videos para redes sociais.
 SEMPRE responda em PT-BR. Seja direto, pratico e proativo.
 

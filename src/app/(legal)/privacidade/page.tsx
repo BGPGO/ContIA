@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Política de Privacidade — ContIA",
+  title: "Política de Privacidade — GO Studio",
   description:
-    "Saiba como o ContIA coleta, usa, armazena e protege seus dados pessoais e das redes sociais conectadas. Em conformidade com a LGPD.",
+    "Saiba como o GO Studio coleta, usa, armazena e protege seus dados pessoais e das redes sociais conectadas. Em conformidade com a LGPD.",
   alternates: {
     canonical: "https://contia.bertuzzipatrimonial.com.br/privacidade",
   },
@@ -42,7 +42,7 @@ export default function PrivacidadePage() {
         </p>
         <p className="mt-4 text-[#8b8fb0] text-sm leading-relaxed">
           Esta Política de Privacidade explica como a <strong className="text-[#e8eaff]">BGP — Bertuzzi Patrimonial</strong>,
-          operadora da plataforma ContIA, coleta, usa, armazena e protege seus dados pessoais
+          operadora da plataforma GO Studio, coleta, usa, armazena e protege seus dados pessoais
           e os dados das redes sociais que você conecta. Estamos em conformidade com a
           Lei Geral de Proteção de Dados (LGPD — Lei nº 13.709/2018) e com as políticas de
           dados da Meta, LinkedIn e Google.
@@ -83,7 +83,7 @@ export default function PrivacidadePage() {
             1. Quem somos
           </h2>
           <p>
-            O ContIA é uma plataforma SaaS de criação de conteúdo, publicação e analytics
+            O GO Studio é uma plataforma SaaS de criação de conteúdo, publicação e analytics
             para redes sociais, operada por:
           </p>
           <div className="mt-4 bg-[#0c0f24] border border-[#1e2348] rounded-lg p-4 text-sm space-y-1">
@@ -444,7 +444,7 @@ export default function PrivacidadePage() {
             8. Cookies
           </h2>
           <p className="text-sm mb-3">
-            O ContIA utiliza cookies de forma mínima e apenas para o funcionamento essencial da plataforma:
+            O GO Studio utiliza cookies de forma mínima e apenas para o funcionamento essencial da plataforma:
           </p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
@@ -524,7 +524,7 @@ export default function PrivacidadePage() {
             10. Menores de idade
           </h2>
           <p className="text-sm">
-            O ContIA é uma plataforma B2B voltada exclusivamente para profissionais e empresas.
+            O GO Studio é uma plataforma B2B voltada exclusivamente para profissionais e empresas.
             <strong className="text-[#e8eaff]"> Não coletamos, processamos nem armazenamos dados de menores de 18 anos.</strong>{" "}
             Caso identifiquemos inadvertidamente dados de um menor, os excluiremos imediatamente.
             Se você acredita que dados de um menor foram coletados, entre em contato pelo e-mail

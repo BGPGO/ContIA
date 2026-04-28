@@ -891,7 +891,7 @@ export function EmpresaWizard({ open, onClose, onCreated }: EmpresaWizardProps) 
                 <Sparkles className="w-3.5 h-3.5 text-white" />
               </div>
               <span className="text-[13px] font-semibold text-text-primary tracking-tight">
-                ContIA
+                GO Studio
               </span>
               <span className="text-[11px] text-text-muted px-1.5 py-0.5 rounded bg-bg-input border border-border">
                 Nova empresa

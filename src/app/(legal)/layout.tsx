@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { Sparkles, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
+import { GoStudioLogo } from "@/components/layout/GoStudioLogo";
 
 export const metadata: Metadata = {
   robots: "index, follow",
@@ -20,12 +21,10 @@ export default function LegalLayout({
           <Link
             href="/"
             className="flex items-center gap-2 text-[#e8eaff] hover:text-[#4ecdc4] transition-colors"
-            aria-label="ContIA — Página inicial"
+            aria-label="GO Studio — Página inicial"
           >
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#4ecdc4] to-[#2db6a0] flex items-center justify-center">
-              <Sparkles className="w-3.5 h-3.5 text-white" aria-hidden="true" />
-            </div>
-            <span className="text-base font-semibold tracking-tight">ContIA</span>
+            <GoStudioLogo className="w-7 h-7" idSuffix="legal" withSpark={false} withShadow={false} />
+            <span className="text-base font-semibold tracking-tight">GO Studio</span>
           </Link>
 
           {/* Voltar */}

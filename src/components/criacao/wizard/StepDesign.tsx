@@ -32,7 +32,7 @@ export function StepDesign({ state, setField, empresa }: StepDesignProps) {
     subheadline: state.result?.visualPost?.subheadline || undefined,
     accentText: state.result?.visualPost?.accentText || undefined,
     cta: state.result?.visualPost?.cta || state.result?.cta || undefined,
-    brandName: empresa?.nome || "ContIA",
+    brandName: empresa?.nome || "GO Studio",
     brandColor: state.designBrandColor || empresa?.cor_primaria || "#4ecdc4",
   };
 

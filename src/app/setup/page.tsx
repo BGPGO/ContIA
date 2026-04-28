@@ -238,7 +238,7 @@ export default function SetupPage() {
           </div>
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight">
-              Setup ContIA 2.0
+              Setup GO Studio 2.0
             </h1>
             <p className="text-[13px] text-text-secondary">
               Migration Supabase e paginas legais ja configuradas pelo Claude em 15/04/2026.
@@ -326,7 +326,7 @@ export default function SetupPage() {
                   <Step n={5}>
                     Abra{" "}
                     <ExtLink href="http://187.77.238.125:8000/project/frrqapqbem8i13ncaifx9xzo/u5gr1pwn7x320gb92ej1kb4s/environment-variables">
-                      Coolify &gt; ContIA &gt; Environment Variables
+                      Coolify &gt; GO Studio &gt; Environment Variables
                     </ExtLink>{" "}
                     e adicione/atualize as 4 variáveis:
                   </Step>
@@ -664,7 +664,7 @@ https://contia.bertuzzipatrimonial.com.br/api/meta-ads/callback`}
                     Preencha:
                     <ul className="mt-1 ml-4 list-disc text-text-muted">
                       <li>
-                        <strong className="text-text-primary">App name:</strong> ContIA
+                        <strong className="text-text-primary">App name:</strong> GO Studio
                       </li>
                       <li>
                         <strong className="text-text-primary">LinkedIn Page:</strong> Bertuzzi
@@ -736,7 +736,7 @@ https://contia.bertuzzipatrimonial.com.br/api/meta-ads/callback`}
                   key={id}
                   id={id}
                   icon={Server}
-                  title="Coolify ContIA: configurar env vars"
+                  title="Coolify GO Studio: configurar env vars"
                   reason="Variaveis de ambiente para LinkedIn e CRM"
                   estimatedTime="5 min"
                   done={isDone(id)}
@@ -746,13 +746,13 @@ https://contia.bertuzzipatrimonial.com.br/api/meta-ads/callback`}
                   <Step n={1}>
                     Acesse{" "}
                     <ExtLink href="http://187.77.238.125:8000/project/frrqapqbem8i13ncaifx9xzo/u5gr1pwn7x320gb92ej1kb4s/environment-variables">
-                      Coolify &gt; ContIA &gt; Environment Variables
+                      Coolify &gt; GO Studio &gt; Environment Variables
                     </ExtLink>
                   </Step>
 
                   <Section title="Gerar API Key para CRM" />
                   <p className="text-[12px] text-text-muted">
-                    Gere uma chave forte e use a MESMA tanto no ContIA quanto no
+                    Gere uma chave forte e use a MESMA tanto no GO Studio quanto no
                     CRM (proximo card).
                   </p>
                   <GenerateKeyButton
@@ -773,11 +773,11 @@ APP_URL=https://contia.bertuzzipatrimonial.com.br`}
                   />
                   <Step n={3}>
                     Salve e faca <strong className="text-text-primary">Redeploy</strong> do
-                    ContIA.
+                    GO Studio.
                   </Step>
 
                   <Callout>
-                    A CRM_ANALYTICS_API_KEY tem que ser IDENTICA no ContIA e no
+                    A CRM_ANALYTICS_API_KEY tem que ser IDENTICA no GO Studio e no
                     CRM (proximo card).
                   </Callout>
                 </SetupCard>
@@ -791,7 +791,7 @@ APP_URL=https://contia.bertuzzipatrimonial.com.br`}
                   id={id}
                   icon={ServerCog}
                   title="Coolify CRM: configurar mesma API key"
-                  reason="O CRM precisa da mesma chave para aceitar requests do ContIA"
+                  reason="O CRM precisa da mesma chave para aceitar requests do GO Studio"
                   estimatedTime="3 min"
                   done={isDone(id)}
                   onToggleDone={() => toggleDone(id)}
@@ -816,7 +816,7 @@ APP_URL=https://contia.bertuzzipatrimonial.com.br`}
                   </Step>
 
                   <Callout>
-                    Tem que ser EXATAMENTE a mesma string dos dois lados (ContIA e
+                    Tem que ser EXATAMENTE a mesma string dos dois lados (GO Studio e
                     CRM). Se gerar uma nova, atualize ambos.
                   </Callout>
                 </SetupCard>
@@ -913,7 +913,7 @@ APP_URL=https://contia.bertuzzipatrimonial.com.br`}
                     </strong>
                   </Step>
                   <Step n={4}>
-                    Aceite o convite do app &quot;ContIA&quot; (ou o nome que aparece no Meta
+                    Aceite o convite do app &quot;GO Studio&quot; (ou o nome que aparece no Meta
                     App).
                   </Step>
 
@@ -956,7 +956,7 @@ APP_URL=https://contia.bertuzzipatrimonial.com.br`}
                   <Step n={1}>
                     Abra{" "}
                     <ExtLink href="http://187.77.238.125:8000/project/frrqapqbem8i13ncaifx9xzo/u5gr1pwn7x320gb92ej1kb4s">
-                      Coolify &gt; ContIA
+                      Coolify &gt; GO Studio
                     </ExtLink>{" "}
                     e vá na aba <strong className="text-text-primary">Scheduled Tasks</strong>.
                   </Step>
@@ -975,7 +975,7 @@ Frequency: 0 5 * * 1,3,5`}
                   <Section title="Garantir CRON_SECRET no env" />
                   <Step n={4}>
                     Verifique que <code className="text-accent">CRON_SECRET</code> existe nas
-                    Environment Variables do ContIA (mesma do cron de sync-snapshots).
+                    Environment Variables do GO Studio (mesma do cron de sync-snapshots).
                     Se não existir:
                   </Step>
                   <GenerateKeyButton

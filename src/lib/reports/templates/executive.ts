@@ -414,12 +414,12 @@ export function renderExecutiveTemplate(report: Report, dna: BrandDna): string {
 
 <!-- ══ CAPA ══════════════════════════════════════════════════════════════════ -->
 <div class="cover">
-  <div class="cover-badge">Relatório Executivo &bull; ContIA</div>
+  <div class="cover-badge">Relatório Executivo &bull; GO Studio</div>
   <div class="cover-company">${escHtml(brandName)}</div>
   <div class="cover-title">Relatório ${escHtml(report.type.charAt(0).toUpperCase() + report.type.slice(1))}</div>
   <div class="cover-period">${periodStart} &rarr; ${periodEnd}</div>
   <div class="cover-divider"></div>
-  <div class="cover-meta">Gerado em ${generatedAt} &bull; ContIA 2.0</div>
+  <div class="cover-meta">Gerado em ${generatedAt} &bull; GO Studio</div>
   <div class="cover-type-tag">EXECUTIVE</div>
 </div>
 
@@ -444,7 +444,7 @@ export function renderExecutiveTemplate(report: Report, dna: BrandDna): string {
   ${barChart ? `<div class="chart-wrapper">${barChart}</div>` : ''}
 
   <div class="page-footer">
-    <div class="footer-brand">ContIA 2.0 &bull; Gerado por IA</div>
+    <div class="footer-brand">GO Studio &bull; Gerado por IA</div>
     <div class="footer-page">2</div>
   </div>
 </div>
@@ -461,7 +461,7 @@ ${analysis?.highlights?.length ? `
   ${highlightRows}
 
   <div class="page-footer">
-    <div class="footer-brand">ContIA 2.0 &bull; Gerado por IA</div>
+    <div class="footer-brand">GO Studio &bull; Gerado por IA</div>
     <div class="footer-page">3</div>
   </div>
 </div>` : ''}
@@ -478,7 +478,7 @@ ${analysis?.recommendations?.length ? `
   ${recRows}
 
   <div class="page-footer">
-    <div class="footer-brand">ContIA 2.0 &bull; Gerado por IA</div>
+    <div class="footer-brand">GO Studio &bull; Gerado por IA</div>
     <div class="footer-page">4</div>
   </div>
 </div>` : ''}
@@ -495,7 +495,7 @@ ${analysis?.warnings?.length ? `
   ${warningRows}
 
   <div class="page-footer">
-    <div class="footer-brand">ContIA 2.0 &bull; Gerado por IA</div>
+    <div class="footer-brand">GO Studio &bull; Gerado por IA</div>
     <div class="footer-page">5</div>
   </div>
 </div>` : ''}

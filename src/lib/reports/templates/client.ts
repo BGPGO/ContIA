@@ -514,7 +514,7 @@ export function renderClientTemplate(report: Report, dna: BrandDna): string {
 
   <div class="cover-bottom">
     <span>Gerado em ${generatedAt}</span>
-    <span>ContIA 2.0 &bull; Inteligência de Conteúdo</span>
+    <span>GO Studio &bull; Inteligência de Conteúdo</span>
   </div>
 </div>
 
@@ -545,7 +545,7 @@ export function renderClientTemplate(report: Report, dna: BrandDna): string {
   <div class="chart-wrapper" style="display:inline-block">${pieChart}</div>` : ''}
 
   <div class="page-footer">
-    <div class="footer-brand">ContIA 2.0 &bull; ${escHtml(brandName)}</div>
+    <div class="footer-brand">GO Studio &bull; ${escHtml(brandName)}</div>
     <div class="footer-page">2</div>
   </div>
 </div>
@@ -566,7 +566,7 @@ ${storyHighlights ? `
   ${storyHighlights}
 
   <div class="page-footer">
-    <div class="footer-brand">ContIA 2.0 &bull; ${escHtml(brandName)}</div>
+    <div class="footer-brand">GO Studio &bull; ${escHtml(brandName)}</div>
     <div class="footer-page">3</div>
   </div>
 </div>` : ''}
@@ -587,7 +587,7 @@ ${nextSteps ? `
   ${nextSteps}
 
   <div class="page-footer">
-    <div class="footer-brand">ContIA 2.0 &bull; ${escHtml(brandName)}</div>
+    <div class="footer-brand">GO Studio &bull; ${escHtml(brandName)}</div>
     <div class="footer-page">4</div>
   </div>
 </div>` : ''}
@@ -608,7 +608,7 @@ ${hasWarnings ? `
   ${warningBlocks}
 
   <div class="page-footer">
-    <div class="footer-brand">ContIA 2.0 &bull; ${escHtml(brandName)}</div>
+    <div class="footer-brand">GO Studio &bull; ${escHtml(brandName)}</div>
     <div class="footer-page">5</div>
   </div>
 </div>` : ''}
@@ -618,12 +618,12 @@ ${hasWarnings ? `
   <div class="closing-tagline">Dados que geram decisões.</div>
   <div class="closing-divider"></div>
   <div class="closing-sub">
-    Este relatório foi gerado automaticamente pelo ContIA 2.0,<br>
+    Este relatório foi gerado automaticamente pelo GO Studio,<br>
     a plataforma de inteligência de conteúdo da ${escHtml(brandName)}.<br><br>
     Todas as análises são baseadas em dados reais das plataformas conectadas.
   </div>
   <div class="closing-footer">
-    ContIA 2.0 &bull; Gerado em ${generatedAt} &bull; ${periodStart} → ${periodEnd}
+    GO Studio &bull; Gerado em ${generatedAt} &bull; ${periodStart} → ${periodEnd}
   </div>
 </div>
 

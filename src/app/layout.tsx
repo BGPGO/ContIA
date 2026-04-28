@@ -31,7 +31,7 @@ const plusJakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "ContIA — Gestor de Conteúdo IA",
+  title: "GO Studio — Gestor de Conteúdo IA",
   description:
     "Plataforma de gestão de conteúdo e redes sociais com inteligência artificial",
 };

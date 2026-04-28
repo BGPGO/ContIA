@@ -7,7 +7,7 @@
 import { buildReportReadyEmail } from "./templates/report-ready";
 import type { Report } from "@/types/reports";
 
-const FROM_ADDRESS = "ContIA <relatorios@bertuzzipatrimonial.app.br>";
+const FROM_ADDRESS = "GO Studio <relatorios@bertuzzipatrimonial.app.br>";
 const REPLY_TO = "vitor@bertuzzipatrimonial.com.br";
 const RESEND_API_URL = "https://api.resend.com/emails";
 
