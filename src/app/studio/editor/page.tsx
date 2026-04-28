@@ -105,8 +105,8 @@ function SaveTemplateModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-[#141736] border border-white/10 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
-        <h3 className="text-lg font-semibold text-[#e8eaff] mb-4">
+      <div className="relative bg-bg-card border border-white/10 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
+        <h3 className="text-lg font-semibold text-text-primary mb-4">
           {isUpdate ? "Salvar Template" : "Salvar como Template"}
         </h3>
 
@@ -119,7 +119,7 @@ function SaveTemplateModal({
               className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
                 mode === "update"
                   ? "border-[#4ecdc4] text-[#4ecdc4] bg-[#4ecdc4]/10"
-                  : "border-white/10 text-[#8b8fb0] hover:text-[#e8eaff] hover:bg-white/5"
+                  : "border-white/10 text-text-secondary hover:text-text-primary hover:bg-white/5"
               }`}
             >
               Salvar (substituir)
@@ -134,7 +134,7 @@ function SaveTemplateModal({
               className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
                 mode === "new"
                   ? "border-[#6c5ce7] text-[#6c5ce7] bg-[#6c5ce7]/10"
-                  : "border-white/10 text-[#8b8fb0] hover:text-[#e8eaff] hover:bg-white/5"
+                  : "border-white/10 text-text-secondary hover:text-text-primary hover:bg-white/5"
               }`}
             >
               Salvar como novo
@@ -144,7 +144,7 @@ function SaveTemplateModal({
 
         {/* Update mode: shows current name (read-only) */}
         {isUpdate ? (
-          <div className="w-full bg-[#080b1e] border border-white/10 rounded-lg px-4 py-3 text-sm text-[#8b8fb0]">
+          <div className="w-full bg-bg-primary border border-white/10 rounded-lg px-4 py-3 text-sm text-text-secondary">
             {originalTemplateName}
           </div>
         ) : (
@@ -158,8 +158,8 @@ function SaveTemplateModal({
               if (e.key === "Escape") onClose();
             }}
             placeholder="Nome do template..."
-            className="w-full bg-[#080b1e] border border-white/10 rounded-lg px-4 py-3 text-sm text-[#e8eaff]
-              placeholder:text-[#5e6388] focus:outline-none focus:border-[#4ecdc4]/40 transition-colors"
+            className="w-full bg-bg-primary border border-white/10 rounded-lg px-4 py-3 text-sm text-text-primary
+              placeholder:text-text-muted focus:outline-none focus:border-[#4ecdc4]/40 transition-colors"
           />
         )}
 
@@ -167,8 +167,8 @@ function SaveTemplateModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-[#8b8fb0]
-              hover:text-[#e8eaff] hover:bg-white/5 transition-all cursor-pointer"
+            className="px-4 py-2 rounded-lg text-sm font-medium text-text-secondary
+              hover:text-text-primary hover:bg-white/5 transition-all cursor-pointer"
           >
             Cancelar
           </button>
@@ -225,9 +225,9 @@ function CopyTextPanel({
   if (!copy) {
     return (
       <div className="flex flex-col items-center justify-center h-full px-4 py-8 text-center">
-        <Type size={24} className="text-[#5e6388] mb-2" />
-        <p className="text-xs text-[#5e6388]">Nenhuma copy carregada</p>
-        <p className="text-[10px] text-[#5e6388]/60 mt-1">Crie uma copy no Copy Studio primeiro</p>
+        <Type size={24} className="text-text-muted mb-2" />
+        <p className="text-xs text-text-muted">Nenhuma copy carregada</p>
+        <p className="text-[10px] text-text-muted/60 mt-1">Crie uma copy no Copy Studio primeiro</p>
       </div>
     );
   }
@@ -257,7 +257,7 @@ function CopyTextPanel({
           type="button"
           onClick={onGenerateLayout}
           className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold
-            text-[#e8eaff] bg-[#141736] border border-white/10 cursor-pointer transition-all hover:border-[#4ecdc4]/30"
+            text-text-primary bg-bg-card border border-white/10 cursor-pointer transition-all hover:border-[#4ecdc4]/30"
         >
           <Sparkles size={12} className="text-[#4ecdc4]" />
           Gerar Layout Inteligente
@@ -268,16 +268,16 @@ function CopyTextPanel({
       {copy.headline && (
         <div className="space-y-1">
           <div className="flex items-center justify-between">
-            <label className="text-[10px] font-medium text-[#5e6388] uppercase tracking-wider">Headline</label>
+            <label className="text-[10px] font-medium text-text-muted uppercase tracking-wider">Headline</label>
             <button
               onClick={() => copyToClipboard(copy.headline!, "headline")}
-              className="p-1 rounded text-[#5e6388] hover:text-[#4ecdc4] cursor-pointer transition-colors"
+              className="p-1 rounded text-text-muted hover:text-[#4ecdc4] cursor-pointer transition-colors"
               title="Copiar headline"
             >
               <ClipboardCopy size={10} className={copiedField === "headline" ? "text-[#4ecdc4]" : ""} />
             </button>
           </div>
-          <p className="text-sm font-semibold text-[#e8eaff] select-all cursor-text bg-[#080b1e] rounded-lg px-3 py-2 border border-white/5">
+          <p className="text-sm font-semibold text-text-primary select-all cursor-text bg-bg-primary rounded-lg px-3 py-2 border border-white/5">
             {copy.headline}
           </p>
         </div>
@@ -287,16 +287,16 @@ function CopyTextPanel({
       {copy.caption && (
         <div className="space-y-1">
           <div className="flex items-center justify-between">
-            <label className="text-[10px] font-medium text-[#5e6388] uppercase tracking-wider">Legenda</label>
+            <label className="text-[10px] font-medium text-text-muted uppercase tracking-wider">Legenda</label>
             <button
               onClick={() => copyToClipboard(copy.caption!, "caption")}
-              className="p-1 rounded text-[#5e6388] hover:text-[#4ecdc4] cursor-pointer transition-colors"
+              className="p-1 rounded text-text-muted hover:text-[#4ecdc4] cursor-pointer transition-colors"
               title="Copiar legenda"
             >
               <ClipboardCopy size={10} className={copiedField === "caption" ? "text-[#4ecdc4]" : ""} />
             </button>
           </div>
-          <p className="text-xs text-[#e8eaff]/80 select-all cursor-text bg-[#080b1e] rounded-lg px-3 py-2 border border-white/5 whitespace-pre-line max-h-[120px] overflow-y-auto">
+          <p className="text-xs text-text-primary/80 select-all cursor-text bg-bg-primary rounded-lg px-3 py-2 border border-white/5 whitespace-pre-line max-h-[120px] overflow-y-auto">
             {copy.caption}
           </p>
         </div>
@@ -305,21 +305,21 @@ function CopyTextPanel({
       {/* Slides (carousel) */}
       {copy.slides && copy.slides.length > 0 && (
         <div className="space-y-2">
-          <label className="text-[10px] font-medium text-[#5e6388] uppercase tracking-wider">Slides</label>
+          <label className="text-[10px] font-medium text-text-muted uppercase tracking-wider">Slides</label>
           {copy.slides.map((slide, i) => (
-            <div key={i} className="bg-[#080b1e] rounded-lg px-3 py-2 border border-white/5 space-y-1">
+            <div key={i} className="bg-bg-primary rounded-lg px-3 py-2 border border-white/5 space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold text-[#4ecdc4]">Slide {slide.slideNumber || i + 1}</span>
                 <button
                   onClick={() => copyToClipboard(`${slide.headline}\n\n${slide.body}`, `slide-${i}`)}
-                  className="p-1 rounded text-[#5e6388] hover:text-[#4ecdc4] cursor-pointer transition-colors"
+                  className="p-1 rounded text-text-muted hover:text-[#4ecdc4] cursor-pointer transition-colors"
                   title={`Copiar slide ${i + 1}`}
                 >
                   <ClipboardCopy size={10} className={copiedField === `slide-${i}` ? "text-[#4ecdc4]" : ""} />
                 </button>
               </div>
-              <p className="text-xs font-semibold text-[#e8eaff] select-all cursor-text">{slide.headline}</p>
-              <p className="text-[11px] text-[#e8eaff]/70 select-all cursor-text whitespace-pre-line">{slide.body}</p>
+              <p className="text-xs font-semibold text-text-primary select-all cursor-text">{slide.headline}</p>
+              <p className="text-[11px] text-text-primary/70 select-all cursor-text whitespace-pre-line">{slide.body}</p>
             </div>
           ))}
         </div>
@@ -329,10 +329,10 @@ function CopyTextPanel({
       {copy.hashtags && copy.hashtags.length > 0 && (
         <div className="space-y-1">
           <div className="flex items-center justify-between">
-            <label className="text-[10px] font-medium text-[#5e6388] uppercase tracking-wider">Hashtags</label>
+            <label className="text-[10px] font-medium text-text-muted uppercase tracking-wider">Hashtags</label>
             <button
               onClick={() => copyToClipboard(copy.hashtags!.map((t: string) => `#${t.replace('#', '')}`).join(' '), "hashtags")}
-              className="p-1 rounded text-[#5e6388] hover:text-[#4ecdc4] cursor-pointer transition-colors"
+              className="p-1 rounded text-text-muted hover:text-[#4ecdc4] cursor-pointer transition-colors"
               title="Copiar hashtags"
             >
               <ClipboardCopy size={10} className={copiedField === "hashtags" ? "text-[#4ecdc4]" : ""} />
@@ -352,16 +352,16 @@ function CopyTextPanel({
       {copy.cta && (
         <div className="space-y-1">
           <div className="flex items-center justify-between">
-            <label className="text-[10px] font-medium text-[#5e6388] uppercase tracking-wider">CTA</label>
+            <label className="text-[10px] font-medium text-text-muted uppercase tracking-wider">CTA</label>
             <button
               onClick={() => copyToClipboard(copy.cta || '', "cta")}
-              className="p-1 rounded text-[#5e6388] hover:text-[#4ecdc4] cursor-pointer transition-colors"
+              className="p-1 rounded text-text-muted hover:text-[#4ecdc4] cursor-pointer transition-colors"
               title="Copiar CTA"
             >
               <ClipboardCopy size={10} className={copiedField === "cta" ? "text-[#4ecdc4]" : ""} />
             </button>
           </div>
-          <p className="text-xs font-medium text-[#6c5ce7] select-all cursor-text bg-[#080b1e] rounded-lg px-3 py-2 border border-white/5">
+          <p className="text-xs font-medium text-[#6c5ce7] select-all cursor-text bg-bg-primary rounded-lg px-3 py-2 border border-white/5">
             {copy.cta}
           </p>
         </div>
@@ -1014,13 +1014,13 @@ function EditorContent() {
   const isLoading = isLoadingSession || isLoadingTemplate;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#080b1e] overflow-hidden" data-editor-root>
+    <div className="fixed inset-0 z-50 flex flex-col bg-bg-primary overflow-hidden" data-editor-root>
       {/* Loading overlay */}
       {isLoading && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#080b1e]/80 backdrop-blur-sm">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-bg-primary/80 backdrop-blur-sm">
           <div className="flex flex-col items-center gap-3">
             <Loader2 size={32} className="animate-spin text-[#4ecdc4]" />
-            <p className="text-sm text-[#8b8fb0]">
+            <p className="text-sm text-text-secondary">
               {isLoadingSession ? "Carregando copy..." : "Carregando template..."}
             </p>
           </div>
@@ -1043,7 +1043,7 @@ function EditorContent() {
       <div className="flex-1 flex overflow-hidden min-h-0">
 
         {/* LEFT: Layers Panel (desktop only) */}
-        <div className="hidden lg:flex flex-col w-[250px] shrink-0 border-r border-white/10 bg-[#0c0f24]">
+        <div className="hidden lg:flex flex-col w-[250px] shrink-0 border-r border-white/10 bg-bg-secondary">
           <LayersPanel
             canvasRef={canvasRef}
             selection={selection}
@@ -1053,7 +1053,7 @@ function EditorContent() {
         {/* CENTER: Canvas + Slide Navigator */}
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           {/* Canvas area — takes remaining space, centers the canvas, NO scroll */}
-          <div className="flex-1 flex items-center justify-center bg-[#080b1e] overflow-hidden relative">
+          <div className="flex-1 flex items-center justify-center bg-bg-primary overflow-hidden relative">
             <FabricCanvas
               ref={canvasRef}
               width={dims.width}
@@ -1100,7 +1100,7 @@ function EditorContent() {
         </div>
 
         {/* RIGHT: Properties + Brand Assets (desktop only) */}
-        <div className="hidden lg:flex flex-col w-[280px] shrink-0 border-l border-white/10 bg-[#0c0f24]">
+        <div className="hidden lg:flex flex-col w-[280px] shrink-0 border-l border-white/10 bg-bg-secondary">
           {/* Tab switcher */}
           <div className="flex border-b border-white/10 shrink-0">
             <button
@@ -1108,7 +1108,7 @@ function EditorContent() {
               className={`flex-1 py-2 text-[10px] font-medium uppercase tracking-wider transition-all cursor-pointer
                 ${rightPanelTab === "properties"
                   ? "text-[#4ecdc4] border-b-2 border-[#4ecdc4]"
-                  : "text-[#5e6388] hover:text-[#8b8fb0]"
+                  : "text-text-muted hover:text-text-secondary"
                 }`}
             >
               Propriedades
@@ -1118,7 +1118,7 @@ function EditorContent() {
               className={`flex-1 py-2 text-[10px] font-medium uppercase tracking-wider transition-all cursor-pointer
                 ${rightPanelTab === "assets"
                   ? "text-[#4ecdc4] border-b-2 border-[#4ecdc4]"
-                  : "text-[#5e6388] hover:text-[#8b8fb0]"
+                  : "text-text-muted hover:text-text-secondary"
                 }`}
             >
               Materiais
@@ -1128,7 +1128,7 @@ function EditorContent() {
               className={`flex-1 py-2 text-[10px] font-medium uppercase tracking-wider transition-all cursor-pointer
                 ${rightPanelTab === "copy"
                   ? "text-[#4ecdc4] border-b-2 border-[#4ecdc4]"
-                  : "text-[#5e6388] hover:text-[#8b8fb0]"
+                  : "text-text-muted hover:text-text-secondary"
                 }`}
             >
               Copy
@@ -1247,10 +1247,10 @@ function EditorContent() {
 
 function EditorLoadingFallback() {
   return (
-    <div className="h-screen flex items-center justify-center bg-[#080b1e]">
+    <div className="h-screen flex items-center justify-center bg-bg-primary">
       <div className="flex flex-col items-center gap-3">
         <Loader2 size={32} className="animate-spin text-[#4ecdc4]" />
-        <p className="text-sm text-[#8b8fb0]">Carregando editor...</p>
+        <p className="text-sm text-text-secondary">Carregando editor...</p>
       </div>
     </div>
   );

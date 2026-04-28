@@ -57,20 +57,20 @@ export function DeleteEmpresaModal({ empresa, open, onClose, onDeleted }: Delete
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Overlay */}
       <div
-        className="absolute inset-0 bg-[#080b1e]/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-bg-primary/80 backdrop-blur-sm"
         onClick={handleClose}
         aria-hidden="true"
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md bg-[#0f1230] border border-[#1e2348]/80 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
+      <div className="relative w-full max-w-md bg-bg-input border border-border/80 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#1e2348]/60">
-          <h2 className="text-[15px] font-semibold text-[#e8eaff]">Deletar empresa</h2>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
+          <h2 className="text-[15px] font-semibold text-text-primary">Deletar empresa</h2>
           <button
             type="button"
             onClick={handleClose}
-            className="p-1.5 rounded-lg text-[#5e6388] hover:text-[#e8eaff] hover:bg-[#1a1e42] transition-colors duration-150"
+            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-card-hover transition-colors duration-150"
           >
             <X size={16} />
           </button>
@@ -91,9 +91,9 @@ export function DeleteEmpresaModal({ empresa, open, onClose, onDeleted }: Delete
 
           {/* Confirm name */}
           <div>
-            <label className="block text-[12px] text-[#8b8fb0] mb-2">
+            <label className="block text-[12px] text-text-secondary mb-2">
               Digite{' '}
-              <code className="px-1 py-0.5 bg-[#141736] border border-[#1e2348] rounded text-[#e8eaff] text-[11px]">
+              <code className="px-1 py-0.5 bg-bg-card border border-border rounded text-text-primary text-[11px]">
                 {empresa.nome}
               </code>{' '}
               para confirmar:
@@ -103,7 +103,7 @@ export function DeleteEmpresaModal({ empresa, open, onClose, onDeleted }: Delete
               value={confirmInput}
               onChange={(e) => setConfirmInput(e.target.value)}
               placeholder={empresa.nome}
-              className="w-full h-9 bg-[#141736] border border-[#1e2348] text-[#e8eaff] placeholder:text-[#5e6388] rounded-lg px-3 text-sm outline-none focus:border-[#f87171]/40 focus:ring-1 focus:ring-[#f87171]/15 transition-all duration-200"
+              className="w-full h-9 bg-bg-card border border-border text-text-primary placeholder:text-text-muted rounded-lg px-3 text-sm outline-none focus:border-[#f87171]/40 focus:ring-1 focus:ring-[#f87171]/15 transition-all duration-200"
             />
           </div>
 
@@ -120,7 +120,7 @@ export function DeleteEmpresaModal({ empresa, open, onClose, onDeleted }: Delete
               type="button"
               onClick={handleClose}
               disabled={loading}
-              className="px-4 h-9 text-[12px] font-medium text-[#8b8fb0] hover:text-[#e8eaff] bg-[#141736] border border-[#1e2348] rounded-lg transition-colors duration-150 disabled:opacity-60"
+              className="px-4 h-9 text-[12px] font-medium text-text-secondary hover:text-text-primary bg-bg-card border border-border rounded-lg transition-colors duration-150 disabled:opacity-60"
             >
               Cancelar
             </button>

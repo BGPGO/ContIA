@@ -123,19 +123,19 @@ export default function MembrosPage() {
   const pendingInvites = invites.filter((i) => !i.accepted_at && !i.revoked_at);
 
   return (
-    <div className="min-h-screen bg-[#080b1e] p-4 lg:p-6">
+    <div className="min-h-screen bg-bg-primary p-4 lg:p-6">
       {/* Header */}
       <div className="mb-6">
         <Link
           href="/configuracoes"
-          className="inline-flex items-center gap-1.5 text-[12px] text-[#5e6388] hover:text-[#8b8fb0] transition-colors duration-150 mb-3"
+          className="inline-flex items-center gap-1.5 text-[12px] text-text-muted hover:text-text-secondary transition-colors duration-150 mb-3"
         >
           <ArrowLeft size={13} />
           Configurações
         </Link>
 
         <div className="flex items-center gap-3 flex-wrap">
-          <h1 className="text-xl font-semibold text-[#e8eaff]">
+          <h1 className="text-xl font-semibold text-text-primary">
             {empresa?.nome ?? 'Empresa'} — Membros
           </h1>
           {myRole && <RoleBadge role={myRole} size="md" />}
@@ -171,19 +171,19 @@ export default function MembrosPage() {
       {/* Members list */}
       {!loading && !error && (
         <div className="space-y-4">
-          <div className="bg-[#0f1230] border border-[#1e2348]/60 rounded-2xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-[#1e2348]/40">
-              <h2 className="text-[11px] font-semibold text-[#5e6388] uppercase tracking-wide">
+          <div className="bg-bg-input border border-border/60 rounded-2xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-border/40">
+              <h2 className="text-[11px] font-semibold text-text-muted uppercase tracking-wide">
                 Membros ({members.length})
               </h2>
             </div>
 
             {members.length === 0 ? (
-              <div className="py-10 text-center text-[#5e6388] text-[13px]">
+              <div className="py-10 text-center text-text-muted text-[13px]">
                 Nenhum membro encontrado
               </div>
             ) : (
-              <div className="divide-y divide-[#1e2348]/30">
+              <div className="divide-y divide-border/30">
                 {members.map((member) => (
                   <MemberRow
                     key={member.user_id}
@@ -201,19 +201,19 @@ export default function MembrosPage() {
 
           {/* Pending invites — owner only */}
           {isOwner && pendingInvites.length > 0 && (
-            <div className="bg-[#0f1230] border border-[#1e2348]/60 rounded-2xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-[#1e2348]/40">
-                <h2 className="text-[11px] font-semibold text-[#5e6388] uppercase tracking-wide">
+            <div className="bg-bg-input border border-border/60 rounded-2xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-border/40">
+                <h2 className="text-[11px] font-semibold text-text-muted uppercase tracking-wide">
                   Convites pendentes ({pendingInvites.length})
                 </h2>
               </div>
 
-              <div className="divide-y divide-[#1e2348]/30">
+              <div className="divide-y divide-border/30">
                 {pendingInvites.map((invite) => (
                   <div key={invite.id} className="flex items-center gap-3 px-4 py-3">
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-medium text-[#e8eaff] truncate">{invite.email}</p>
-                      <p className="text-[11px] text-[#5e6388]">
+                      <p className="text-[13px] font-medium text-text-primary truncate">{invite.email}</p>
+                      <p className="text-[11px] text-text-muted">
                         {ROLE_LABELS[invite.role]} — enviado em{' '}
                         {new Date(invite.created_at).toLocaleDateString('pt-BR')}
                       </p>
@@ -225,7 +225,7 @@ export default function MembrosPage() {
                       <button
                         type="button"
                         onClick={() => handleCopyInviteLink(invite.token, invite.id)}
-                        className="p-1.5 rounded-lg text-[#5e6388] hover:text-[#4ecdc4] hover:bg-[#4ecdc4]/10 transition-colors duration-150"
+                        className="p-1.5 rounded-lg text-text-muted hover:text-[#4ecdc4] hover:bg-[#4ecdc4]/10 transition-colors duration-150"
                         title="Copiar link"
                       >
                         {copiedInviteId === invite.id ? <X size={13} /> : <Copy size={13} />}

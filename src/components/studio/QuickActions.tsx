@@ -49,7 +49,7 @@ export function QuickActions({ actions, onAction, disabled }: QuickActionsProps)
             onClick={() => onAction(action.id)}
             disabled={disabled}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium whitespace-nowrap
-              bg-[#141736] text-text-secondary border border-white/10
+              bg-bg-card text-text-secondary border border-white/10
               hover:bg-[#1a1f45] hover:text-text-primary hover:border-accent/20
               disabled:opacity-40 disabled:cursor-not-allowed
               transition-all duration-200 shrink-0 cursor-pointer"

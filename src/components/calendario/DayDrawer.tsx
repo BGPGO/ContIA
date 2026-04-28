@@ -268,7 +268,7 @@ export function DayDrawer({
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="hidden md:flex fixed right-0 top-0 bottom-0 w-[420px] z-50 flex-col bg-[#080b1e] border-l border-white/8 shadow-2xl"
+            className="hidden md:flex fixed right-0 top-0 bottom-0 w-[420px] z-50 flex-col bg-bg-primary border-l border-white/8 shadow-2xl"
           >
             <DrawerContent
               dateLabelCapitalized={dateLabelCapitalized}
@@ -288,7 +288,7 @@ export function DayDrawer({
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="md:hidden fixed bottom-0 left-0 right-0 z-50 max-h-[90vh] rounded-t-2xl bg-[#080b1e] border-t border-white/8 shadow-2xl flex flex-col"
+            className="md:hidden fixed bottom-0 left-0 right-0 z-50 max-h-[90vh] rounded-t-2xl bg-bg-primary border-t border-white/8 shadow-2xl flex flex-col"
           >
             {/* pill handle */}
             <div className="flex justify-center pt-2 pb-1 shrink-0">

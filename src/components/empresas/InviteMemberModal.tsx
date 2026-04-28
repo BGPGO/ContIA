@@ -85,22 +85,22 @@ export function InviteMemberModal({ empresaId, open, onClose, onInvited }: Invit
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Overlay */}
       <div
-        className="absolute inset-0 bg-[#080b1e]/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-bg-primary/80 backdrop-blur-sm"
         onClick={handleClose}
         aria-hidden="true"
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md bg-[#0f1230] border border-[#1e2348]/80 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
+      <div className="relative w-full max-w-md bg-bg-input border border-border/80 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#1e2348]/60">
-          <h2 className="text-[15px] font-semibold text-[#e8eaff]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
+          <h2 className="text-[15px] font-semibold text-text-primary">
             {view === 'form' ? 'Convidar membro' : 'Convite gerado'}
           </h2>
           <button
             type="button"
             onClick={handleClose}
-            className="p-1.5 rounded-lg text-[#5e6388] hover:text-[#e8eaff] hover:bg-[#1a1e42] transition-colors duration-150"
+            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-card-hover transition-colors duration-150"
           >
             <X size={16} />
           </button>
@@ -112,7 +112,7 @@ export function InviteMemberModal({ empresaId, open, onClose, onInvited }: Invit
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Email */}
               <div>
-                <label className="block text-[11px] font-medium text-[#8b8fb0] uppercase tracking-wide mb-1.5">
+                <label className="block text-[11px] font-medium text-text-secondary uppercase tracking-wide mb-1.5">
                   E-mail
                 </label>
                 <input
@@ -121,25 +121,25 @@ export function InviteMemberModal({ empresaId, open, onClose, onInvited }: Invit
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="usuario@empresa.com"
-                  className="w-full h-9 bg-[#141736] border border-[#1e2348] text-[#e8eaff] placeholder:text-[#5e6388] rounded-lg px-3 text-sm outline-none focus:border-[#6c5ce7]/50 focus:ring-1 focus:ring-[#6c5ce7]/20 transition-all duration-200"
+                  className="w-full h-9 bg-bg-card border border-border text-text-primary placeholder:text-text-muted rounded-lg px-3 text-sm outline-none focus:border-[#6c5ce7]/50 focus:ring-1 focus:ring-[#6c5ce7]/20 transition-all duration-200"
                 />
               </div>
 
               {/* Role */}
               <div>
-                <label className="block text-[11px] font-medium text-[#8b8fb0] uppercase tracking-wide mb-1.5">
+                <label className="block text-[11px] font-medium text-text-secondary uppercase tracking-wide mb-1.5">
                   Papel
                 </label>
                 <select
                   value={role}
                   onChange={(e) => setRole(e.target.value as EmpresaRole)}
-                  className="w-full h-9 bg-[#141736] border border-[#1e2348] text-[#e8eaff] rounded-lg px-3 text-sm outline-none focus:border-[#6c5ce7]/50 focus:ring-1 focus:ring-[#6c5ce7]/20 transition-all duration-200"
+                  className="w-full h-9 bg-bg-card border border-border text-text-primary rounded-lg px-3 text-sm outline-none focus:border-[#6c5ce7]/50 focus:ring-1 focus:ring-[#6c5ce7]/20 transition-all duration-200"
                 >
                   {INVITABLE_ROLES.map((r) => (
                     <option key={r} value={r}>{ROLE_LABELS[r]}</option>
                   ))}
                 </select>
-                <p className="mt-1.5 text-[11px] text-[#5e6388]">{ROLE_DESCRIPTIONS[role]}</p>
+                <p className="mt-1.5 text-[11px] text-text-muted">{ROLE_DESCRIPTIONS[role]}</p>
               </div>
 
               {/* Error */}
@@ -154,7 +154,7 @@ export function InviteMemberModal({ empresaId, open, onClose, onInvited }: Invit
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="px-4 h-9 text-[12px] font-medium text-[#8b8fb0] hover:text-[#e8eaff] bg-[#141736] border border-[#1e2348] rounded-lg transition-colors duration-150"
+                  className="px-4 h-9 text-[12px] font-medium text-text-secondary hover:text-text-primary bg-bg-card border border-border rounded-lg transition-colors duration-150"
                 >
                   Cancelar
                 </button>
@@ -172,13 +172,13 @@ export function InviteMemberModal({ empresaId, open, onClose, onInvited }: Invit
             <div className="space-y-4">
               <div className="flex items-start gap-2.5 px-3 py-3 bg-[#4ecdc4]/[0.06] border border-[#4ecdc4]/20 rounded-xl">
                 <Check size={14} className="text-[#4ecdc4] shrink-0 mt-0.5" />
-                <p className="text-[12px] text-[#8b8fb0]">
+                <p className="text-[12px] text-text-secondary">
                   Usuário ainda não cadastrado. Envie este link para ele acessar o convite:
                 </p>
               </div>
 
               <div>
-                <label className="block text-[11px] font-medium text-[#8b8fb0] uppercase tracking-wide mb-1.5">
+                <label className="block text-[11px] font-medium text-text-secondary uppercase tracking-wide mb-1.5">
                   Link de convite
                 </label>
                 <div className="flex gap-2">
@@ -186,7 +186,7 @@ export function InviteMemberModal({ empresaId, open, onClose, onInvited }: Invit
                     type="text"
                     readOnly
                     value={acceptUrl}
-                    className="flex-1 h-9 bg-[#141736] border border-[#1e2348] text-[#8b8fb0] rounded-lg px-3 text-xs font-mono outline-none select-all"
+                    className="flex-1 h-9 bg-bg-card border border-border text-text-secondary rounded-lg px-3 text-xs font-mono outline-none select-all"
                   />
                   <button
                     type="button"
@@ -197,14 +197,14 @@ export function InviteMemberModal({ empresaId, open, onClose, onInvited }: Invit
                     {copied ? 'Copiado' : 'Copiar'}
                   </button>
                 </div>
-                <p className="mt-1.5 text-[11px] text-[#5e6388]">Expira em 7 dias.</p>
+                <p className="mt-1.5 text-[11px] text-text-muted">Expira em 7 dias.</p>
               </div>
 
               <div className="flex justify-end pt-1">
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="px-4 h-9 text-[12px] font-medium text-[#e8eaff] bg-[#141736] border border-[#1e2348] rounded-lg hover:border-[#1e2348]/80 transition-colors duration-150"
+                  className="px-4 h-9 text-[12px] font-medium text-text-primary bg-bg-card border border-border rounded-lg hover:border-border/80 transition-colors duration-150"
                 >
                   Fechar
                 </button>

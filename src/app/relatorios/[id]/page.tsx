@@ -519,7 +519,7 @@ function SendEmailModal({ reportId, onClose }: { reportId: string; onClose: () =
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-[#141736] border border-[#1e2348] rounded-2xl p-6 w-full max-w-md shadow-2xl">
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-2xl">
         {done ? (
           <div className="text-center space-y-3">
             <CheckCircle2 size={40} className="text-emerald-400 mx-auto" />

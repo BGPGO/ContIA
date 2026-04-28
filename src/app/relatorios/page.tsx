@@ -107,7 +107,7 @@ function SendEmailModal({ report, onClose }: { report: Report; onClose: () => vo
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="bg-[#141736] border border-[#1e2348] rounded-2xl p-6 w-full max-w-md shadow-2xl"
+        className="bg-bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-2xl"
       >
         <h3 className="text-[16px] font-semibold text-text-primary mb-1">Enviar por email</h3>
         <p className="text-[12px] text-text-secondary mb-4">{report.name}</p>

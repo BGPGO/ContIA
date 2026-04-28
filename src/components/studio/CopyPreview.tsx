@@ -257,7 +257,7 @@ function PostPreview({
         <EditableField
           value={copy.caption || ""}
           onChange={(val) => onEdit("caption", val)}
-          className="text-sm text-[#e8eaff] leading-relaxed whitespace-pre-line"
+          className="text-sm text-text-primary leading-relaxed whitespace-pre-line"
           multiline
         />
       </div>
@@ -536,7 +536,7 @@ function RichCarouselPreview({
         <EditableField
           value={copy.caption || ""}
           onChange={(val) => onEdit("caption", val)}
-          className="text-sm text-[#e8eaff] leading-relaxed"
+          className="text-sm text-text-primary leading-relaxed"
           multiline
           placeholder="Legenda do carrossel..."
         />
@@ -636,7 +636,7 @@ function BasicCarouselPreview({
         <EditableField
           value={copy.caption || ""}
           onChange={(val) => onEdit("caption", val)}
-          className="text-sm text-[#e8eaff] leading-relaxed"
+          className="text-sm text-text-primary leading-relaxed"
           multiline
           placeholder="Legenda do carrossel..."
         />
@@ -776,7 +776,7 @@ export function CopyPreview({
         <div className="relative rounded-xl overflow-hidden">
           {/* Gradient border effect */}
           <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-[#4ecdc4]/20 to-[#6c5ce7]/20 p-px">
-            <div className="w-full h-full rounded-xl bg-[#141736]" />
+            <div className="w-full h-full rounded-xl bg-bg-card" />
           </div>
           {/* Content */}
           <div className="relative p-5">

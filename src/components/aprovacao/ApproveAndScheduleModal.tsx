@@ -228,7 +228,7 @@ export function ApproveAndScheduleModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50 bg-[#080b1e]/80 backdrop-blur-sm"
+            className="fixed inset-0 z-50 bg-bg-primary/80 backdrop-blur-sm"
             onClick={() => !submitting && onClose()}
             aria-hidden="true"
           />
@@ -245,11 +245,11 @@ export function ApproveAndScheduleModal({
             transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
           >
-            <div className="pointer-events-auto w-full max-w-lg bg-[#0c0f24] border border-[#1e2348]/80 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
+            <div className="pointer-events-auto w-full max-w-lg bg-bg-secondary border border-border/80 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
 
               {/* ── Header ── */}
               <div
-                className="px-5 py-4 border-b border-[#1e2348]/60 flex items-center gap-3"
+                className="px-5 py-4 border-b border-border/60 flex items-center gap-3"
                 style={{ background: "#34d39908" }}
               >
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-[#34d39915]">
@@ -258,18 +258,18 @@ export function ApproveAndScheduleModal({
                 <div className="flex-1 min-w-0">
                   <h2
                     id="as-modal-title"
-                    className="text-[15px] font-semibold text-[#e8eaff]"
+                    className="text-[15px] font-semibold text-text-primary"
                   >
                     Aprovar e agendar
                   </h2>
-                  <p className="text-[12px] text-[#5e6388] truncate mt-0.5">
+                  <p className="text-[12px] text-text-muted truncate mt-0.5">
                     {post.titulo}
                   </p>
                 </div>
                 <button
                   onClick={() => !submitting && onClose()}
                   disabled={submitting}
-                  className="p-1.5 rounded-lg text-[#5e6388] hover:text-[#e8eaff] hover:bg-[#1a1e42] transition-all duration-200 disabled:opacity-40"
+                  className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-card-hover transition-all duration-200 disabled:opacity-40"
                   aria-label="Fechar modal"
                 >
                   <X size={16} />
@@ -283,10 +283,10 @@ export function ApproveAndScheduleModal({
                 <div className="space-y-1.5">
                   <label
                     htmlFor="as-comment"
-                    className="text-[12px] font-medium text-[#8b8fb0]"
+                    className="text-[12px] font-medium text-text-secondary"
                   >
                     Comentário para a equipe{" "}
-                    <span className="text-[#5e6388] font-normal">
+                    <span className="text-text-muted font-normal">
                       (opcional)
                     </span>
                   </label>
@@ -298,18 +298,18 @@ export function ApproveAndScheduleModal({
                     disabled={submitting}
                     placeholder="Ex: Aprovado! Ótimo conteúdo."
                     rows={2}
-                    className="w-full px-3 py-2.5 rounded-xl bg-[#141736]/80 border border-[#1e2348]/60 text-[13px] text-[#e8eaff] placeholder-[#5e6388]/60 resize-none transition-all duration-200 outline-none focus:border-[#4ecdc4]/40 focus:ring-1 focus:ring-[#4ecdc4]/20 disabled:opacity-50"
+                    className="w-full px-3 py-2.5 rounded-xl bg-bg-card/80 border border-border/60 text-[13px] text-text-primary placeholder-text-muted/60 resize-none transition-all duration-200 outline-none focus:border-[#4ecdc4]/40 focus:ring-1 focus:ring-[#4ecdc4]/20 disabled:opacity-50"
                   />
                 </div>
 
                 {/* Divisor */}
-                <div className="border-t border-[#1e2348]/50" />
+                <div className="border-t border-border/50" />
 
                 {/* Seção 2: Data/Hora */}
                 <div className="space-y-1.5">
                   <label
                     htmlFor="as-datetime"
-                    className="flex items-center gap-1.5 text-[12px] font-medium text-[#8b8fb0]"
+                    className="flex items-center gap-1.5 text-[12px] font-medium text-text-secondary"
                   >
                     <Calendar className="w-3.5 h-3.5 text-[#6c5ce7]" />
                     Data e hora do agendamento
@@ -324,13 +324,13 @@ export function ApproveAndScheduleModal({
                       setValidationError(null);
                     }}
                     disabled={submitting}
-                    className="w-full px-3 py-2.5 rounded-xl bg-[#141736]/80 border border-[#1e2348]/60 text-[13px] text-[#e8eaff] transition-all duration-200 outline-none focus:border-[#6c5ce7]/40 focus:ring-1 focus:ring-[#6c5ce7]/20 disabled:opacity-50"
+                    className="w-full px-3 py-2.5 rounded-xl bg-bg-card/80 border border-border/60 text-[13px] text-text-primary transition-all duration-200 outline-none focus:border-[#6c5ce7]/40 focus:ring-1 focus:ring-[#6c5ce7]/20 disabled:opacity-50"
                     style={{
                       colorScheme: "dark",
                     }}
                   />
                   {datePreview && (
-                    <p className="flex items-center gap-1.5 text-[11px] text-[#5e6388]">
+                    <p className="flex items-center gap-1.5 text-[11px] text-text-muted">
                       <Clock className="w-3 h-3 shrink-0" />
                       {datePreview}
                     </p>
@@ -338,19 +338,19 @@ export function ApproveAndScheduleModal({
                 </div>
 
                 {/* Divisor */}
-                <div className="border-t border-[#1e2348]/50" />
+                <div className="border-t border-border/50" />
 
                 {/* Seção 3: Plataformas */}
                 <div className="space-y-2">
-                  <label className="flex items-center gap-1.5 text-[12px] font-medium text-[#8b8fb0]">
+                  <label className="flex items-center gap-1.5 text-[12px] font-medium text-text-secondary">
                     Plataformas
                     <span className="text-[#f87171] ml-0.5">*</span>
-                    <span className="ml-1 text-[#5e6388] font-normal">
+                    <span className="ml-1 text-text-muted font-normal">
                       (ao menos uma)
                     </span>
                   </label>
                   {post.plataformas.length === 0 ? (
-                    <p className="text-[12px] text-[#5e6388]">
+                    <p className="text-[12px] text-text-muted">
                       Nenhuma plataforma definida neste post.
                     </p>
                   ) : (
@@ -366,7 +366,7 @@ export function ApproveAndScheduleModal({
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium border transition-all duration-200 disabled:opacity-50 ${
                               active
                                 ? "bg-[#4ecdc4]/15 border-[#4ecdc4]/40 text-[#4ecdc4]"
-                                : "bg-[#141736]/60 border-[#1e2348]/60 text-[#5e6388] hover:border-[#4ecdc4]/20 hover:text-[#8b8fb0]"
+                                : "bg-bg-card/60 border-border/60 text-text-muted hover:border-[#4ecdc4]/20 hover:text-text-secondary"
                             }`}
                           >
                             {plataformaIcon(plat)}
@@ -398,11 +398,11 @@ export function ApproveAndScheduleModal({
               </div>
 
               {/* ── Footer ── */}
-              <div className="px-5 pb-5 pt-3 border-t border-[#1e2348]/50 flex gap-2.5 justify-end">
+              <div className="px-5 pb-5 pt-3 border-t border-border/50 flex gap-2.5 justify-end">
                 <button
                   onClick={() => !submitting && onClose()}
                   disabled={submitting}
-                  className="px-4 py-2 rounded-xl text-[13px] font-medium text-[#8b8fb0] hover:text-[#e8eaff] hover:bg-[#1a1e42] transition-all duration-200 disabled:opacity-40"
+                  className="px-4 py-2 rounded-xl text-[13px] font-medium text-text-secondary hover:text-text-primary hover:bg-bg-card-hover transition-all duration-200 disabled:opacity-40"
                 >
                   Cancelar
                 </button>

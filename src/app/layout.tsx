@@ -2,6 +2,22 @@ import type { Metadata } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import AppShell from "@/components/layout/AppShell";
+import { ThemeProvider } from "@/components/layout/ThemeProvider";
+
+const themeInitScript = `
+(function() {
+  try {
+    var t = localStorage.getItem('contia_theme');
+    if (t !== 'light' && t !== 'dark') t = 'dark';
+    var root = document.documentElement;
+    root.classList.remove('light', 'dark');
+    root.classList.add(t);
+    root.style.colorScheme = t;
+  } catch (e) {
+    document.documentElement.classList.add('dark');
+  }
+})();
+`;
 
 const inter = Inter({
   subsets: ["latin"],
@@ -26,9 +42,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR" className={`${inter.variable} ${plusJakarta.variable}`}>
+    <html
+      lang="pt-BR"
+      className={`${inter.variable} ${plusJakarta.variable} dark`}
+      suppressHydrationWarning
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body className={`${plusJakarta.className} bg-bg-primary text-text-primary`}>
-        <AppShell>{children}</AppShell>
+        <ThemeProvider>
+          <AppShell>{children}</AppShell>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -40,7 +40,7 @@ function MessageBubble({ message, isStreaming }: { message: CopyChatMessage; isS
         transition={{ duration: 0.25 }}
         className="w-full flex justify-center"
       >
-        <span className="text-[11px] text-[#5e6388] bg-bg-card/30 px-3 py-1 rounded-full">
+        <span className="text-[11px] text-text-muted bg-bg-card/30 px-3 py-1 rounded-full">
           {message.content}
         </span>
       </motion.div>
@@ -74,7 +74,7 @@ function MessageBubble({ message, isStreaming }: { message: CopyChatMessage; isS
       className="flex justify-start"
     >
       <div className="max-w-[85%] space-y-1.5">
-        <div className="bg-[#141736] text-[#e8eaff] border border-white/5 rounded-2xl rounded-bl-md px-4 py-3 text-sm leading-relaxed whitespace-pre-line">
+        <div className="bg-bg-card text-text-primary border border-white/5 rounded-2xl rounded-bl-md px-4 py-3 text-sm leading-relaxed whitespace-pre-line">
           {message.content}
           {isStreaming && (
             <motion.span
@@ -191,7 +191,7 @@ export function ChatInterface({
             animate={{ opacity: 1, y: 0 }}
             className="flex justify-start"
           >
-            <div className="bg-[#141736] border border-white/5 rounded-2xl rounded-bl-md">
+            <div className="bg-bg-card border border-white/5 rounded-2xl rounded-bl-md">
               <TypingIndicator />
             </div>
           </motion.div>

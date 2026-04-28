@@ -202,7 +202,7 @@ function RichSlidePreview({
         return (
           <div
             key={i}
-            className={`bg-[#111528] border border-[#1e2348] rounded-lg border-l-2 border-l-[#3b82f6] ${isSmall ? "p-1.5" : "p-3"}`}
+            className={`bg-[#111528] border border-border rounded-lg border-l-2 border-l-[#3b82f6] ${isSmall ? "p-1.5" : "p-3"}`}
           >
             <p
               className={`text-[#e0e4f0]/80 italic ${isSmall ? "text-[6px]" : "text-xs"}`}

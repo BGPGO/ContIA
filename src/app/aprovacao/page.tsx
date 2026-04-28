@@ -17,21 +17,21 @@ function ApprovalSkeleton() {
       {Array.from({ length: 3 }).map((_, i) => (
         <div
           key={i}
-          className="rounded-2xl bg-[#0c0f24] border border-[#1e2348]/70 overflow-hidden"
+          className="rounded-2xl bg-bg-secondary border border-border/70 overflow-hidden"
         >
-          <div className="bg-[#141736]" style={{ aspectRatio: "1 / 1" }} />
+          <div className="bg-bg-card" style={{ aspectRatio: "1 / 1" }} />
           <div className="p-4 space-y-3">
-            <div className="h-4 bg-[#141736] rounded w-3/4" />
-            <div className="h-3 bg-[#141736] rounded" />
-            <div className="h-3 bg-[#141736] rounded w-5/6" />
+            <div className="h-4 bg-bg-card rounded w-3/4" />
+            <div className="h-3 bg-bg-card rounded" />
+            <div className="h-3 bg-bg-card rounded w-5/6" />
             <div className="flex gap-1.5">
-              <div className="h-5 w-20 bg-[#141736] rounded-full" />
-              <div className="h-5 w-16 bg-[#141736] rounded-full" />
+              <div className="h-5 w-20 bg-bg-card rounded-full" />
+              <div className="h-5 w-16 bg-bg-card rounded-full" />
             </div>
           </div>
           <div className="p-4 pt-0 flex gap-2">
-            <div className="flex-1 h-9 bg-[#141736] rounded-xl" />
-            <div className="flex-1 h-9 bg-[#141736] rounded-xl" />
+            <div className="flex-1 h-9 bg-bg-card rounded-xl" />
+            <div className="flex-1 h-9 bg-bg-card rounded-xl" />
           </div>
         </div>
       ))}
@@ -64,8 +64,8 @@ export default function AprovacaoPage() {
   if (!empresa) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
-        <AlertCircle className="w-10 h-10 text-[#5e6388]" />
-        <p className="text-[#8b8fb0] text-sm">
+        <AlertCircle className="w-10 h-10 text-text-muted" />
+        <p className="text-text-secondary text-sm">
           Selecione uma empresa para ver as aprovacoes pendentes.
         </p>
       </div>
@@ -82,11 +82,11 @@ export default function AprovacaoPage() {
             <CheckCircle className="w-5 h-5 text-[#34d399]" />
           </div>
           <div>
-            <h1 className="text-base sm:text-xl font-semibold text-[#e8eaff] tracking-tight">
+            <h1 className="text-base sm:text-xl font-semibold text-text-primary tracking-tight">
               Aprovacoes
             </h1>
             {!loading && (
-              <p className="text-[12px] text-[#5e6388]">
+              <p className="text-[12px] text-text-muted">
                 {items.length === 0
                   ? "Nenhum post pendente"
                   : `${items.length} post${items.length !== 1 ? "s" : ""} aguardando revisao`}
@@ -112,7 +112,7 @@ export default function AprovacaoPage() {
             onClick={refetch}
             disabled={loading}
             title="Atualizar lista"
-            className="p-2 rounded-xl text-[#5e6388] hover:text-[#4ecdc4] hover:bg-[#4ecdc4]/10 transition-all duration-200 disabled:opacity-40"
+            className="p-2 rounded-xl text-text-muted hover:text-[#4ecdc4] hover:bg-[#4ecdc4]/10 transition-all duration-200 disabled:opacity-40"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
@@ -154,10 +154,10 @@ export default function AprovacaoPage() {
             <CheckCircle className="w-8 h-8 text-[#34d399]/60" />
           </div>
           <div className="text-center space-y-1">
-            <p className="text-[#e8eaff] font-medium">
+            <p className="text-text-primary font-medium">
               Nenhum post aguardando aprovacao
             </p>
-            <p className="text-[13px] text-[#5e6388]">
+            <p className="text-[13px] text-text-muted">
               Quando um post for enviado para aprovacao, ele aparecera aqui.
             </p>
           </div>

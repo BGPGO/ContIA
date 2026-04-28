@@ -195,22 +195,22 @@ export default function BrandAssetsPage() {
     : assets;
 
   return (
-    <div className="min-h-screen bg-[#080b1e] text-[#e8eaff]">
+    <div className="min-h-screen bg-bg-primary text-text-primary">
       {/* Header */}
-      <div className="border-b border-white/5 bg-[#0c0f24]/80 backdrop-blur-md sticky top-0 z-10">
+      <div className="border-b border-white/5 bg-bg-secondary/80 backdrop-blur-md sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link
               href="/marca"
-              className="p-2 rounded-lg hover:bg-white/5 text-[#5e6388] hover:text-[#e8eaff] transition-all"
+              className="p-2 rounded-lg hover:bg-white/5 text-text-muted hover:text-text-primary transition-all"
             >
               <ArrowLeft size={18} />
             </Link>
             <div>
-              <h1 className="text-lg font-semibold text-[#e8eaff]">
+              <h1 className="text-lg font-semibold text-text-primary">
                 Materiais da Marca
               </h1>
-              <p className="text-xs text-[#5e6388]">
+              <p className="text-xs text-text-muted">
                 Logos, fontes, elementos e paleta de cores
               </p>
             </div>
@@ -219,14 +219,14 @@ export default function BrandAssetsPage() {
           <div className="flex items-center gap-3">
             {/* Search */}
             <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5e6388]" />
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar material..."
-                className="pl-9 pr-3 py-2 bg-[#080b1e] border border-white/10 rounded-lg text-xs
-                  text-[#e8eaff] placeholder:text-[#5e6388] focus:outline-none focus:border-[#4ecdc4]/40
+                className="pl-9 pr-3 py-2 bg-bg-primary border border-white/10 rounded-lg text-xs
+                  text-text-primary placeholder:text-text-muted focus:outline-none focus:border-[#4ecdc4]/40
                   w-48 transition-all"
               />
             </div>
@@ -263,7 +263,7 @@ export default function BrandAssetsPage() {
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer
                     ${isActive
                       ? "bg-[#4ecdc4]/15 text-[#4ecdc4] border border-[#4ecdc4]/30"
-                      : "text-[#5e6388] hover:text-[#8b8fb0] hover:bg-white/5 border border-transparent"
+                      : "text-text-muted hover:text-text-secondary hover:bg-white/5 border border-transparent"
                     }`}
                 >
                   <Icon size={14} />
@@ -275,7 +275,7 @@ export default function BrandAssetsPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-[10px] text-[#5e6388]">Tipo do upload:</span>
+            <span className="text-[10px] text-text-muted">Tipo do upload:</span>
             {(["logo", "element", "photo", "texture", "font"] as const).map((t) => (
               <button
                 key={t}
@@ -283,7 +283,7 @@ export default function BrandAssetsPage() {
                 className={`px-2 py-1 rounded text-[10px] font-medium transition-all cursor-pointer
                   ${uploadType === t
                     ? "bg-[#6c5ce7]/20 text-[#a78bfa] border border-[#6c5ce7]/30"
-                    : "text-[#5e6388] hover:text-[#8b8fb0] border border-transparent hover:bg-white/5"
+                    : "text-text-muted hover:text-text-secondary border border-transparent hover:bg-white/5"
                   }`}
               >
                 {t.charAt(0).toUpperCase() + t.slice(1)}
@@ -315,11 +315,11 @@ export default function BrandAssetsPage() {
             <Loader2 size={32} className="animate-spin text-[#4ecdc4] mx-auto" />
           ) : (
             <>
-              <Upload size={32} className="text-[#5e6388] mx-auto mb-3" />
-              <p className="text-sm text-[#8b8fb0] mb-1">
+              <Upload size={32} className="text-text-muted mx-auto mb-3" />
+              <p className="text-sm text-text-secondary mb-1">
                 Arraste arquivos aqui ou clique para selecionar
               </p>
-              <p className="text-xs text-[#5e6388]">
+              <p className="text-xs text-text-muted">
                 Imagens, SVGs, fontes (TTF/OTF/WOFF) - max 20MB
               </p>
             </>
@@ -355,12 +355,12 @@ export default function BrandAssetsPage() {
                 <Loader2 size={32} className="animate-spin text-[#4ecdc4]/40" />
               </div>
             ) : filteredAssets.length === 0 ? (
-              <div className="text-center py-16 bg-[#0c0f24] rounded-xl border border-white/5">
-                <Image size={48} className="text-[#5e6388]/30 mx-auto mb-4" />
-                <h3 className="text-sm font-medium text-[#8b8fb0] mb-1">
+              <div className="text-center py-16 bg-bg-secondary rounded-xl border border-white/5">
+                <Image size={48} className="text-text-muted/30 mx-auto mb-4" />
+                <h3 className="text-sm font-medium text-text-secondary mb-1">
                   Nenhum material encontrado
                 </h3>
-                <p className="text-xs text-[#5e6388]">
+                <p className="text-xs text-text-muted">
                   Faca upload de logos, icones e elementos da sua marca
                 </p>
               </div>
@@ -369,15 +369,15 @@ export default function BrandAssetsPage() {
                 {filteredAssets.map((asset) => (
                   <div
                     key={asset.id}
-                    className="group relative bg-[#0c0f24] rounded-xl border border-white/5
+                    className="group relative bg-bg-secondary rounded-xl border border-white/5
                       hover:border-[#4ecdc4]/30 transition-all overflow-hidden"
                   >
                     {/* Thumbnail */}
-                    <div className="aspect-square bg-[#080b1e] flex items-center justify-center overflow-hidden">
+                    <div className="aspect-square bg-bg-primary flex items-center justify-center overflow-hidden">
                       {asset.type === "font" ? (
                         <div className="flex flex-col items-center gap-2">
-                          <Type size={32} className="text-[#5e6388]/40" />
-                          <span className="text-xs text-[#5e6388]">.{asset.file_name?.split(".").pop()}</span>
+                          <Type size={32} className="text-text-muted/40" />
+                          <span className="text-xs text-text-muted">.{asset.file_name?.split(".").pop()}</span>
                         </div>
                       ) : (
                         <img
@@ -391,10 +391,10 @@ export default function BrandAssetsPage() {
 
                     {/* Info */}
                     <div className="p-3 border-t border-white/5">
-                      <p className="text-xs text-[#e8eaff] font-medium truncate">{asset.name}</p>
+                      <p className="text-xs text-text-primary font-medium truncate">{asset.name}</p>
                       <div className="flex items-center justify-between mt-1">
-                        <span className="text-[10px] text-[#5e6388] capitalize">{asset.type}</span>
-                        <span className="text-[10px] text-[#5e6388]">
+                        <span className="text-[10px] text-text-muted capitalize">{asset.type}</span>
+                        <span className="text-[10px] text-text-muted">
                           {formatFileSize(asset.file_size)}
                         </span>
                       </div>
@@ -430,15 +430,15 @@ export default function BrandAssetsPage() {
 
           {/* Color palette sidebar */}
           <div className="lg:col-span-1">
-            <div className="bg-[#0c0f24] rounded-xl border border-white/5 p-4 sticky top-24">
+            <div className="bg-bg-secondary rounded-xl border border-white/5 p-4 sticky top-24">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-[#e8eaff] flex items-center gap-2">
+                <h3 className="text-sm font-medium text-text-primary flex items-center gap-2">
                   <Palette size={14} className="text-[#4ecdc4]" />
                   Paleta de Cores
                 </h3>
                 <button
                   onClick={() => setShowColorInput(!showColorInput)}
-                  className="p-1 rounded-md hover:bg-white/5 text-[#5e6388] hover:text-[#4ecdc4]
+                  className="p-1 rounded-md hover:bg-white/5 text-text-muted hover:text-[#4ecdc4]
                     transition-all cursor-pointer"
                 >
                   <Plus size={14} />
@@ -457,7 +457,7 @@ export default function BrandAssetsPage() {
                       title={color}
                       onClick={() => navigator.clipboard?.writeText(color)}
                     />
-                    <span className="absolute -bottom-4 left-0 right-0 text-[8px] text-[#5e6388]
+                    <span className="absolute -bottom-4 left-0 right-0 text-[8px] text-text-muted
                       text-center opacity-0 group-hover:opacity-100 transition-opacity">
                       {color}
                     </span>
@@ -474,7 +474,7 @@ export default function BrandAssetsPage() {
               </div>
 
               {brandColors.length === 0 && !showColorInput && (
-                <p className="text-xs text-[#5e6388] text-center py-4">
+                <p className="text-xs text-text-muted text-center py-4">
                   Adicione as cores da sua marca
                 </p>
               )}
@@ -493,8 +493,8 @@ export default function BrandAssetsPage() {
                     value={newColor}
                     onChange={(e) => setNewColor(e.target.value)}
                     placeholder="#000000"
-                    className="flex-1 bg-[#080b1e] border border-white/10 rounded-lg px-3 py-2 text-xs
-                      text-[#e8eaff] placeholder:text-[#5e6388] focus:outline-none focus:border-[#4ecdc4]/40"
+                    className="flex-1 bg-bg-primary border border-white/10 rounded-lg px-3 py-2 text-xs
+                      text-text-primary placeholder:text-text-muted focus:outline-none focus:border-[#4ecdc4]/40"
                     onKeyDown={(e) => e.key === "Enter" && handleAddColor()}
                   />
                   <button
@@ -510,7 +510,7 @@ export default function BrandAssetsPage() {
               {/* Primary/Secondary from empresa */}
               {empresa && (
                 <div className="mt-4 pt-3 border-t border-white/5">
-                  <p className="text-[10px] text-[#5e6388] uppercase tracking-wider mb-2">
+                  <p className="text-[10px] text-text-muted uppercase tracking-wider mb-2">
                     Cores da empresa
                   </p>
                   <div className="flex gap-2">
@@ -519,7 +519,7 @@ export default function BrandAssetsPage() {
                         className="w-5 h-5 rounded border border-white/10"
                         style={{ backgroundColor: empresa.cor_primaria }}
                       />
-                      <span className="text-[10px] text-[#8b8fb0]">
+                      <span className="text-[10px] text-text-secondary">
                         {empresa.cor_primaria}
                       </span>
                     </div>
@@ -528,7 +528,7 @@ export default function BrandAssetsPage() {
                         className="w-5 h-5 rounded border border-white/10"
                         style={{ backgroundColor: empresa.cor_secundaria }}
                       />
-                      <span className="text-[10px] text-[#8b8fb0]">
+                      <span className="text-[10px] text-text-secondary">
                         {empresa.cor_secundaria}
                       </span>
                     </div>

@@ -310,7 +310,7 @@ function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
       className="flex justify-start"
     >
       <div className="max-w-[85%] space-y-1.5">
-        <div className="bg-[#141736] text-[#e8eaff] border border-white/5 rounded-2xl rounded-bl-md px-4 py-3 text-sm leading-relaxed whitespace-pre-line">
+        <div className="bg-bg-card text-text-primary border border-white/5 rounded-2xl rounded-bl-md px-4 py-3 text-sm leading-relaxed whitespace-pre-line">
           {prose || (hasCode ? "Desenhando criativo…" : "")}
           {isStreaming && (
             <motion.span
@@ -505,7 +505,7 @@ export function CreativeChatInterface({
               exit={{ opacity: 0, y: -4 }}
               className="flex justify-start"
             >
-              <div className="bg-[#141736] border border-white/5 rounded-2xl rounded-bl-md">
+              <div className="bg-bg-card border border-white/5 rounded-2xl rounded-bl-md">
                 <PhaseIndicator phase={streamingPhase} />
               </div>
             </motion.div>

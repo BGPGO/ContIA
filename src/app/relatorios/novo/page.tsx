@@ -78,10 +78,10 @@ const TEMPLATES: { id: TemplateId; label: string; description: string; preview: 
     label: "Executivo",
     description: "Resumido e direto ao ponto. Ideal para apresentar para sócios e diretoria.",
     preview: (
-      <div className="w-full h-20 bg-gradient-to-br from-[#1a1e42] to-[#0c0f24] rounded-lg border border-[#1e2348] p-2.5 space-y-1.5">
+      <div className="w-full h-20 bg-gradient-to-br from-bg-card-hover to-bg-secondary rounded-lg border border-border p-2.5 space-y-1.5">
         <div className="h-2 bg-accent/40 rounded w-3/4" />
-        <div className="h-1.5 bg-[#1e2348] rounded w-full" />
-        <div className="h-1.5 bg-[#1e2348] rounded w-5/6" />
+        <div className="h-1.5 bg-border rounded w-full" />
+        <div className="h-1.5 bg-border rounded w-5/6" />
         <div className="flex gap-1.5 mt-1">
           <div className="h-5 bg-emerald-400/20 rounded w-1/3" />
           <div className="h-5 bg-blue-400/20 rounded w-1/3" />
@@ -95,9 +95,9 @@ const TEMPLATES: { id: TemplateId; label: string; description: string; preview: 
     label: "Técnico",
     description: "Análise completa com todas as métricas, gráficos e comparações detalhadas.",
     preview: (
-      <div className="w-full h-20 bg-gradient-to-br from-[#1a1e42] to-[#0c0f24] rounded-lg border border-[#1e2348] p-2.5 space-y-1.5">
-        <div className="h-1.5 bg-[#1e2348] rounded w-full" />
-        <div className="h-1.5 bg-[#1e2348] rounded w-full" />
+      <div className="w-full h-20 bg-gradient-to-br from-bg-card-hover to-bg-secondary rounded-lg border border-border p-2.5 space-y-1.5">
+        <div className="h-1.5 bg-border rounded w-full" />
+        <div className="h-1.5 bg-border rounded w-full" />
         <div className="flex gap-1 mt-1">
           {[40, 60, 45, 70, 55, 80].map((h, i) => (
             <div key={i} className="flex-1 bg-accent/30 rounded-sm" style={{ height: `${h * 0.4}px` }} />
@@ -111,13 +111,13 @@ const TEMPLATES: { id: TemplateId; label: string; description: string; preview: 
     label: "Cliente",
     description: "Visual atraente com highlights e recomendações. Perfeito para enviar a clientes.",
     preview: (
-      <div className="w-full h-20 bg-gradient-to-br from-[#1a1e42] to-[#0c0f24] rounded-lg border border-[#1e2348] p-2.5">
+      <div className="w-full h-20 bg-gradient-to-br from-bg-card-hover to-bg-secondary rounded-lg border border-border p-2.5">
         <div className="h-2 bg-gradient-to-r from-accent/40 to-secondary/40 rounded w-2/3 mb-2" />
         <div className="grid grid-cols-2 gap-1.5">
-          <div className="h-5 bg-[#1e2348] rounded" />
-          <div className="h-5 bg-[#1e2348] rounded" />
-          <div className="h-5 bg-[#1e2348] rounded" />
-          <div className="h-5 bg-[#1e2348] rounded" />
+          <div className="h-5 bg-border rounded" />
+          <div className="h-5 bg-border rounded" />
+          <div className="h-5 bg-border rounded" />
+          <div className="h-5 bg-border rounded" />
         </div>
       </div>
     ),

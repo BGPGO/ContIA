@@ -97,18 +97,18 @@ function ConfirmDeleteModal({
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onCancel}
       />
-      <div className="relative bg-[#0c0f24] border border-white/[0.08] rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
-        <h3 className="text-base font-semibold text-[#e8eaff] mb-2">
+      <div className="relative bg-bg-secondary border border-white/[0.08] rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+        <h3 className="text-base font-semibold text-text-primary mb-2">
           Excluir template?
         </h3>
-        <p className="text-sm text-[#5e6388] mb-5">
-          O template <strong className="text-[#e8eaff]">{name}</strong> sera
+        <p className="text-sm text-text-muted mb-5">
+          O template <strong className="text-text-primary">{name}</strong> sera
           excluido permanentemente.
         </p>
         <div className="flex items-center gap-3 justify-end">
           <button
             onClick={onCancel}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-[#5e6388] hover:bg-white/5 transition-colors"
+            className="px-4 py-2 rounded-lg text-sm font-medium text-text-muted hover:bg-white/5 transition-colors"
           >
             Cancelar
           </button>
@@ -267,8 +267,8 @@ export default function TemplatesPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <Layout size={40} className="mx-auto text-[#5e6388] opacity-40 mb-3" />
-          <p className="text-[#5e6388]">
+          <Layout size={40} className="mx-auto text-text-muted opacity-40 mb-3" />
+          <p className="text-text-muted">
             Selecione uma empresa para ver os templates.
           </p>
         </div>
@@ -281,10 +281,10 @@ export default function TemplatesPage() {
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-[#e8eaff] mb-1">
+          <h1 className="text-2xl md:text-3xl font-bold text-text-primary mb-1">
             Templates & Assets
           </h1>
-          <p className="text-sm text-[#5e6388]">
+          <p className="text-sm text-text-muted">
             Gerencie seus templates visuais e assets da marca
           </p>
         </div>
@@ -302,19 +302,19 @@ export default function TemplatesPage() {
       <div className="relative mb-8 max-w-md">
         <Search
           size={16}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5e6388]"
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"
         />
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar templates e assets..."
-          className="w-full pl-9 pr-4 py-2.5 bg-[#141736] border border-white/[0.06] rounded-xl text-sm text-[#e8eaff] placeholder:text-[#5e6388] focus:outline-none focus:border-[#4ecdc4]/40 transition-colors"
+          className="w-full pl-9 pr-4 py-2.5 bg-bg-card border border-white/[0.06] rounded-xl text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-[#4ecdc4]/40 transition-colors"
         />
         {search && (
           <button
             onClick={() => setSearch("")}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#5e6388] hover:text-[#e8eaff]"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
           >
             <X size={14} />
           </button>
@@ -325,11 +325,11 @@ export default function TemplatesPage() {
          Section: Templates Salvos
          ══════════════════════════════════════════════════════════════════════ */}
       <section className="mb-12">
-        <h2 className="text-xs font-semibold text-[#5e6388] uppercase tracking-wider mb-4 flex items-center gap-2">
+        <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-4 flex items-center gap-2">
           <Layers size={14} />
           Templates Salvos
           {!templatesLoading && (
-            <span className="text-[#5e6388]/60">({filteredTemplates.length})</span>
+            <span className="text-text-muted/60">({filteredTemplates.length})</span>
           )}
         </h2>
 
@@ -337,7 +337,7 @@ export default function TemplatesPage() {
         {templatesLoading && (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-5 h-5 text-[#4ecdc4] animate-spin" />
-            <span className="ml-3 text-sm text-[#5e6388]">
+            <span className="ml-3 text-sm text-text-muted">
               Carregando templates...
             </span>
           </div>
@@ -356,12 +356,12 @@ export default function TemplatesPage() {
             {/* "+ Novo" card */}
             <button
               onClick={handleNewTemplate}
-              className="group flex flex-col items-center justify-center aspect-square rounded-xl border-2 border-dashed border-white/[0.1] hover:border-[#4ecdc4]/40 bg-[#141736]/50 hover:bg-[#141736] transition-all duration-200"
+              className="group flex flex-col items-center justify-center aspect-square rounded-xl border-2 border-dashed border-white/[0.1] hover:border-[#4ecdc4]/40 bg-bg-card/50 hover:bg-bg-card transition-all duration-200"
             >
               <div className="w-12 h-12 rounded-xl bg-[#4ecdc4]/10 group-hover:bg-[#4ecdc4]/20 flex items-center justify-center mb-2 transition-colors">
                 <Plus size={24} className="text-[#4ecdc4]" />
               </div>
-              <span className="text-xs font-medium text-[#5e6388] group-hover:text-[#4ecdc4] transition-colors">
+              <span className="text-xs font-medium text-text-muted group-hover:text-[#4ecdc4] transition-colors">
                 Novo Template
               </span>
             </button>
@@ -370,14 +370,14 @@ export default function TemplatesPage() {
             {filteredTemplates.map((tpl) => (
               <div
                 key={tpl.id}
-                className="group relative bg-[#141736] rounded-xl overflow-hidden border border-white/[0.04] hover:border-[#4ecdc4]/30 transition-all duration-200"
+                className="group relative bg-bg-card rounded-xl overflow-hidden border border-white/[0.04] hover:border-[#4ecdc4]/30 transition-all duration-200"
               >
                 {/* Thumbnail */}
                 <button
                   onClick={() => handleEditTemplate(tpl.id)}
                   className="w-full"
                 >
-                  <div className="aspect-square bg-[#080b1e] flex items-center justify-center overflow-hidden">
+                  <div className="aspect-square bg-bg-primary flex items-center justify-center overflow-hidden">
                     {tpl.thumbnail_url ? (
                       <img
                         src={tpl.thumbnail_url}
@@ -387,7 +387,7 @@ export default function TemplatesPage() {
                     ) : (
                       <Layout
                         size={28}
-                        className="text-[#5e6388] opacity-30"
+                        className="text-text-muted opacity-30"
                       />
                     )}
                   </div>
@@ -395,12 +395,12 @@ export default function TemplatesPage() {
 
                 {/* Info */}
                 <div className="p-3 space-y-1.5">
-                  <p className="text-[12px] font-semibold text-[#e8eaff] truncate">
+                  <p className="text-[12px] font-semibold text-text-primary truncate">
                     {tpl.name}
                   </p>
                   <div className="flex items-center gap-1.5">
                     <SourceBadge source={tpl.source} />
-                    <span className="text-[10px] text-[#5e6388]">
+                    <span className="text-[10px] text-text-muted">
                       {tpl.aspect_ratio}
                     </span>
                   </div>
@@ -416,7 +416,7 @@ export default function TemplatesPage() {
                     className="w-7 h-7 rounded-md bg-black/60 backdrop-blur-sm flex items-center justify-center hover:bg-black/80 transition-colors"
                     title="Editar"
                   >
-                    <Pencil size={13} className="text-[#e8eaff]" />
+                    <Pencil size={13} className="text-text-primary" />
                   </button>
                   <button
                     onClick={(e) => {
@@ -426,7 +426,7 @@ export default function TemplatesPage() {
                     className="w-7 h-7 rounded-md bg-black/60 backdrop-blur-sm flex items-center justify-center hover:bg-black/80 transition-colors"
                     title="Duplicar"
                   >
-                    <Copy size={13} className="text-[#e8eaff]" />
+                    <Copy size={13} className="text-text-primary" />
                   </button>
                   <button
                     onClick={(e) => {
@@ -447,12 +447,12 @@ export default function TemplatesPage() {
               <div className="col-span-full border border-dashed border-white/[0.06] rounded-xl p-10 text-center">
                 <Layout
                   size={32}
-                  className="mx-auto text-[#5e6388] opacity-30 mb-3"
+                  className="mx-auto text-text-muted opacity-30 mb-3"
                 />
-                <p className="text-sm text-[#5e6388]">
+                <p className="text-sm text-text-muted">
                   Nenhum template salvo ainda
                 </p>
-                <p className="text-xs text-[#5e6388]/60 mt-1">
+                <p className="text-xs text-text-muted/60 mt-1">
                   Crie um design no editor e salve como template
                 </p>
               </div>
@@ -461,7 +461,7 @@ export default function TemplatesPage() {
             {/* No search results */}
             {filteredTemplates.length === 0 && search && (
               <div className="col-span-full py-8 text-center">
-                <p className="text-sm text-[#5e6388]">
+                <p className="text-sm text-text-muted">
                   Nenhum template encontrado para &quot;{search}&quot;
                 </p>
               </div>
@@ -475,11 +475,11 @@ export default function TemplatesPage() {
          ══════════════════════════════════════════════════════════════════════ */}
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xs font-semibold text-[#5e6388] uppercase tracking-wider flex items-center gap-2">
+          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider flex items-center gap-2">
             <ImageIcon size={14} />
             Brand Assets (Logos, Fotos, Texturas)
             {!assetsLoading && (
-              <span className="text-[#5e6388]/60">({filteredAssets.length})</span>
+              <span className="text-text-muted/60">({filteredAssets.length})</span>
             )}
           </h2>
 
@@ -490,7 +490,7 @@ export default function TemplatesPage() {
               onChange={(e) =>
                 setUploadType(e.target.value as BrandAsset["type"])
               }
-              className="px-2 py-1.5 rounded-lg text-xs bg-[#141736] border border-white/[0.06] text-[#e8eaff] focus:outline-none focus:border-[#4ecdc4]/40"
+              className="px-2 py-1.5 rounded-lg text-xs bg-bg-card border border-white/[0.06] text-text-primary focus:outline-none focus:border-[#4ecdc4]/40"
             >
               {ASSET_TYPE_OPTIONS.map((t) => (
                 <option key={t} value={t}>
@@ -526,7 +526,7 @@ export default function TemplatesPage() {
         {assetsLoading && (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-5 h-5 text-[#4ecdc4] animate-spin" />
-            <span className="ml-3 text-sm text-[#5e6388]">
+            <span className="ml-3 text-sm text-text-muted">
               Carregando assets...
             </span>
           </div>
@@ -545,10 +545,10 @@ export default function TemplatesPage() {
             {filteredAssets.map((asset) => (
               <div
                 key={asset.id}
-                className="group relative bg-[#141736] rounded-xl overflow-hidden border border-white/[0.04] hover:border-white/[0.1] transition-all duration-200"
+                className="group relative bg-bg-card rounded-xl overflow-hidden border border-white/[0.04] hover:border-white/[0.1] transition-all duration-200"
               >
                 {/* Image */}
-                <div className="aspect-square bg-[#080b1e] flex items-center justify-center overflow-hidden">
+                <div className="aspect-square bg-bg-primary flex items-center justify-center overflow-hidden">
                   {asset.mime_type?.startsWith("image/") ? (
                     <img
                       src={asset.file_url}
@@ -558,14 +558,14 @@ export default function TemplatesPage() {
                   ) : (
                     <ImageIcon
                       size={24}
-                      className="text-[#5e6388] opacity-30"
+                      className="text-text-muted opacity-30"
                     />
                   )}
                 </div>
 
                 {/* Info */}
                 <div className="p-2">
-                  <p className="text-[10px] font-medium text-[#e8eaff] truncate">
+                  <p className="text-[10px] font-medium text-text-primary truncate">
                     {asset.name}
                   </p>
                   <span
@@ -586,12 +586,12 @@ export default function TemplatesPage() {
               <div className="col-span-full border border-dashed border-white/[0.06] rounded-xl p-8 text-center">
                 <ImageIcon
                   size={28}
-                  className="mx-auto text-[#5e6388] opacity-30 mb-2"
+                  className="mx-auto text-text-muted opacity-30 mb-2"
                 />
-                <p className="text-sm text-[#5e6388]">
+                <p className="text-sm text-text-muted">
                   Nenhum asset da marca
                 </p>
-                <p className="text-xs text-[#5e6388]/60 mt-1">
+                <p className="text-xs text-text-muted/60 mt-1">
                   Faca upload de logos, fotos e texturas
                 </p>
               </div>
@@ -600,7 +600,7 @@ export default function TemplatesPage() {
             {/* No search results */}
             {filteredAssets.length === 0 && search && (
               <div className="col-span-full py-6 text-center">
-                <p className="text-sm text-[#5e6388]">
+                <p className="text-sm text-text-muted">
                   Nenhum asset encontrado para &quot;{search}&quot;
                 </p>
               </div>

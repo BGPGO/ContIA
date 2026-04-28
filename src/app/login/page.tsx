@@ -51,7 +51,7 @@ export default function LoginPage() {
       initial={{ opacity: 0, y: 20, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
-      className="bg-gradient-to-br from-[#0f1230] to-[#141736] border border-[#1e2348]/60 rounded-xl p-8 max-w-sm w-full shadow-[0_0_40px_rgba(78,205,196,0.08)] relative overflow-hidden"
+      className="bg-gradient-to-br from-bg-input to-bg-card border border-border/60 rounded-xl p-8 max-w-sm w-full shadow-[0_0_40px_rgba(78,205,196,0.08)] relative overflow-hidden"
     >
       {/* Ambient glow orbs */}
       <div className="absolute -top-20 -right-20 w-40 h-40 rounded-full bg-gradient-to-br from-[#4ecdc4]/10 to-[#6c5ce7]/10 blur-3xl pointer-events-none" />

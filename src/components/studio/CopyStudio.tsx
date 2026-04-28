@@ -466,9 +466,9 @@ export function CopyStudio() {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -4, scale: 0.96 }}
                         transition={{ duration: 0.15 }}
-                        className="absolute top-full right-0 mt-1 z-50 bg-[#141736] border border-white/10 rounded-xl shadow-xl w-[280px] py-2 max-h-[300px] overflow-y-auto"
+                        className="absolute top-full right-0 mt-1 z-50 bg-bg-card border border-white/10 rounded-xl shadow-xl w-[280px] py-2 max-h-[300px] overflow-y-auto"
                       >
-                        <p className="px-3 py-1 text-[10px] font-medium text-[#5e6388] uppercase tracking-wider">Rascunhos recentes</p>
+                        <p className="px-3 py-1 text-[10px] font-medium text-text-muted uppercase tracking-wider">Rascunhos recentes</p>
                         {draftSessions.map((draft) => {
                           const FmtIcon = DRAFT_FORMAT_ICON[draft.format] || FileText;
                           return (
@@ -481,10 +481,10 @@ export function CopyStudio() {
                               }}
                               className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-white/5 transition-colors cursor-pointer text-left"
                             >
-                              <FmtIcon size={13} className="text-[#5e6388] shrink-0" />
+                              <FmtIcon size={13} className="text-text-muted shrink-0" />
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs font-medium text-[#e8eaff] truncate">{draft.title || "Sem titulo"}</p>
-                                <p className="text-[10px] text-[#5e6388]">{formatDraftDate(draft.updated_at)} · {DRAFT_FORMAT_LABEL[draft.format]}</p>
+                                <p className="text-xs font-medium text-text-primary truncate">{draft.title || "Sem titulo"}</p>
+                                <p className="text-[10px] text-text-muted">{formatDraftDate(draft.updated_at)} · {DRAFT_FORMAT_LABEL[draft.format]}</p>
                               </div>
                             </button>
                           );
@@ -546,7 +546,7 @@ export function CopyStudio() {
                       type="button"
                       onClick={() => handleChipClick(chip)}
                       className="px-3.5 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer
-                        bg-[#141736] border border-[#4ecdc4]/15 text-[#4ecdc4]/90
+                        bg-bg-card border border-[#4ecdc4]/15 text-[#4ecdc4]/90
                         hover:bg-[#4ecdc4]/10 hover:border-[#4ecdc4]/30 hover:text-[#4ecdc4]"
                     >
                       {chip.label}
@@ -576,7 +576,7 @@ export function CopyStudio() {
                               type="button"
                               onClick={() => studio.selectSession(draft.id)}
                               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
-                                bg-[#141736] border border-white/5
+                                bg-bg-card border border-white/5
                                 hover:border-[#4ecdc4]/20 transition-all cursor-pointer text-left"
                             >
                               <FmtIcon size={14} className="text-text-muted shrink-0" />
@@ -611,7 +611,7 @@ export function CopyStudio() {
                         }
                       }}
                       placeholder="Digite sua ideia ou peca sugestoes..."
-                      className="w-full bg-[#141736] border border-[#4ecdc4]/10 rounded-xl px-4 py-3.5 text-sm text-text-primary
+                      className="w-full bg-bg-card border border-[#4ecdc4]/10 rounded-xl px-4 py-3.5 text-sm text-text-primary
                         placeholder:text-text-muted/50 focus:outline-none focus:border-[#4ecdc4]/40
                         transition-colors"
                     />

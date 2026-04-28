@@ -45,7 +45,7 @@
 }
 
 @theme {
-  /* ── Core palette — SOLID navy colors, no transparency ── */
+  /* ── Core palette — SOLID navy colors, no transparency (DARK default) ── */
   --color-bg-primary: #080b1e;
   --color-bg-secondary: #0c0f24;
   --color-bg-card: #141736;
@@ -63,6 +63,13 @@
   --color-text-primary: #e8eaff;
   --color-text-secondary: #8b8fb0;
   --color-text-muted: #5e6388;
+
+  /* ── Sidebar tokens (referenciados como hex no Sidebar — agora variáveis) ── */
+  --color-sidebar-bg: #0c0f24;
+  --color-sidebar-card: #141736;
+  --color-sidebar-card-hover: #1a1e42;
+  --color-sidebar-border: #1e2348;
+  --color-sidebar-input: #0f1230;
 
   /* ── Accent (emerald primary) ── */
   --color-accent: #4ecdc4;
@@ -95,6 +102,66 @@
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
   --shadow-glow: 0 0 20px rgba(78, 205, 196, 0.25);
   --shadow-glow-secondary: 0 0 16px rgba(108, 92, 231, 0.2);
+}
+
+/* ── Light theme overrides ────────────────────────────────────
+   Aplicado quando <html class="light">. Sobrescreve as CSS vars
+   usadas pelas utilities do Tailwind (bg-bg-primary, text-text-*, etc).
+   ────────────────────────────────────────────────────────────── */
+html.light {
+  --color-bg-primary: #f7f8fc;
+  --color-bg-secondary: #ffffff;
+  --color-bg-card: #ffffff;
+  --color-bg-card-hover: #f1f3f9;
+  --color-bg-card-solid: #ffffff;
+  --color-bg-input: #ffffff;
+  --color-bg-elevated: #ffffff;
+
+  --color-border: #e4e7ef;
+  --color-border-light: #d4d8e3;
+  --color-border-subtle: #eef0f5;
+
+  --color-text-primary: #0f1230;
+  --color-text-secondary: #4a4f70;
+  --color-text-muted: #7a7f9c;
+
+  --color-sidebar-bg: #ffffff;
+  --color-sidebar-card: #f7f8fc;
+  --color-sidebar-card-hover: #eef0f5;
+  --color-sidebar-border: #e4e7ef;
+  --color-sidebar-input: #ffffff;
+
+  --shadow-sm: 0 1px 2px 0 rgba(15, 18, 48, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(15, 18, 48, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(15, 18, 48, 0.08);
+  --shadow-xl: 0 20px 25px -5px rgba(15, 18, 48, 0.1);
+}
+
+/* Suaviza o mesh radial e o ruído no tema claro */
+html.light body::before {
+  background:
+    radial-gradient(ellipse 80% 60% at 10% 0%, rgba(78, 205, 196, 0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 90% 100%, rgba(108, 92, 231, 0.05) 0%, transparent 60%);
+}
+html.light body::after {
+  opacity: 0.06;
+}
+
+/* Glass premium e variantes de card precisam de fundo sólido no light */
+html.light .glass {
+  background: var(--color-bg-card);
+}
+html.light .glass-premium {
+  background: linear-gradient(135deg, rgba(255,255,255,0.96) 0%, rgba(247,248,252,0.92) 100%);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 8px 32px rgba(15, 18, 48, 0.06), inset 0 1px 0 rgba(255,255,255,0.6);
+}
+html.light .btn-secondary {
+  background: var(--color-bg-card);
+  color: var(--color-text-secondary);
+}
+html.light .btn-secondary:hover {
+  background: var(--color-bg-card-hover);
 }
 
 /* ── Base ── */

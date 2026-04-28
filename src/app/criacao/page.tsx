@@ -22,7 +22,7 @@ import type { EmpresaContext } from "@/types/ai";
 export default function CriacaoPage() {
   const { empresa } = useEmpresa();
   const empresaId = empresa?.id || "";
-  const { createPost } = usePosts(empresaId || undefined);
+  const { createPost, updatePost } = usePosts(empresaId || undefined);
   const { templates, loading: templatesLoading, saveTemplate, removeTemplate } = useTemplates(empresaId || undefined);
 
   const wizard = useCreationWizard();
@@ -216,6 +216,7 @@ export default function CriacaoPage() {
             state={state}
             setField={wizard.setField}
             createPost={createPost}
+            updatePost={updatePost}
             saveTemplate={saveTemplate}
             empresaId={empresaId}
             onReset={wizard.reset}

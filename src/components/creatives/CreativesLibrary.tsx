@@ -386,7 +386,7 @@ export function CreativesLibrary({
                 <button
                   type="button"
                   onClick={handleNewConversation}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#4ecdc4] hover:bg-[#4ecdc4]/90 text-[#080b1e] text-sm font-semibold transition-all shrink-0"
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#4ecdc4] hover:bg-[#4ecdc4]/90 text-bg-primary text-sm font-semibold transition-all shrink-0"
                 >
                   <Plus className="w-4 h-4" />
                   Nova conversa
@@ -437,7 +437,7 @@ export function CreativesLibrary({
                     <button
                       type="button"
                       onClick={handleNewConversation}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#4ecdc4] hover:bg-[#4ecdc4]/90 text-[#080b1e] text-sm font-semibold transition-all"
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#4ecdc4] hover:bg-[#4ecdc4]/90 text-bg-primary text-sm font-semibold transition-all"
                     >
                       <Plus className="w-4 h-4" />
                       Nova conversa

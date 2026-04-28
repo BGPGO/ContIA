@@ -105,7 +105,7 @@ function RichSection({ section }: { section: SlideSection }) {
     case "callout":
       if (!section.callout) return null;
       return (
-        <div className="bg-[#111528] border border-[#1e2348] rounded-[6px] p-3 border-l-[3px] border-l-[#3b82f6]/60">
+        <div className="bg-[#111528] border border-border rounded-[6px] p-3 border-l-[3px] border-l-[#3b82f6]/60">
           <p className="text-[10px] text-[#e0e4f0]/80 italic leading-relaxed">{section.callout.text}</p>
           {section.callout.attribution && (
             <p className="text-[8px] text-[#6b7094] mt-1">— {section.callout.attribution}</p>

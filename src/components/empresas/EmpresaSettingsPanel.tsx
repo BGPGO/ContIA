@@ -15,10 +15,10 @@ interface EmpresaSettingsPanelProps {
 }
 
 const inputClass =
-  'w-full h-9 bg-[#141736] border border-[#1e2348] text-[#e8eaff] placeholder:text-[#5e6388] rounded-lg px-3 text-sm outline-none focus:border-[#6c5ce7]/50 focus:ring-1 focus:ring-[#6c5ce7]/20 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed';
+  'w-full h-9 bg-bg-card border border-border text-text-primary placeholder:text-text-muted rounded-lg px-3 text-sm outline-none focus:border-[#6c5ce7]/50 focus:ring-1 focus:ring-[#6c5ce7]/20 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed';
 
 const labelClass =
-  'block text-[11px] font-medium text-[#8b8fb0] uppercase tracking-wide mb-1.5';
+  'block text-[11px] font-medium text-text-secondary uppercase tracking-wide mb-1.5';
 
 export function EmpresaSettingsPanel({ empresa, myRole }: EmpresaSettingsPanelProps) {
   const { updateEmpresa, refreshEmpresas } = useEmpresa();
@@ -73,9 +73,9 @@ export function EmpresaSettingsPanel({ empresa, myRole }: EmpresaSettingsPanelPr
   return (
     <div className="space-y-4">
       {/* Dados da empresa */}
-      <div className="bg-[#0f1230] border border-[#1e2348]/60 rounded-2xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-[#1e2348]/40">
-          <h3 className="text-[11px] font-semibold text-[#5e6388] uppercase tracking-wide">
+      <div className="bg-bg-input border border-border/60 rounded-2xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-border/40">
+          <h3 className="text-[11px] font-semibold text-text-muted uppercase tracking-wide">
             Dados da empresa
           </h3>
         </div>
@@ -142,7 +142,7 @@ export function EmpresaSettingsPanel({ empresa, myRole }: EmpresaSettingsPanelPr
                 value={form.cor_primaria}
                 onChange={(e) => updateField('cor_primaria', e.target.value)}
                 disabled={!canEdit}
-                className="w-6 h-6 rounded-md border border-[#1e2348] bg-transparent cursor-pointer p-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-6 h-6 rounded-md border border-border bg-transparent cursor-pointer p-0 disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <input
                 type="text"
@@ -165,7 +165,7 @@ export function EmpresaSettingsPanel({ empresa, myRole }: EmpresaSettingsPanelPr
                 value={form.cor_secundaria}
                 onChange={(e) => updateField('cor_secundaria', e.target.value)}
                 disabled={!canEdit}
-                className="w-6 h-6 rounded-md border border-[#1e2348] bg-transparent cursor-pointer p-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-6 h-6 rounded-md border border-border bg-transparent cursor-pointer p-0 disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <input
                 type="text"
@@ -208,9 +208,9 @@ export function EmpresaSettingsPanel({ empresa, myRole }: EmpresaSettingsPanelPr
       </div>
 
       {/* Membros */}
-      <div className="bg-[#0f1230] border border-[#1e2348]/60 rounded-2xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-[#1e2348]/40">
-          <h3 className="text-[11px] font-semibold text-[#5e6388] uppercase tracking-wide">
+      <div className="bg-bg-input border border-border/60 rounded-2xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-border/40">
+          <h3 className="text-[11px] font-semibold text-text-muted uppercase tracking-wide">
             Equipe
           </h3>
         </div>
@@ -220,13 +220,13 @@ export function EmpresaSettingsPanel({ empresa, myRole }: EmpresaSettingsPanelPr
               <Users size={14} className="text-[#6c5ce7]" />
             </div>
             <div>
-              <p className="text-[13px] font-medium text-[#e8eaff]">Membros da empresa</p>
-              <p className="text-[11px] text-[#5e6388]">Gerencie quem tem acesso</p>
+              <p className="text-[13px] font-medium text-text-primary">Membros da empresa</p>
+              <p className="text-[11px] text-text-muted">Gerencie quem tem acesso</p>
             </div>
           </div>
           <Link
             href={`/empresas/${empresa.id}/membros`}
-            className="inline-flex items-center gap-1.5 px-3 h-8 text-[12px] font-medium text-[#8b8fb0] hover:text-[#e8eaff] bg-[#141736] border border-[#1e2348] rounded-lg transition-colors duration-150"
+            className="inline-flex items-center gap-1.5 px-3 h-8 text-[12px] font-medium text-text-secondary hover:text-text-primary bg-bg-card border border-border rounded-lg transition-colors duration-150"
           >
             Gerenciar
           </Link>
@@ -234,9 +234,9 @@ export function EmpresaSettingsPanel({ empresa, myRole }: EmpresaSettingsPanelPr
       </div>
 
       {/* Redes Sociais */}
-      <div className="bg-[#0f1230] border border-[#1e2348]/60 rounded-2xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-[#1e2348]/40">
-          <h3 className="text-[11px] font-semibold text-[#5e6388] uppercase tracking-wide">
+      <div className="bg-bg-input border border-border/60 rounded-2xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-border/40">
+          <h3 className="text-[11px] font-semibold text-text-muted uppercase tracking-wide">
             Redes Sociais
           </h3>
         </div>
@@ -246,13 +246,13 @@ export function EmpresaSettingsPanel({ empresa, myRole }: EmpresaSettingsPanelPr
               <Cable size={14} className="text-[#4ecdc4]" />
             </div>
             <div>
-              <p className="text-[13px] font-medium text-[#e8eaff]">Conexões de redes sociais</p>
-              <p className="text-[11px] text-[#5e6388]">Instagram, Facebook, LinkedIn e mais</p>
+              <p className="text-[13px] font-medium text-text-primary">Conexões de redes sociais</p>
+              <p className="text-[11px] text-text-muted">Instagram, Facebook, LinkedIn e mais</p>
             </div>
           </div>
           <Link
             href={`/conexoes?empresaId=${empresa.id}`}
-            className="inline-flex items-center gap-1.5 px-3 h-8 text-[12px] font-medium text-[#8b8fb0] hover:text-[#e8eaff] bg-[#141736] border border-[#1e2348] rounded-lg transition-colors duration-150"
+            className="inline-flex items-center gap-1.5 px-3 h-8 text-[12px] font-medium text-text-secondary hover:text-text-primary bg-bg-card border border-border rounded-lg transition-colors duration-150"
           >
             Gerenciar
           </Link>
@@ -261,7 +261,7 @@ export function EmpresaSettingsPanel({ empresa, myRole }: EmpresaSettingsPanelPr
 
       {/* Zona de perigo */}
       {canDelete && (
-        <div className="bg-[#0f1230] border border-[#f87171]/25 rounded-2xl overflow-hidden">
+        <div className="bg-bg-input border border-[#f87171]/25 rounded-2xl overflow-hidden">
           <div className="px-4 py-3 border-b border-[#f87171]/15">
             <h3 className="text-[11px] font-semibold text-[#f87171]/70 uppercase tracking-wide">
               Zona de perigo
@@ -269,8 +269,8 @@ export function EmpresaSettingsPanel({ empresa, myRole }: EmpresaSettingsPanelPr
           </div>
           <div className="px-4 py-3 flex items-center justify-between">
             <div>
-              <p className="text-[13px] font-medium text-[#e8eaff]">Deletar empresa</p>
-              <p className="text-[11px] text-[#5e6388]">
+              <p className="text-[13px] font-medium text-text-primary">Deletar empresa</p>
+              <p className="text-[11px] text-text-muted">
                 Desativa a empresa. Restaurável em até 30 dias.
               </p>
             </div>

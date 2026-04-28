@@ -156,7 +156,7 @@ export function InstagramPostModal({
             className="fixed inset-0 z-[70] flex items-center justify-center p-4 pointer-events-none"
           >
             <div
-              className="pointer-events-auto w-full flex flex-col md:flex-row rounded-2xl overflow-hidden shadow-2xl shadow-black/60 border border-[#1e2348]/60"
+              className="pointer-events-auto w-full flex flex-col md:flex-row rounded-2xl overflow-hidden shadow-2xl shadow-black/60 border border-border/60"
               style={{
                 background: "linear-gradient(135deg, #0c0f24 0%, #10133a 100%)",
                 maxWidth: "min(940px, 96vw)",
@@ -165,7 +165,7 @@ export function InstagramPostModal({
             >
               {/* ── Painel de imagem ── */}
               <div
-                className="relative flex-shrink-0 bg-[#080b1e] flex items-center justify-center overflow-hidden"
+                className="relative flex-shrink-0 bg-bg-primary flex items-center justify-center overflow-hidden"
                 style={{
                   width: "min(540px, 100%)",
                   // portrait 4:5 no desktop, quadrado no mobile
@@ -176,10 +176,10 @@ export function InstagramPostModal({
                 {slides.length === 0 ? (
                   // Sem mídia
                   <div className="flex flex-col items-center gap-3 p-8">
-                    <div className="w-16 h-16 rounded-2xl bg-[#1e2348] border border-white/10 flex items-center justify-center">
-                      <ImageOff className="w-8 h-8 text-[#5e6388]" />
+                    <div className="w-16 h-16 rounded-2xl bg-border border border-white/10 flex items-center justify-center">
+                      <ImageOff className="w-8 h-8 text-text-muted" />
                     </div>
-                    <p className="text-sm font-medium text-[#5e6388]">
+                    <p className="text-sm font-medium text-text-muted">
                       Sem mídia gerada
                     </p>
                   </div>
@@ -255,17 +255,17 @@ export function InstagramPostModal({
                 style={{ minWidth: 0, maxWidth: "380px" }}
               >
                 {/* Header do painel */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-[#1e2348]/60 shrink-0">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-border/60 shrink-0">
                   <h2
                     id="ig-modal-title"
-                    className="text-[14px] font-semibold text-[#e8eaff] leading-snug line-clamp-1 flex-1 min-w-0 pr-2"
+                    className="text-[14px] font-semibold text-text-primary leading-snug line-clamp-1 flex-1 min-w-0 pr-2"
                   >
                     {post.titulo}
                   </h2>
                   <button
                     onClick={onClose}
                     aria-label="Fechar"
-                    className="p-1.5 rounded-lg text-[#5e6388] hover:text-[#e8eaff] hover:bg-[#1a1e42] transition-all duration-200 shrink-0"
+                    className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-card-hover transition-all duration-200 shrink-0"
                   >
                     <X size={16} />
                   </button>
@@ -302,7 +302,7 @@ export function InstagramPostModal({
                   {/* Legenda / conteúdo */}
                   {post.conteudo && (
                     <div className="space-y-1.5">
-                      <p className="text-[11px] font-medium text-[#5e6388] uppercase tracking-wide">
+                      <p className="text-[11px] font-medium text-text-muted uppercase tracking-wide">
                         Legenda
                       </p>
                       <p className="text-[13px] text-[#c8caee] leading-relaxed whitespace-pre-line">
@@ -312,20 +312,20 @@ export function InstagramPostModal({
                   )}
 
                   {/* Metadados */}
-                  <div className="space-y-1 pt-1 border-t border-[#1e2348]/40">
+                  <div className="space-y-1 pt-1 border-t border-border/40">
                     {createdAt && (
-                      <p className="text-[11px] text-[#5e6388]">
+                      <p className="text-[11px] text-text-muted">
                         Criado em: {createdAt}
                       </p>
                     )}
-                    <p className="text-[11px] text-[#5e6388]">
+                    <p className="text-[11px] text-text-muted">
                       Status:{" "}
                       <span className="text-[#a29bfe] font-medium capitalize">
                         {post.status.replace(/_/g, " ")}
                       </span>
                     </p>
                     {isCarousel && (
-                      <p className="text-[11px] text-[#5e6388]">
+                      <p className="text-[11px] text-text-muted">
                         Carrossel:{" "}
                         <span className="text-[#4ecdc4] font-medium">
                           {totalSlides} slides
@@ -337,7 +337,7 @@ export function InstagramPostModal({
 
                 {/* Footer: ações */}
                 {(onApprove || onReject) && (
-                  <div className="px-4 py-3 border-t border-[#1e2348]/60 flex gap-2.5 shrink-0">
+                  <div className="px-4 py-3 border-t border-border/60 flex gap-2.5 shrink-0">
                     {onReject && (
                       <button
                         onClick={(e) => {

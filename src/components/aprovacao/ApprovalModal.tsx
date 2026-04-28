@@ -81,7 +81,7 @@ export function ApprovalModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50 bg-[#080b1e]/75 backdrop-blur-sm"
+            className="fixed inset-0 z-50 bg-bg-primary/75 backdrop-blur-sm"
             onClick={() => !submitting && onClose()}
             aria-hidden="true"
           />
@@ -98,10 +98,10 @@ export function ApprovalModal({
             transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
           >
-            <div className="pointer-events-auto w-full max-w-md bg-[#0c0f24] border border-[#1e2348]/80 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
+            <div className="pointer-events-auto w-full max-w-md bg-bg-secondary border border-border/80 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
               {/* Header */}
               <div
-                className="px-5 py-4 border-b border-[#1e2348]/60 flex items-center gap-3"
+                className="px-5 py-4 border-b border-border/60 flex items-center gap-3"
                 style={{ background: `${accentColor}08` }}
               >
                 <div
@@ -113,18 +113,18 @@ export function ApprovalModal({
                 <div className="flex-1 min-w-0">
                   <h2
                     id="modal-title"
-                    className="text-[15px] font-semibold text-[#e8eaff]"
+                    className="text-[15px] font-semibold text-text-primary"
                   >
                     {isApprove ? "Aprovar post" : "Rejeitar post"}
                   </h2>
-                  <p className="text-[12px] text-[#5e6388] truncate mt-0.5">
+                  <p className="text-[12px] text-text-muted truncate mt-0.5">
                     {postTitle}
                   </p>
                 </div>
                 <button
                   onClick={() => !submitting && onClose()}
                   disabled={submitting}
-                  className="p-1.5 rounded-lg text-[#5e6388] hover:text-[#e8eaff] hover:bg-[#1a1e42] transition-all duration-200 disabled:opacity-40"
+                  className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-card-hover transition-all duration-200 disabled:opacity-40"
                   aria-label="Fechar modal"
                 >
                   <X size={16} />
@@ -133,7 +133,7 @@ export function ApprovalModal({
 
               {/* Body */}
               <div className="p-5 space-y-4">
-                <p className="text-[13px] text-[#8b8fb0]">
+                <p className="text-[13px] text-text-secondary">
                   {isApprove
                     ? "Voce pode adicionar um comentario opcional antes de aprovar este post."
                     : "Informe o motivo da rejeicao. Este comentario sera enviado ao autor do post."}
@@ -142,7 +142,7 @@ export function ApprovalModal({
                 <div className="space-y-1.5">
                   <label
                     htmlFor="modal-comment"
-                    className="text-[12px] font-medium text-[#8b8fb0]"
+                    className="text-[12px] font-medium text-text-secondary"
                   >
                     {isApprove ? "Comentario (opcional)" : "Motivo da rejeicao"}
                     {!isApprove && (
@@ -164,10 +164,10 @@ export function ApprovalModal({
                         : "Ex: O texto precisa ser revisado..."
                     }
                     rows={3}
-                    className={`w-full px-3 py-2.5 rounded-xl bg-[#141736]/80 border text-[13px] text-[#e8eaff] placeholder-[#5e6388]/60 resize-none transition-all duration-200 outline-none focus:ring-1 disabled:opacity-50 ${
+                    className={`w-full px-3 py-2.5 rounded-xl bg-bg-card/80 border text-[13px] text-text-primary placeholder-text-muted/60 resize-none transition-all duration-200 outline-none focus:ring-1 disabled:opacity-50 ${
                       validationError
                         ? "border-[#f87171]/60 focus:border-[#f87171] focus:ring-[#f87171]/30"
-                        : "border-[#1e2348]/60 focus:border-[#4ecdc4]/40 focus:ring-[#4ecdc4]/20"
+                        : "border-border/60 focus:border-[#4ecdc4]/40 focus:ring-[#4ecdc4]/20"
                     }`}
                   />
                   {validationError && (
@@ -187,7 +187,7 @@ export function ApprovalModal({
                 <button
                   onClick={() => !submitting && onClose()}
                   disabled={submitting}
-                  className="px-4 py-2 rounded-xl text-[13px] font-medium text-[#8b8fb0] hover:text-[#e8eaff] hover:bg-[#1a1e42] transition-all duration-200 disabled:opacity-40"
+                  className="px-4 py-2 rounded-xl text-[13px] font-medium text-text-secondary hover:text-text-primary hover:bg-bg-card-hover transition-all duration-200 disabled:opacity-40"
                 >
                   Cancelar
                 </button>

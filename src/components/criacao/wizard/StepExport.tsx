@@ -33,6 +33,7 @@ interface StepExportProps {
   state: WizardState;
   setField: <K extends keyof WizardState>(field: K, value: WizardState[K]) => void;
   createPost: (data: Omit<Post, "id" | "created_at" | "metricas">) => Promise<Post | null>;
+  updatePost: (id: string, data: Partial<Omit<Post, "id" | "created_at">>) => Promise<Post | null>;
   saveTemplate: (template: CreationTemplate) => CreationTemplate;
   empresaId: string;
   onReset: () => void;
@@ -58,6 +59,7 @@ export function StepExport({
   state,
   setField,
   createPost,
+  updatePost,
   saveTemplate,
   empresaId,
   onReset,
@@ -186,6 +188,78 @@ export function StepExport({
       showToast(msg, "error");
     } finally {
       setSubmittingApproval(false);
+    }
+  };
+
+  const handlePublishNow = async () => {
+    if (!state.generatedImageUrl) {
+      showToast("É necessário gerar uma imagem antes de publicar", "error");
+      return;
+    }
+    if (!state.platforms.includes("instagram")) {
+      showToast("Selecione Instagram nas plataformas para publicar", "error");
+      return;
+    }
+
+    setField("saving", true);
+    try {
+      const post = await createPost({
+        empresa_id: empresaId,
+        titulo: getTitle(),
+        conteudo: getContent(),
+        midia_url: state.generatedImageUrl,
+        plataformas: state.platforms,
+        status: "rascunho",
+        agendado_para: null,
+        publicado_em: null,
+        tematica: state.topic,
+      });
+
+      if (!post) {
+        throw new Error("Falha ao salvar o post antes de publicar");
+      }
+
+      const caption = [
+        getContent(),
+        result?.hashtags?.length
+          ? "\n\n" + result.hashtags.map((h) => `#${h.replace(/^#/, "")}`).join(" ")
+          : "",
+      ]
+        .filter(Boolean)
+        .join("");
+
+      const isReels = state.format === "reels";
+
+      const res = await fetch("/api/instagram/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          empresa_id: empresaId,
+          image_url: isReels ? undefined : state.generatedImageUrl,
+          video_url: isReels ? state.generatedImageUrl : undefined,
+          caption,
+          media_type: isReels ? "REELS" : "IMAGE",
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Erro ao publicar no Instagram");
+      }
+
+      await updatePost(post.id, {
+        status: "publicado",
+        publicado_em: new Date().toISOString(),
+      }).catch(() => {});
+
+      showToast("Publicado no Instagram!", "success");
+      setSavedPost(true);
+      setField("saved", true);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro ao publicar";
+      showToast(msg, "error");
+    } finally {
+      setField("saving", false);
     }
   };
 
@@ -383,6 +457,38 @@ export function StepExport({
           </div>
         </motion.button>
 
+        {/* Publish now */}
+        <motion.button
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.14 }}
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.99 }}
+          onClick={handlePublishNow}
+          disabled={state.saving || !state.generatedImageUrl || !state.platforms.includes("instagram")}
+          className="w-full flex items-center gap-4 bg-gradient-to-r from-[#e1306c]/10 to-[#fd1d1d]/10 border border-[#e1306c]/30 rounded-xl p-4 hover:border-[#e1306c]/60 hover:from-[#e1306c]/15 hover:to-[#fd1d1d]/15 transition-all text-left group disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#e1306c] to-[#fd1d1d] flex items-center justify-center">
+            {state.saving ? (
+              <Loader2 size={18} className="text-white animate-spin" />
+            ) : (
+              <Send size={18} className="text-white" />
+            )}
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-text-primary">
+              {state.saving ? "Publicando..." : "Publicar Agora no Instagram"}
+            </p>
+            <p className="text-xs text-text-muted mt-0.5">
+              {!state.generatedImageUrl
+                ? "Gere uma imagem antes de publicar"
+                : !state.platforms.includes("instagram")
+                  ? "Adicione Instagram nas plataformas"
+                  : "Publica imediatamente na conta conectada"}
+            </p>
+          </div>
+        </motion.button>
+
         {/* Schedule */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
@@ -534,8 +640,8 @@ export function StepExport({
             exit={{ opacity: 0, y: 20 }}
             className={`fixed bottom-6 right-6 z-[60] flex items-center gap-3 px-5 py-3 rounded-xl border shadow-xl backdrop-blur-xl ${
               toast.type === "success"
-                ? "bg-[#0c0f24]/95 border-[#34d399]/30 text-[#34d399]"
-                : "bg-[#0c0f24]/95 border-[#f87171]/30 text-[#f87171]"
+                ? "bg-bg-secondary/95 border-[#34d399]/30 text-[#34d399]"
+                : "bg-bg-secondary/95 border-[#f87171]/30 text-[#f87171]"
             }`}
           >
             {toast.type === "success" ? (
@@ -543,7 +649,7 @@ export function StepExport({
             ) : (
               <XCircle size={16} className="shrink-0" />
             )}
-            <span className="text-sm font-medium text-[#e8eaff]">{toast.message}</span>
+            <span className="text-sm font-medium text-text-primary">{toast.message}</span>
           </motion.div>
         )}
       </AnimatePresence>

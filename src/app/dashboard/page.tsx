@@ -346,7 +346,7 @@ export default function DashboardPage() {
       {/* ── Recent Posts Grid ──────────────────────────────────── */}
       {loading ? (
         <div>
-          <span className="section-title mb-3 block text-[#e8eaff]">
+          <span className="section-title mb-3 block text-text-primary">
             Posts recentes
           </span>
           <PostGridSkeleton />
@@ -354,7 +354,7 @@ export default function DashboardPage() {
       ) : connected && recentPosts.length > 0 ? (
         <div>
           <div className="flex items-center justify-between mb-3">
-            <span className="section-title text-[#e8eaff]">
+            <span className="section-title text-text-primary">
               Posts recentes
             </span>
             <button
@@ -465,7 +465,7 @@ export default function DashboardPage() {
               <div className="w-7 h-7 rounded-lg bg-[#4ecdc4]/15 flex items-center justify-center">
                 <BarChart3 size={14} className="text-[#4ecdc4]" />
               </div>
-              <h2 className="section-title text-[#e8eaff]">
+              <h2 className="section-title text-text-primary">
                 Resumo de performance
               </h2>
             </div>
@@ -528,7 +528,7 @@ export default function DashboardPage() {
               <div className="w-7 h-7 rounded-lg bg-[#6c5ce7]/15 flex items-center justify-center">
                 <Sparkles size={14} className="text-[#6c5ce7]" />
               </div>
-              <h2 className="section-title text-[#e8eaff]">DNA da Marca</h2>
+              <h2 className="section-title text-text-primary">DNA da Marca</h2>
             </div>
 
             <DNACard dna={dna} empresaId={empresa.id} connected={connected} onDNAGenerated={refresh} />
@@ -548,7 +548,7 @@ export default function DashboardPage() {
             <div className="w-7 h-7 rounded-lg bg-[#6c5ce7]/15 flex items-center justify-center">
               <Sparkles size={14} className="text-[#6c5ce7]" />
             </div>
-            <h2 className="section-title text-[#e8eaff]">DNA da Marca</h2>
+            <h2 className="section-title text-text-primary">DNA da Marca</h2>
           </div>
           <DNACard dna={dna} empresaId={empresa.id} connected={false} onDNAGenerated={refresh} />
         </motion.div>

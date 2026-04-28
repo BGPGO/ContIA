@@ -39,6 +39,7 @@ import { useUser } from "@/hooks/useUser";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { EmpresaWizard } from "@/components/empresas/EmpresaWizard";
 import { RoleBadge } from "@/components/empresas/RoleBadge";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import type { Empresa } from "@/types";
 
 /* ── Types ── */
@@ -138,7 +139,7 @@ const iconColorMap: Record<string, string> = {
   "/marca/assets": "text-[#fbbf24]",
   "/setup": "text-[#4ecdc4]",
   "/conexoes": "text-[#6c5ce7]",
-  "/configuracoes": "text-[#8b8fb0]",
+  "/configuracoes": "text-text-secondary",
 };
 
 const STORAGE_KEY = "contia_sidebar_sections";
@@ -263,50 +264,53 @@ export function Sidebar() {
   const sidebarContent = (
     <div className="flex flex-col h-full">
       {/* ── Brand Header ── */}
-      <div className="relative px-5 h-16 flex items-center gap-3 border-b border-[#1e2348]/80">
+      <div className="relative px-5 h-16 flex items-center gap-3 border-b border-border/80">
         {/* Subtle gradient overlay on brand area */}
         <div className="absolute inset-0 bg-gradient-to-r from-[#4ecdc4]/[0.03] to-[#6c5ce7]/[0.03] pointer-events-none" />
         <div className="relative w-8 h-8 rounded-xl bg-gradient-to-br from-[#4ecdc4] to-[#6c5ce7] flex items-center justify-center shadow-lg shadow-[#4ecdc4]/20">
           <Sparkles className="w-4 h-4 text-white" />
         </div>
         <div className="flex flex-col">
-          <span className="text-[15px] font-bold tracking-tight text-[#e8eaff]">
+          <span className="text-[15px] font-bold tracking-tight text-text-primary">
             ContIA
           </span>
-          <span className="text-[10px] font-medium text-[#5e6388] tracking-wide">
+          <span className="text-[10px] font-medium text-text-muted tracking-wide">
             Content Intelligence
           </span>
         </div>
-        <span className="ml-auto text-[9px] font-semibold text-[#4ecdc4] bg-[#4ecdc4]/10 px-2 py-0.5 rounded-full border border-[#4ecdc4]/20 uppercase tracking-wider">
-          AI
-        </span>
-        {/* Mobile close */}
-        <button
-          onClick={closeMobile}
-          className="md:hidden ml-1 p-1.5 rounded-lg text-[#5e6388] hover:text-[#e8eaff] hover:bg-[#1a1e42] transition-all duration-200"
-          aria-label="Fechar menu"
-        >
-          <X size={18} />
-        </button>
+        <div className="ml-auto flex items-center gap-1.5">
+          <span className="text-[9px] font-semibold text-[#4ecdc4] bg-[#4ecdc4]/10 px-2 py-0.5 rounded-full border border-[#4ecdc4]/20 uppercase tracking-wider">
+            AI
+          </span>
+          <ThemeToggle />
+          {/* Mobile close */}
+          <button
+            onClick={closeMobile}
+            className="md:hidden p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-card-hover transition-all duration-200"
+            aria-label="Fechar menu"
+          >
+            <X size={18} />
+          </button>
+        </div>
       </div>
 
       {/* ── Empresa Selector ── */}
-      <div className="px-3 py-3 border-b border-[#1e2348]/60 relative" ref={dropdownRef}>
+      <div className="px-3 py-3 border-b border-border/60 relative" ref={dropdownRef}>
         <button
           onClick={() => setDropdownOpen((o) => !o)}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[#141736]/80 border border-[#1e2348]/60 hover:border-[#4ecdc4]/30 hover:bg-[#141736] transition-all duration-200 group"
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-bg-card/80 border border-border/60 hover:border-[#4ecdc4]/30 hover:bg-bg-card transition-all duration-200 group"
           aria-expanded={dropdownOpen}
           aria-haspopup="listbox"
         >
           {empresa ? (
             <span
-              className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-[#141736] group-hover:ring-[#1a1e42] transition-all duration-200"
+              className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-bg-card group-hover:ring-bg-card-hover transition-all duration-200"
               style={{ backgroundColor: empresa.cor_primaria }}
             />
           ) : (
-            <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-[#5e6388]/50" />
+            <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-text-muted/50" />
           )}
-          <span className="flex-1 text-left text-[13px] text-[#e8eaff] truncate font-medium">
+          <span className="flex-1 text-left text-[13px] text-text-primary truncate font-medium">
             {empresa?.nome ?? "Selecionar empresa"}
           </span>
           {myRole && (
@@ -315,7 +319,7 @@ export function Sidebar() {
             </span>
           )}
           <ChevronDown
-            className={`w-3.5 h-3.5 text-[#5e6388] transition-transform duration-200 ${
+            className={`w-3.5 h-3.5 text-text-muted transition-transform duration-200 ${
               dropdownOpen ? "rotate-180" : ""
             }`}
           />
@@ -328,7 +332,7 @@ export function Sidebar() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -6, scale: 0.97 }}
               transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
-              className="absolute left-3 right-3 top-full mt-1 z-50 bg-gradient-to-b from-[#141736] to-[#0f1230] border border-[#1e2348]/60 backdrop-blur-xl rounded-xl shadow-xl shadow-black/40 overflow-hidden py-1"
+              className="absolute left-3 right-3 top-full mt-1 z-50 bg-gradient-to-b from-bg-card to-bg-input border border-border/60 backdrop-blur-xl rounded-xl shadow-xl shadow-black/40 overflow-hidden py-1"
               role="listbox"
             >
               {empresas.map((e) => (
@@ -340,7 +344,7 @@ export function Sidebar() {
                   }}
                   role="option"
                   aria-selected={empresa?.id === e.id}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-[#8b8fb0] hover:text-[#e8eaff] hover:bg-[#1a1e42] transition-colors duration-150"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-text-secondary hover:text-text-primary hover:bg-bg-card-hover transition-colors duration-150"
                 >
                   <span
                     className="w-2 h-2 rounded-full shrink-0"
@@ -352,7 +356,7 @@ export function Sidebar() {
                   )}
                 </button>
               ))}
-              <div className="my-1 mx-2.5 border-t border-[#1e2348]" />
+              <div className="my-1 mx-2.5 border-t border-border" />
               <button
                 onClick={() => {
                   setDropdownOpen(false);
@@ -381,7 +385,7 @@ export function Sidebar() {
             <div key={section.id}>
               {/* Section divider (not before the first) */}
               {sectionIdx > 0 && (
-                <div className="mx-2 my-2 border-t border-[#1e2348]/50" />
+                <div className="mx-2 my-2 border-t border-border/50" />
               )}
 
               {/* Section label */}
@@ -395,14 +399,14 @@ export function Sidebar() {
                   className={`text-[10px] font-semibold uppercase tracking-[0.12em] transition-colors duration-200 ${
                     hasActive
                       ? "text-[#4ecdc4]/80"
-                      : "text-[#5e6388]/70 group-hover:text-[#5e6388]"
+                      : "text-text-muted/70 group-hover:text-text-muted"
                   }`}
                 >
                   {section.label}
                 </span>
                 <div className="flex-1" />
                 <ChevronRight
-                  className={`w-3 h-3 text-[#5e6388]/50 transition-transform duration-200 ${
+                  className={`w-3 h-3 text-text-muted/50 transition-transform duration-200 ${
                     open ? "rotate-90" : ""
                   }`}
                 />
@@ -427,7 +431,7 @@ export function Sidebar() {
                           pathname.startsWith(link.href + "/");
                         const iconColor = active
                           ? "text-white"
-                          : iconColorMap[link.href] || "text-[#5e6388]";
+                          : iconColorMap[link.href] || "text-text-muted";
 
                         return (
                           <Link
@@ -438,7 +442,7 @@ export function Sidebar() {
                             className={`relative flex items-center gap-2.5 px-2.5 h-9 rounded-xl text-[13px] font-medium transition-all duration-200 group/link ${
                               active
                                 ? "text-white bg-gradient-to-r from-[#4ecdc4]/20 via-[#6c5ce7]/10 to-transparent shadow-[inset_0_0_20px_rgba(78,205,196,0.06)]"
-                                : "text-[#8b8fb0] hover:text-[#e8eaff] hover:bg-[#1a1e42]/60"
+                                : "text-text-secondary hover:text-text-primary hover:bg-bg-card-hover/60"
                             }`}
                           >
                             {/* Active indicator bar */}
@@ -495,36 +499,36 @@ export function Sidebar() {
       </nav>
 
       {/* ── Footer ── */}
-      <div className="px-3 py-3 border-t border-[#1e2348]/80">
+      <div className="px-3 py-3 border-t border-border/80">
         {/* Powered by AI indicator */}
         <div className="flex items-center gap-1.5 px-2.5 mb-2">
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#34d399] opacity-50" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-[#34d399]" />
           </span>
-          <span className="text-[10px] text-[#5e6388] font-medium">
+          <span className="text-[10px] text-text-muted font-medium">
             Powered by AI
           </span>
-          <span className="ml-auto text-[10px] text-[#5e6388]/50 font-mono">
+          <span className="ml-auto text-[10px] text-text-muted/50 font-mono">
             v0.1
           </span>
         </div>
 
         {/* User row */}
         {supabaseConfigured && (
-          <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-[#1a1e42]/60 transition-all duration-200 group/user">
+          <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-bg-card-hover/60 transition-all duration-200 group/user">
             {/* User avatar */}
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#6c5ce7]/30 to-[#4ecdc4]/30 border border-[#1e2348] flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#6c5ce7]/30 to-[#4ecdc4]/30 border border-border flex items-center justify-center shrink-0">
               <span className="text-[11px] font-bold text-[#a29bfe]">
                 {userInitials}
               </span>
             </div>
             {/* Email */}
             <div className="flex-1 min-w-0">
-              <p className="text-[12px] text-[#e8eaff] font-medium truncate">
+              <p className="text-[12px] text-text-primary font-medium truncate">
                 {user?.email ?? "Usuario"}
               </p>
-              <p className="text-[10px] text-[#5e6388] truncate">
+              <p className="text-[10px] text-text-muted truncate">
                 {empresa?.nome ?? "Sem empresa"}
               </p>
             </div>
@@ -532,7 +536,7 @@ export function Sidebar() {
             <button
               type="button"
               onClick={signOut}
-              className="p-1.5 rounded-lg text-[#5e6388] hover:text-[#f87171] hover:bg-[#f87171]/10 transition-all duration-200 opacity-0 group-hover/user:opacity-100"
+              className="p-1.5 rounded-lg text-text-muted hover:text-[#f87171] hover:bg-[#f87171]/10 transition-all duration-200 opacity-0 group-hover/user:opacity-100"
               title="Sair"
               aria-label="Sair da conta"
             >
@@ -547,10 +551,10 @@ export function Sidebar() {
   return (
     <>
       {/* ── Mobile Top Bar ── */}
-      <div className="fixed top-0 left-0 right-0 z-40 md:hidden h-14 bg-[#0c0f24]/95 backdrop-blur-xl border-b border-[#1e2348]/60 flex items-center px-4 gap-3">
+      <div className="fixed top-0 left-0 right-0 z-40 md:hidden h-14 bg-bg-secondary/95 backdrop-blur-xl border-b border-border/60 flex items-center px-4 gap-3">
         <button
           onClick={() => setMobileOpen(true)}
-          className="p-1.5 rounded-lg text-[#5e6388] hover:text-[#e8eaff] hover:bg-[#1a1e42] transition-all duration-200"
+          className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-card-hover transition-all duration-200"
           aria-label="Abrir menu"
         >
           <Menu size={22} />
@@ -558,11 +562,11 @@ export function Sidebar() {
         <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#4ecdc4] to-[#6c5ce7] flex items-center justify-center shadow-lg shadow-[#4ecdc4]/15">
           <Sparkles className="w-3.5 h-3.5 text-white" />
         </div>
-        <span className="text-[14px] font-bold tracking-tight text-[#e8eaff]">
+        <span className="text-[14px] font-bold tracking-tight text-text-primary">
           ContIA
         </span>
         {empresa && (
-          <span className="ml-auto text-[11px] text-[#8b8fb0] truncate max-w-[140px] font-medium">
+          <span className="ml-auto text-[11px] text-text-secondary truncate max-w-[140px] font-medium">
             {empresa.nome}
           </span>
         )}
@@ -578,7 +582,7 @@ export function Sidebar() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.25 }}
-              className="fixed inset-0 z-40 bg-[#080b1e]/70 backdrop-blur-md md:hidden"
+              className="fixed inset-0 z-40 bg-bg-primary/70 backdrop-blur-md md:hidden"
               onClick={closeMobile}
               aria-hidden="true"
             />
@@ -588,7 +592,7 @@ export function Sidebar() {
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", stiffness: 380, damping: 35 }}
-              className="fixed top-0 left-0 bottom-0 z-50 w-[280px] flex flex-col bg-[#0c0f24] border-r border-[#1e2348]/60 shadow-2xl shadow-black/50 md:hidden"
+              className="fixed top-0 left-0 bottom-0 z-50 w-[280px] flex flex-col bg-bg-secondary border-r border-border/60 shadow-2xl shadow-black/50 md:hidden"
               role="dialog"
               aria-modal="true"
               aria-label="Menu de navegacao"
@@ -600,7 +604,7 @@ export function Sidebar() {
       </AnimatePresence>
 
       {/* ── Desktop Sidebar ── */}
-      <aside className="hidden md:flex flex-col w-[260px] h-screen shrink-0 border-r border-[#1e2348]/60 bg-[#0c0f24] relative z-30 overflow-hidden">
+      <aside className="hidden md:flex flex-col w-[260px] h-screen shrink-0 border-r border-border/60 bg-bg-secondary relative z-30 overflow-hidden">
         {/* Subtle side gradient */}
         <div className="absolute inset-0 bg-gradient-to-b from-[#4ecdc4]/[0.02] via-transparent to-[#6c5ce7]/[0.02] pointer-events-none" />
         <div className="relative flex flex-col h-full">

@@ -34,7 +34,7 @@ export function CodeBlock({ code, language }: CodeBlockProps) {
   return (
     <div className="relative group rounded-lg bg-[#0a0d20] border border-border overflow-hidden">
       {language && (
-        <div className="px-3 py-1 text-[10px] font-medium text-text-muted border-b border-border bg-[#0c0f24]">
+        <div className="px-3 py-1 text-[10px] font-medium text-text-muted border-b border-border bg-bg-secondary">
           {language}
         </div>
       )}

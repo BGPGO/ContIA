@@ -130,7 +130,7 @@ function ScheduleModal({ editing, connectedProviders, onSave, onClose }: Schedul
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="bg-[#141736] border border-[#1e2348] rounded-2xl p-6 w-full max-w-lg shadow-2xl my-4"
+        className="bg-bg-card border border-border rounded-2xl p-6 w-full max-w-lg shadow-2xl my-4"
       >
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-[16px] font-semibold text-text-primary">

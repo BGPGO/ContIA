@@ -238,7 +238,7 @@ export function ConversationsSidebar({
   onRename,
 }: ConversationsSidebarProps) {
   return (
-    <div className="flex flex-col h-full w-full bg-[#080b1e]">
+    <div className="flex flex-col h-full w-full bg-bg-primary">
       {/* Header fixo */}
       <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-white/10">
         <span className="text-sm font-semibold text-white/80 tracking-wide">
