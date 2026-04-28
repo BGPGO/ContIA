@@ -114,6 +114,7 @@ export function PostApprovalCard({
     : null;
 
   const hasThumbnail = Boolean(post.midia_url);
+  const [mediaAspect, setMediaAspect] = useState<number | null>(null);
 
   return (
     <>
@@ -124,23 +125,28 @@ export function PostApprovalCard({
         exit={{ opacity: 0, scale: 0.97 }}
         transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
         onClick={() => setIgModalOpen(true)}
-        className="bg-bg-secondary border border-border/70 rounded-2xl overflow-hidden shadow-lg hover:border-[#4ecdc4]/30 hover:shadow-[#4ecdc4]/5 transition-all duration-300 flex flex-col cursor-pointer"
-        style={{
-          background: "linear-gradient(135deg, #0c0f24 0%, #10133a 100%)",
-        }}
+        className="bg-bg-secondary dark:bg-gradient-to-br dark:from-[#0c0f24] dark:to-[#10133a] border border-border/70 rounded-2xl overflow-hidden shadow-lg hover:border-[#4ecdc4]/30 hover:shadow-[#4ecdc4]/5 transition-all duration-300 flex flex-col cursor-pointer"
       >
         {/* ── Hero image ── */}
         {hasThumbnail ? (
           <div
-            className="relative w-full overflow-hidden bg-bg-primary flex items-center justify-center"
-            style={{ maxHeight: "500px", aspectRatio: "1 / 1" }}
+            className="relative w-full overflow-hidden bg-bg-primary"
+            style={{
+              aspectRatio: mediaAspect ? `${mediaAspect}` : "1 / 1",
+              maxHeight: "640px",
+            }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={post.midia_url!}
               alt={post.titulo}
-              className="w-full h-full object-contain"
-              style={{ maxHeight: "500px" }}
+              onLoad={(e) => {
+                const img = e.currentTarget;
+                if (img.naturalWidth && img.naturalHeight) {
+                  setMediaAspect(img.naturalWidth / img.naturalHeight);
+                }
+              }}
+              className="w-full h-full object-cover"
             />
             {/* Badge de carrossel */}
             {post.midia_urls && post.midia_urls.length > 1 && (
