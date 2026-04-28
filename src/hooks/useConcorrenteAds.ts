@@ -24,6 +24,8 @@ interface AdsResponse {
   total: number;
   has_more: boolean;
   cached?: boolean;
+  not_authorized?: boolean;
+  fallback_url?: string;
 }
 
 // ── In-memory cache ──────────────────────────────────────────────────────────
@@ -38,6 +40,8 @@ export function useConcorrenteAds(concorrenteId: string | null) {
   const [error, setError] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
   const [cached, setCached] = useState(false);
+  const [notAuthorized, setNotAuthorized] = useState(false);
+  const [fallbackUrl, setFallbackUrl] = useState<string | null>(null);
   const lastIdRef = useRef<string | null>(null);
 
   const fetchAds = useCallback(
@@ -50,12 +54,16 @@ export function useConcorrenteAds(concorrenteId: string | null) {
         setAds(cached.ads);
         setTotal(cached.total);
         setCached(cached.cached ?? true);
+        setNotAuthorized(cached.not_authorized ?? false);
+        setFallbackUrl(cached.fallback_url ?? null);
         setError(null);
         return;
       }
 
       setLoading(true);
       setError(null);
+      setNotAuthorized(false);
+      setFallbackUrl(null);
 
       try {
         const params = new URLSearchParams();
@@ -70,6 +78,7 @@ export function useConcorrenteAds(concorrenteId: string | null) {
 
         if (!res.ok) {
           setError(data.error || "Erro ao buscar anúncios.");
+          if (data.fallback_url) setFallbackUrl(data.fallback_url);
           return;
         }
 
@@ -78,12 +87,16 @@ export function useConcorrenteAds(concorrenteId: string | null) {
           total: data.total ?? 0,
           has_more: data.has_more ?? false,
           cached: data.cached ?? false,
+          not_authorized: data.not_authorized ?? false,
+          fallback_url: data.fallback_url,
         };
 
         adsCache.set(concorrenteId, response);
         setAds(response.ads);
         setTotal(response.total);
         setCached(response.cached ?? false);
+        setNotAuthorized(response.not_authorized ?? false);
+        setFallbackUrl(response.fallback_url ?? null);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Erro desconhecido.");
       } finally {
@@ -108,5 +121,15 @@ export function useConcorrenteAds(concorrenteId: string | null) {
     }
   }, [concorrenteId, fetchAds]);
 
-  return { ads, loading, error, total, cached, fetchAds, refresh };
+  return {
+    ads,
+    loading,
+    error,
+    total,
+    cached,
+    notAuthorized,
+    fallbackUrl,
+    fetchAds,
+    refresh,
+  };
 }

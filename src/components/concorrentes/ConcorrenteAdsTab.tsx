@@ -208,7 +208,7 @@ interface ConcorrenteAdsTabProps {
 }
 
 export function ConcorrenteAdsTab({ concorrenteId }: ConcorrenteAdsTabProps) {
-  const { ads, loading, error, total, cached, refresh } =
+  const { ads, loading, error, total, cached, notAuthorized, fallbackUrl, refresh } =
     useConcorrenteAds(concorrenteId);
 
   return (
@@ -251,8 +251,39 @@ export function ConcorrenteAdsTab({ concorrenteId }: ConcorrenteAdsTabProps) {
         </div>
       )}
 
+      {/* Not authorized — Meta App sem permissão Ad Library API */}
+      {!loading && notAuthorized && (
+        <div className="bg-bg-card border border-[#fbbf24]/30 rounded-xl p-5 space-y-3">
+          <div className="flex items-start gap-3">
+            <AlertCircle size={16} className="text-[#fbbf24] mt-0.5 shrink-0" />
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium text-text-primary">
+                Acesso à Ad Library API ainda não aprovado
+              </p>
+              <p className="text-xs text-text-muted leading-relaxed">
+                O app Meta deste workspace ainda não tem a feature{" "}
+                <span className="font-medium text-text-secondary">Ad Library API</span>{" "}
+                aprovada. Enquanto isso, você pode ver os anúncios deste concorrente
+                diretamente na Biblioteca de Anúncios pública do Meta.
+              </p>
+            </div>
+          </div>
+          {fallbackUrl && (
+            <a
+              href={fallbackUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-gradient-to-r from-[#1877f2] to-[#4ecdc4] text-white hover:opacity-90 transition-opacity"
+            >
+              <ExternalLink size={13} />
+              Abrir na Biblioteca de Anúncios do Meta
+            </a>
+          )}
+        </div>
+      )}
+
       {/* Error state */}
-      {!loading && error && (
+      {!loading && !notAuthorized && error && (
         <div className="bg-bg-card border border-[#f87171]/30 rounded-xl p-5 space-y-3">
           <div className="flex items-start gap-3">
             <AlertCircle size={16} className="text-[#f87171] mt-0.5 shrink-0" />
@@ -263,18 +294,31 @@ export function ConcorrenteAdsTab({ concorrenteId }: ConcorrenteAdsTabProps) {
               <p className="text-xs text-text-muted">{error}</p>
             </div>
           </div>
-          <button
-            onClick={refresh}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-[#f87171]/30 text-[#f87171] hover:bg-[#f87171]/10 transition-colors"
-          >
-            <RefreshCw size={11} />
-            Tentar novamente
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={refresh}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-[#f87171]/30 text-[#f87171] hover:bg-[#f87171]/10 transition-colors"
+            >
+              <RefreshCw size={11} />
+              Tentar novamente
+            </button>
+            {fallbackUrl && (
+              <a
+                href={fallbackUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border text-text-secondary hover:text-text-primary hover:border-border-hover transition-colors"
+              >
+                <ExternalLink size={11} />
+                Abrir na Ad Library pública
+              </a>
+            )}
+          </div>
         </div>
       )}
 
       {/* Empty state */}
-      {!loading && !error && ads.length === 0 && (
+      {!loading && !error && !notAuthorized && ads.length === 0 && (
         <div className="bg-bg-card border border-border rounded-xl p-8 text-center space-y-3">
           <Megaphone size={28} className="text-text-muted mx-auto" />
           <div className="space-y-1">

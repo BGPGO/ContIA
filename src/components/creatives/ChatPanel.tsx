@@ -85,6 +85,7 @@ export function ChatPanel({
   empresaId = "",
 }: ChatPanelProps) {
   const [ideasModalOpen, setIdeasModalOpen] = useState(false);
+  const [prefillSignal, setPrefillSignal] = useState<{ text: string; nonce: number } | null>(null);
 
   // Handler de quick action: recebe o QuickAction id, mas usa o prompt mapeado
   const handleQuickAction = (actionId: QuickAction) => {
@@ -102,7 +103,8 @@ export function ChatPanel({
         onClose={() => setIdeasModalOpen(false)}
         empresaId={empresaId}
         onSelectIdea={(prompt) => {
-          onSendMessage(prompt);
+          // Preenche o input pra usuário editar antes de enviar (não envia automaticamente)
+          setPrefillSignal({ text: prompt, nonce: Date.now() });
         }}
       />
 
@@ -220,6 +222,7 @@ export function ChatPanel({
           pendingAttachments={pendingAttachments}
           onAddAttachment={onAddAttachment}
           onRemoveAttachment={onRemoveAttachment}
+          prefillSignal={prefillSignal}
         />
       </div>
     </div>

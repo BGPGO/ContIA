@@ -21,6 +21,23 @@ interface AdsRouteResponse {
   total: number;
   has_more: boolean;
   cached?: boolean;
+  not_authorized?: boolean;
+  fallback_url?: string;
+}
+
+/**
+ * Constrói URL pública da Biblioteca de Anúncios do Meta.
+ * Funciona sem autenticação — qualquer um pode acessar.
+ */
+function buildAdLibraryWebUrl(query: string): string {
+  const params = new URLSearchParams({
+    active_status: "all",
+    ad_type: "all",
+    country: "BR",
+    q: query,
+    search_type: "keyword_unordered",
+  });
+  return `https://www.facebook.com/ads/library/?${params.toString()}`;
 }
 
 export async function GET(
@@ -107,12 +124,25 @@ export async function GET(
       limit: 50,
     });
   } catch (err) {
+    const e = err as Error & { code?: string };
+    const fallbackUrl = buildAdLibraryWebUrl(username || concorrente.nome);
+
+    if (e.code === "ADS_LIBRARY_NOT_AUTHORIZED") {
+      // Caso especial: app sem permissão da Ad Library API.
+      // Retorna 200 com flag pra UI exibir link da Ad Library web pública.
+      return NextResponse.json<AdsRouteResponse>({
+        ads: [],
+        total: 0,
+        has_more: false,
+        not_authorized: true,
+        fallback_url: fallbackUrl,
+      });
+    }
+
     return NextResponse.json(
       {
-        error:
-          err instanceof Error
-            ? err.message
-            : "Erro ao consultar Meta Ad Library",
+        error: e.message ?? "Erro ao consultar Meta Ad Library",
+        fallback_url: fallbackUrl,
       },
       { status: 502 }
     );

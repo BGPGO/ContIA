@@ -1,6 +1,6 @@
 export interface CreativeIdea {
   titulo: string;
-  formato: "estatico" | "carrossel" | "reel";
+  formato: "estatico" | "carrossel";
   gancho: string;
   prompt_completo: string;
   inspiracao: string;

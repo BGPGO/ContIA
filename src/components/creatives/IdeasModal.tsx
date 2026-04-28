@@ -37,11 +37,6 @@ const FORMAT_CONFIG: Record<
     label: "Carrossel",
     classes: "bg-[#6c5ce7]/15 text-[#a29bfe] border border-[#6c5ce7]/25",
   },
-  reel: {
-    emoji: "🎬",
-    label: "Reel",
-    classes: "bg-[#ec4899]/15 text-[#ec4899] border border-[#ec4899]/25",
-  },
 };
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -115,7 +110,7 @@ function IdeaCard({ idea, index, onSelect }: IdeaCardProps) {
             bg-gradient-to-r from-[#6c5ce7]/80 to-[#4ecdc4]/80 hover:from-[#6c5ce7] hover:to-[#4ecdc4]
             text-white transition-all shadow-sm hover:shadow-[0_0_14px_rgba(78,205,196,0.25)] cursor-pointer"
         >
-          Usar este prompt
+          Usar e editar antes de enviar
           <ArrowRight className="w-3.5 h-3.5" />
         </button>
       </div>

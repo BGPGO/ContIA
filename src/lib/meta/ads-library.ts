@@ -152,6 +152,20 @@ export async function searchAdsLibrary(
       );
     }
 
+    // Erro de permissão na Ad Library API (app sem feature aprovada)
+    const isPermissionError =
+      /permission for this action/i.test(errMsg) ||
+      /ad library/i.test(errMsg) && /permission/i.test(errMsg);
+
+    if (response.status === 400 && isPermissionError) {
+      const err = new Error(
+        "O app Meta ainda não tem acesso à Ad Library API aprovado. " +
+          "Use o link 'Abrir na Biblioteca de Anúncios' para ver os anúncios diretamente no Facebook."
+      ) as Error & { code?: string };
+      err.code = "ADS_LIBRARY_NOT_AUTHORIZED";
+      throw err;
+    }
+
     if (response.status === 400) {
       throw new Error(
         `Requisição inválida para Meta Ad Library: ${errMsg}. ` +

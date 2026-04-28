@@ -225,9 +225,7 @@ function buildIdeasPrompt(
         .join("\n")
     : "  (nenhum histórico disponível — empresa ainda não conectou Instagram)";
 
-  return `Você é um estrategista de conteúdo para Instagram especializado em criar ideias virais e altamente personalizadas.
-
-Sua tarefa: gerar exatamente 5 ideias de posts para a empresa abaixo, baseadas no DNA da marca e no histórico de performance.
+  return `Você é um estrategista de conteúdo para Instagram. Gera ideias afiadas e personalizadas, focadas em ÂNGULO e COPY — não em arte.
 
 ## DNA DA MARCA
 
@@ -245,13 +243,32 @@ ${formatLines || "  (sem dados de formato)"}`
     : ""
 }
 
-## INSTRUÇÕES
+## TAREFA
 
-1. Analise os padrões dos posts de maior engajamento (tema, gancho, formato).
-2. Identifique o formato que performa melhor (reel vs estático/carrossel) e priorize nas sugestões.
-3. Se não houver histórico, baseie-se 100% no DNA da marca.
-4. Cada ideia deve ser única — varie formato, ângulo e abordagem.
-5. O campo "prompt_completo" deve ser um prompt PRONTO para o chat de criação, com instruções claras de: visual (paleta, layout, estilo), copy específico (headline, subtexto, CTA) e tom. Escreva como se fosse uma instrução para um designer de IA gerar o criativo.
+Gere exatamente 5 ideias de posts. Apenas dois formatos são permitidos: **estático** ou **carrossel**. NÃO sugira reels nem vídeos.
+
+## REGRAS PARA O CAMPO "prompt_completo"
+
+Esse campo será **colado num input de chat onde o usuário vai poder editar antes de mandar pra outra IA criar a arte**. Por isso:
+
+- Seja **enxuto** (idealmente 1 a 3 linhas, no máx 4).
+- Foque na **ideia, no ângulo e no copy/headline** — NÃO descreva paleta, fonte, layout, posição de elementos, estilo visual, CTA específico, ou qualquer instrução prescritiva de design.
+- Pode mencionar o formato (estático vs carrossel) e, no caso de carrossel, sugerir quantos slides e o que cada slide aborda em UMA frase curta.
+- Comece direto na ideia. Sem preâmbulo. Sem "Crie um post...". Sem despedida.
+- Tom da marca já está implícito — não precisa redizer.
+
+Pense neste campo como um **briefing curto pro próprio criador editar e expandir**, não como um prompt fechado pra geração automática.
+
+## EXEMPLOS DE BOM E RUIM
+
+❌ Ruim (prescritivo, longo, focado em arte):
+"Crie um post estático com fundo navy escuro #0a1845, fonte Poppins Bold em branco, headline 'A clareza vale mais que o ouro' centralizada, subtexto em cinza claro abaixo, logo no canto inferior direito, paleta complementar dourada para acentos..."
+
+✅ Bom (curto, focado em ideia/copy):
+"Estático com a frase 'A clareza vale mais que o ouro' como gancho central. Tema: por que entender pra onde vai seu dinheiro vale mais do que o retorno em si."
+
+✅ Bom (carrossel):
+"Carrossel de 5 slides desconstruindo o mito do 'investimento certo'. Slide 1: gancho provocador. Slides 2-4: três crenças comuns + por que estão erradas. Slide 5: convite à reflexão."
 
 ## FORMATO DE RESPOSTA
 
@@ -260,11 +277,11 @@ Responda SOMENTE com JSON válido, sem markdown, sem texto antes ou depois. Use 
 {
   "ideias": [
     {
-      "titulo": "título curto e descritivo da ideia",
-      "formato": "estatico" | "carrossel" | "reel",
+      "titulo": "título curto e descritivo da ideia (max 60 chars)",
+      "formato": "estatico" | "carrossel",
       "gancho": "frase de 1 linha que resume o ângulo principal",
-      "prompt_completo": "prompt completo e detalhado para gerar o criativo no chat de criação",
-      "inspiracao": "qual post histórico inspirou esta ideia (cite caption/data) ou 'baseado no DNA' se sem histórico"
+      "prompt_completo": "briefing curto da ideia/copy — 1 a 4 linhas, foco em ângulo e mensagem, NÃO em arte",
+      "inspiracao": "qual post histórico inspirou esta ideia (cite caption ou data) ou 'baseado no DNA' se sem histórico"
     }
   ]
 }`;
@@ -452,9 +469,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // ── 7.5 Sanitize: força apenas estatico/carrossel (Claude pode desobedecer) ──
+  const sanitized: CreativeIdea[] = parsed.ideias.map((idea) => {
+    const fmt = idea.formato as string;
+    const allowed = fmt === "carrossel" ? "carrossel" : "estatico";
+    return { ...idea, formato: allowed as CreativeIdea["formato"] };
+  });
+
   // ── 8. Build response ──
   const responseBody: CreativeIdeasResponse = {
-    ideias: parsed.ideias,
+    ideias: sanitized,
     baseadoEm: {
       totalPosts: posts.length,
       formatosAnalisados:

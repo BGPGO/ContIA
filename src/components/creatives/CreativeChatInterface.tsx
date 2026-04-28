@@ -398,6 +398,11 @@ interface CreativeChatInterfaceProps {
   pendingAttachments: MessageAttachment[];
   onAddAttachment: (file: File) => void;
   onRemoveAttachment: (url: string) => void;
+  /**
+   * Sinal pra preencher o input com um texto (ex: vindo de "5 ideias por IA").
+   * O `nonce` força re-trigger mesmo se o `text` repetir entre cliques.
+   */
+  prefillSignal?: { text: string; nonce: number } | null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -417,6 +422,7 @@ export function CreativeChatInterface({
   pendingAttachments,
   onAddAttachment,
   onRemoveAttachment,
+  prefillSignal,
 }: CreativeChatInterfaceProps) {
   const [inputValue, setInputValue] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -427,6 +433,22 @@ export function CreativeChatInterface({
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isStreaming, streamingText]);
+
+  // Aplica prefill (vindo do modal "5 ideias por IA"): preenche input,
+  // ajusta height, foca e posiciona caret no fim pra usuário editar.
+  useEffect(() => {
+    if (!prefillSignal) return;
+    setInputValue(prefillSignal.text);
+    requestAnimationFrame(() => {
+      const ta = textareaRef.current;
+      if (!ta) return;
+      ta.style.height = "auto";
+      ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+      ta.focus();
+      const len = prefillSignal.text.length;
+      ta.setSelectionRange(len, len);
+    });
+  }, [prefillSignal]);
 
   // Send handler
   const handleSend = useCallback(() => {
