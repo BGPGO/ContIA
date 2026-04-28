@@ -33,8 +33,8 @@ const STATUS_CONFIG: Record<
   },
   rascunho: {
     label: "Rascunho",
-    dot: "bg-white/30",
-    badgeCls: "bg-white/5 text-white/50 border-white/10",
+    dot: "dark:bg-white/30 bg-text-muted/30",
+    badgeCls: "dark:bg-white/5 dark:text-white/50 dark:border-white/10 bg-bg-card-hover/60 text-text-secondary border-border",
   },
   pendente_aprovacao: {
     label: "Aguardando aprovação",
@@ -113,7 +113,7 @@ function DrawerPostCard({
 
   return (
     <div
-      className="rounded-xl border border-white/8 bg-white/3 overflow-hidden hover:bg-white/5 transition-colors"
+      className="rounded-xl border dark:border-white/8 border-border dark:bg-white/3 bg-bg-card dark:hover:bg-white/5 hover:bg-bg-card-hover/60 overflow-hidden transition-colors"
       style={{ borderLeftWidth: 3, borderLeftColor: color }}
     >
       {/* thumbnail */}
@@ -130,7 +130,7 @@ function DrawerPostCard({
 
       <div className="p-3 space-y-2.5">
         {/* title */}
-        <p className="text-sm font-semibold text-white leading-snug">
+        <p className="text-sm font-semibold text-text-primary leading-snug">
           {post.titulo}
         </p>
 
@@ -149,7 +149,7 @@ function DrawerPostCard({
 
           {/* time */}
           {date && (
-            <span className="text-[11px] text-white/40 tabular-nums">
+            <span className="text-[11px] dark:text-white/40 text-text-muted tabular-nums">
               {format(new Date(date), "HH:mm")}
             </span>
           )}
@@ -181,7 +181,7 @@ function DrawerPostCard({
           {onEditPost && (
             <button
               onClick={() => onEditPost(post.id)}
-              className="text-[11px] px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+              className="text-[11px] px-2.5 py-1 rounded-lg dark:bg-white/5 bg-bg-card-hover/60 dark:border-white/10 border-border dark:text-white/60 text-text-secondary dark:hover:text-white hover:text-text-primary dark:hover:bg-white/10 hover:bg-bg-card-hover transition-colors"
             >
               Editar
             </button>
@@ -268,7 +268,7 @@ export function DayDrawer({
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="hidden md:flex fixed right-0 top-0 bottom-0 w-[420px] z-50 flex-col bg-bg-primary border-l border-white/8 shadow-2xl"
+            className="hidden md:flex fixed right-0 top-0 bottom-0 w-[420px] z-50 flex-col bg-bg-primary dark:border-l dark:border-white/8 border-l border-border shadow-2xl"
           >
             <DrawerContent
               dateLabelCapitalized={dateLabelCapitalized}
@@ -288,11 +288,11 @@ export function DayDrawer({
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="md:hidden fixed bottom-0 left-0 right-0 z-50 max-h-[90vh] rounded-t-2xl bg-bg-primary border-t border-white/8 shadow-2xl flex flex-col"
+            className="md:hidden fixed bottom-0 left-0 right-0 z-50 max-h-[90vh] rounded-t-2xl bg-bg-primary dark:border-t dark:border-white/8 border-t border-border shadow-2xl flex flex-col"
           >
             {/* pill handle */}
             <div className="flex justify-center pt-2 pb-1 shrink-0">
-              <div className="w-10 h-1 rounded-full bg-white/20" />
+              <div className="w-10 h-1 rounded-full dark:bg-white/20 bg-border" />
             </div>
             <DrawerContent
               dateLabelCapitalized={dateLabelCapitalized}
@@ -332,16 +332,16 @@ function DrawerContent({
   return (
     <>
       {/* header */}
-      <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-4 border-b border-white/8 shrink-0">
+      <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-4 dark:border-b dark:border-white/8 border-b border-border shrink-0">
         <div>
-          <h2 className="text-sm font-semibold text-white">{dateLabelCapitalized}</h2>
-          <p className="text-[11px] text-white/40 mt-0.5">
+          <h2 className="text-sm font-semibold text-text-primary">{dateLabelCapitalized}</h2>
+          <p className="text-[11px] dark:text-white/40 text-text-muted mt-0.5">
             {posts.length} post{posts.length !== 1 ? "s" : ""} neste dia
           </p>
         </div>
         <button
           onClick={onClose}
-          className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/8 transition-colors"
+          className="p-1.5 rounded-lg dark:text-white/40 text-text-muted dark:hover:text-white hover:text-text-primary dark:hover:bg-white/8 hover:bg-bg-card-hover transition-colors"
         >
           <X size={16} />
         </button>
@@ -351,8 +351,8 @@ function DrawerContent({
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {posts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-4">
-            <Calendar size={36} className="text-white/20" />
-            <p className="text-sm text-white/40 text-center">
+            <Calendar size={36} className="dark:text-white/20 text-text-muted" />
+            <p className="text-sm dark:text-white/40 text-text-muted text-center">
               Nenhum post neste dia.
             </p>
             <button
@@ -378,8 +378,8 @@ function DrawerContent({
 
       {/* footer */}
       {posts.length > 0 && (
-        <div className="px-5 py-4 border-t border-white/8 shrink-0 flex items-center justify-between">
-          <span className="text-[11px] text-white/30">
+        <div className="px-5 py-4 dark:border-t dark:border-white/8 border-t border-border shrink-0 flex items-center justify-between">
+          <span className="text-[11px] dark:text-white/30 text-text-muted">
             {posts.length} post{posts.length !== 1 ? "s" : ""} · {posts.filter((p) => p.status === "agendado").length} agendados
           </span>
           <button

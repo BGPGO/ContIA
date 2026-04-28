@@ -193,7 +193,7 @@ export function StepFormat({ state, setField, selectSuggestion }: StepFormatProp
             }`}
           >
             <div
-              className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
+              className={`absolute top-0.5 w-5 h-5 rounded-full dark:bg-white bg-bg-elevated shadow transition-transform ${
                 state.visualMode ? "translate-x-[22px]" : "translate-x-0.5"
               }`}
             />

@@ -52,7 +52,7 @@ export function MemberRow({ member, myRole, isMe, ownersCount, onChangeRole, onR
   }, [menuOpen]);
 
   return (
-    <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/[0.03] transition-colors duration-150">
+    <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-bg-card-hover/60 transition-colors duration-150">
       {/* Avatar */}
       <div className="shrink-0 w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-[#6c5ce7]/30 to-[#4ecdc4]/30 border border-border flex items-center justify-center">
         {member.avatar_url ? (

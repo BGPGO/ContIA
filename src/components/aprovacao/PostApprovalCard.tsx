@@ -156,7 +156,7 @@ export function PostApprovalCard({
             className="w-full flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-bg-card to-bg-secondary"
             style={{ minHeight: "200px", aspectRatio: "1 / 1", maxHeight: "300px" }}
           >
-            <div className="w-16 h-16 rounded-2xl bg-border border border-white/10 flex items-center justify-center">
+            <div className="w-16 h-16 rounded-2xl bg-border border border-border-light flex items-center justify-center">
               <ImageOff className="w-8 h-8 text-text-muted" />
             </div>
             <p className="text-sm font-medium text-text-muted">Sem mídia gerada</p>

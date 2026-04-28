@@ -74,7 +74,7 @@ function MessageBubble({ message, isStreaming }: { message: CopyChatMessage; isS
       className="flex justify-start"
     >
       <div className="max-w-[85%] space-y-1.5">
-        <div className="bg-bg-card text-text-primary border border-white/5 rounded-2xl rounded-bl-md px-4 py-3 text-sm leading-relaxed whitespace-pre-line">
+        <div className="bg-bg-card text-text-primary dark:border-white/5 border-border rounded-2xl rounded-bl-md px-4 py-3 text-sm leading-relaxed whitespace-pre-line border">
           {message.content}
           {isStreaming && (
             <motion.span
@@ -191,7 +191,7 @@ export function ChatInterface({
             animate={{ opacity: 1, y: 0 }}
             className="flex justify-start"
           >
-            <div className="bg-bg-card border border-white/5 rounded-2xl rounded-bl-md">
+            <div className="bg-bg-card border dark:border-white/5 border-border rounded-2xl rounded-bl-md">
               <TypingIndicator />
             </div>
           </motion.div>
@@ -234,12 +234,12 @@ export function ChatInterface({
             onClick={handleSend}
             disabled={isStreaming || disabled || !inputValue.trim()}
             className="w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer
-              disabled:opacity-30 disabled:cursor-not-allowed shrink-0 mb-0.5 text-white"
+              disabled:opacity-30 disabled:cursor-not-allowed disabled:bg-bg-card shrink-0 mb-0.5 text-white"
             style={{
               background:
                 !isStreaming && !disabled && inputValue.trim()
                   ? "linear-gradient(135deg, #6c5ce7 0%, #4ecdc4 100%)"
-                  : "rgba(255,255,255,0.06)",
+                  : undefined,
             }}
           >
             <Send size={16} />

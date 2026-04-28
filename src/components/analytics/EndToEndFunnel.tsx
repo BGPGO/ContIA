@@ -66,7 +66,7 @@ function FunnelTooltip({ tip }: { tip: TooltipState }) {
       className="fixed z-50 pointer-events-none"
       style={{ left: tip.x + 12, top: tip.y - 10 }}
     >
-      <div className="bg-[#1a1f2e] border border-white/10 rounded-xl px-4 py-3 shadow-2xl text-[11px] min-w-[200px]">
+      <div className="dark:bg-[#1a1f2e] bg-bg-elevated dark:border-white/10 border-border rounded-xl px-4 py-3 shadow-2xl text-[11px] min-w-[200px]">
         <p className="font-bold text-[13px] mb-2" style={{ color: tip.color }}>
           {tip.stage.label}
         </p>
@@ -102,8 +102,8 @@ function Row({
 }) {
   return (
     <div className="flex items-center justify-between gap-6">
-      <span className="text-white/50">{label}</span>
-      <span className={`font-semibold tabular-nums ${highlight ? "text-emerald-400" : "text-white/80"}`}>
+      <span className="dark:text-white/50 text-text-secondary">{label}</span>
+      <span className={`font-semibold tabular-nums ${highlight ? "text-emerald-400" : "dark:text-white/80 text-text-primary"}`}>
         {value}
       </span>
     </div>
@@ -189,11 +189,11 @@ function ConversionArrow({
       className="flex items-center justify-center gap-2 text-[10px] font-semibold py-0.5"
       style={{ animationDelay: `${index * 60 + 30}ms` }}
     >
-      <div className="h-px w-8 bg-white/10" />
+      <div className="h-px w-8 dark:bg-white/10 bg-border" />
       <span style={{ color }} className="tabular-nums whitespace-nowrap">
         ↓ {pct.toFixed(1)}% avançaram
       </span>
-      <div className="h-px w-8 bg-white/10" />
+      <div className="h-px w-8 dark:bg-white/10 bg-border" />
     </div>
   );
 }
@@ -215,8 +215,8 @@ function MobileStageRow({
   return (
     <div className="flex flex-col gap-1" style={{ animationDelay: `${index * 60}ms` }}>
       <div className="flex items-center gap-2">
-        <span className="text-[11px] text-white/50 w-[90px] shrink-0 truncate">{stage.label}</span>
-        <div className="flex-1 h-7 bg-white/5 rounded overflow-hidden">
+        <span className="text-[11px] dark:text-white/50 text-text-secondary w-[90px] shrink-0 truncate">{stage.label}</span>
+        <div className="flex-1 h-7 dark:bg-white/5 bg-bg-card-hover/60 rounded overflow-hidden">
           <div
             className="h-full rounded flex items-center px-2 transition-all duration-700"
             style={{ width: `${barPct}%`, backgroundColor: color }}
@@ -227,13 +227,13 @@ function MobileStageRow({
           </div>
         </div>
         {stage.conversionFromTop != null && (
-          <span className="text-[10px] text-white/40 tabular-nums w-[36px] text-right shrink-0">
+          <span className="text-[10px] dark:text-white/40 text-text-muted tabular-nums w-[36px] text-right shrink-0">
             {formatPct(stage.conversionFromTop)}
           </span>
         )}
       </div>
       {stage.conversionFromPrev != null && (
-        <div className="pl-[98px] text-[10px] text-white/30">
+        <div className="pl-[98px] text-[10px] dark:text-white/30 text-text-muted">
           ↓ {formatPct(stage.conversionFromPrev)} do anterior
         </div>
       )}
@@ -246,11 +246,11 @@ function MobileStageRow({
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-14 gap-3 text-center">
-      <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
-        <Filter size={20} className="text-white/30" />
+      <div className="w-12 h-12 rounded-2xl dark:bg-white/5 bg-bg-card-hover/60 dark:border-white/10 border-border flex items-center justify-center">
+        <Filter size={20} className="dark:text-white/30 text-text-muted" />
       </div>
-      <p className="text-[14px] font-semibold text-white/60">Aguardando dados do CRM</p>
-      <p className="text-[12px] text-white/30 max-w-[240px] leading-relaxed">
+      <p className="text-[14px] font-semibold dark:text-white/60 text-text-secondary">Aguardando dados do CRM</p>
+      <p className="text-[12px] dark:text-white/30 text-text-muted max-w-[240px] leading-relaxed">
         Conecte o CRM BGPGO para visualizar o funil de conversão completo.
       </p>
     </div>
@@ -276,7 +276,7 @@ export function EndToEndFunnel({
     return (
       <div className="bg-bg-card border border-border rounded-xl p-6">
         <div className="flex items-center gap-2 mb-4">
-          <Filter size={16} className="text-white/40" />
+          <Filter size={16} className="dark:text-white/40 text-text-muted" />
           <h3 className="text-[14px] font-semibold text-text-primary">{title}</h3>
         </div>
         <EmptyState />
@@ -415,12 +415,12 @@ export function EndToEndFunnel({
 
       {/* ── Estágio Lost — barra separada, vermelha ── */}
       {lostStage && lostStage.count > 0 && (
-        <div className="mt-5 pt-5 border-t border-white/8">
+        <div className="mt-5 pt-5 dark:border-t dark:border-white/8 border-t border-border">
           <div className="flex items-center gap-2 mb-2">
             <AlertCircle size={13} className="text-red-400 shrink-0" />
-            <span className="text-[12px] text-white/50 font-medium">Perdidos</span>
+            <span className="text-[12px] dark:text-white/50 text-text-secondary font-medium">Perdidos</span>
           </div>
-          <div className="h-8 bg-white/5 rounded overflow-hidden">
+          <div className="h-8 dark:bg-white/5 bg-bg-card-hover/60 rounded overflow-hidden">
             <div
               className="h-full rounded flex items-center px-3 gap-2 transition-all duration-700"
               style={{
@@ -436,7 +436,7 @@ export function EndToEndFunnel({
             </div>
           </div>
           {lostStage.conversionFromTop != null && (
-            <p className="text-[10px] text-white/30 mt-1 pl-1">
+            <p className="text-[10px] dark:text-white/30 text-text-muted mt-1 pl-1">
               {formatPct(lostStage.conversionFromTop)} do total de leads
             </p>
           )}
@@ -444,7 +444,7 @@ export function EndToEndFunnel({
       )}
 
       {/* ── Footer: KPIs resumo ── */}
-      <div className="mt-5 pt-4 border-t border-white/8 grid grid-cols-3 gap-3">
+      <div className="mt-5 pt-4 dark:border-t dark:border-white/8 border-t border-border grid grid-cols-3 gap-3">
         <div>
           <p className="text-[11px] text-text-muted">Entrada</p>
           <p className="text-[18px] font-bold text-text-primary tabular-nums leading-tight">

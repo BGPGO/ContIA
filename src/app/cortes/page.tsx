@@ -682,7 +682,7 @@ export default function CortesPage() {
                       className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-[12px] font-medium transition-all border-b-2 ${
                         activeTab === tab.key
                           ? "border-accent text-accent bg-accent/5"
-                          : "border-transparent text-text-muted hover:text-text-secondary hover:bg-white/[0.02]"
+                          : "border-transparent text-text-muted hover:text-text-secondary dark:hover:bg-white/[0.02] hover:bg-bg-card-hover/40"
                       }`}
                     >
                       <tab.icon className="w-3.5 h-3.5" />
@@ -729,8 +729,8 @@ export default function CortesPage() {
                   {activeTab === "estilo" && (
                     <div className="space-y-6 flex-1 overflow-y-auto p-3">
                       <section>
-                        <h3 className="text-white font-semibold text-base mb-1">Galeria de estilos virais</h3>
-                        <p className="text-xs text-zinc-500 mb-3">
+                        <h3 className="text-text-primary font-semibold text-base mb-1">Galeria de estilos virais</h3>
+                        <p className="text-xs text-text-muted mb-3">
                           Clique num estilo para aplicar. Você pode ajustar detalhes abaixo.
                         </p>
                         <CaptionStyleGallery

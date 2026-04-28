@@ -193,16 +193,16 @@ export default function AprovacaoPage() {
             {/* Cabeçalho da seção feed */}
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-semibold text-white/80">
+                <h3 className="text-sm font-semibold text-text-primary">
                   Simulação do feed
                 </h3>
-                <span className="text-[11px] text-white/40">
+                <span className="text-[11px] text-text-muted">
                   como ficaria se aprovados
                 </span>
               </div>
               <button
                 onClick={() => setFeedVisible((v) => !v)}
-                className="flex items-center gap-1.5 text-[11px] text-white/40 hover:text-white/70 transition-colors px-2 py-1 rounded-lg hover:bg-white/5"
+                className="flex items-center gap-1.5 text-[11px] text-text-muted hover:text-text-secondary transition-colors px-2 py-1 rounded-lg hover:bg-bg-card-hover"
                 title={feedVisible ? "Esconder simulação" : "Mostrar simulação"}
               >
                 {feedVisible ? (
@@ -239,7 +239,7 @@ export default function AprovacaoPage() {
                 />
 
                 {feedPostsFromPending.length === 0 && (
-                  <p className="text-center text-[11px] text-white/30 mt-3">
+                  <p className="text-center text-[11px] text-text-muted mt-3">
                     Nenhum post com imagem para pré-visualizar.
                   </p>
                 )}

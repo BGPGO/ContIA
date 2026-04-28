@@ -110,11 +110,11 @@ export const KeywordEditor: React.FC<KeywordEditorProps> = ({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Tag className="w-4 h-4 text-yellow-400" />
-          <span className="text-sm font-semibold text-white">
+          <span className="text-sm font-semibold text-text-primary">
             Palavras em destaque
           </span>
           {!loading && (
-            <span className="text-xs text-zinc-500 font-normal">
+            <span className="text-xs text-text-muted font-normal">
               ({keywords.length})
             </span>
           )}
@@ -123,7 +123,7 @@ export const KeywordEditor: React.FC<KeywordEditorProps> = ({
           type="button"
           onClick={onRegenerate}
           disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 border border-white/10 text-xs text-zinc-300 hover:text-white hover:border-white/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-card dark:border-white/10 border-border text-xs text-text-secondary hover:text-text-primary dark:hover:border-white/25 hover:border-border-light disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         >
           {loading ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -136,20 +136,20 @@ export const KeywordEditor: React.FC<KeywordEditorProps> = ({
 
       {/* Loading state */}
       {loading && (
-        <div className="flex items-center gap-2 py-3 px-4 rounded-xl bg-zinc-800/50 border border-white/8">
+        <div className="flex items-center gap-2 py-3 px-4 rounded-xl dark:bg-white/5 bg-bg-card-hover/60 dark:border-white/8 border-border">
           <Loader2 className="w-4 h-4 text-yellow-400 animate-spin shrink-0" />
-          <span className="text-xs text-zinc-400">Detectando palavras-chave...</span>
+          <span className="text-xs text-text-muted">Detectando palavras-chave...</span>
         </div>
       )}
 
       {/* Empty state */}
       {!loading && keywords.length === 0 && (
         <div className="py-4 text-center space-y-1">
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-text-muted">
             Nenhuma palavra em destaque ainda.
           </p>
-          <p className="text-xs text-zinc-600">
-            Clique em <span className="text-zinc-400 font-medium">Regenerar</span> para detectar automaticamente.
+          <p className="text-xs text-text-muted/70">
+            Clique em <span className="text-text-secondary font-medium">Regenerar</span> para detectar automaticamente.
           </p>
         </div>
       )}
@@ -169,7 +169,7 @@ export const KeywordEditor: React.FC<KeywordEditorProps> = ({
               {kw.emoji && (
                 <span className="text-sm leading-none">{kw.emoji}</span>
               )}
-              <span className="text-white">{kw.word}</span>
+              <span className="text-text-primary">{kw.word}</span>
 
               {/* Importance selector */}
               <select
@@ -177,7 +177,7 @@ export const KeywordEditor: React.FC<KeywordEditorProps> = ({
                 onChange={(e) =>
                   updateImportance(index, Number(e.target.value) as 1 | 2 | 3)
                 }
-                className="bg-transparent text-[10px] text-zinc-400 border-none outline-none cursor-pointer hover:text-white transition-colors appearance-none pr-1 pl-0.5"
+                className="bg-transparent text-[10px] text-text-muted border-none outline-none cursor-pointer hover:text-text-primary transition-colors appearance-none pr-1 pl-0.5"
                 title="Importância"
                 aria-label={`Importância de ${kw.word}`}
               >
@@ -196,7 +196,7 @@ export const KeywordEditor: React.FC<KeywordEditorProps> = ({
               <button
                 type="button"
                 onClick={() => removeKeyword(index)}
-                className="ml-0.5 text-zinc-500 hover:text-white transition-colors"
+                className="ml-0.5 text-text-muted hover:text-text-primary transition-colors"
                 aria-label={`Remover ${kw.word}`}
               >
                 <X className="w-3 h-3" />
@@ -208,8 +208,8 @@ export const KeywordEditor: React.FC<KeywordEditorProps> = ({
 
       {/* Add word input */}
       <div className="relative" data-keyword-input="">
-        <div className="flex items-center gap-2 bg-zinc-800/60 border border-white/10 rounded-xl px-3 py-2 focus-within:border-yellow-400/40 transition-colors">
-          <Plus className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+        <div className="flex items-center gap-2 dark:bg-white/5 bg-bg-card dark:border-white/10 border-border rounded-xl px-3 py-2 focus-within:border-yellow-400/40 transition-colors">
+          <Plus className="w-3.5 h-3.5 text-text-muted shrink-0" />
           <input
             ref={inputRef}
             type="text"
@@ -223,7 +223,7 @@ export const KeywordEditor: React.FC<KeywordEditorProps> = ({
               if (inputValue.trim()) setShowSuggestions(true);
             }}
             placeholder="Adicionar palavra..."
-            className="flex-1 bg-transparent text-xs text-white placeholder:text-zinc-600 outline-none"
+            className="flex-1 bg-transparent text-xs text-text-primary placeholder:text-text-muted/60 outline-none"
           />
           {inputValue.trim() && (
             <button
@@ -238,7 +238,7 @@ export const KeywordEditor: React.FC<KeywordEditorProps> = ({
 
         {/* Autocomplete dropdown */}
         {showSuggestions && suggestions.length > 0 && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-zinc-900 border border-white/15 rounded-xl overflow-hidden shadow-xl z-50">
+          <div className="absolute top-full left-0 right-0 mt-1 bg-bg-card dark:border-white/15 border-border rounded-xl overflow-hidden shadow-xl z-50">
             {suggestions.map((word) => (
               <button
                 key={word}
@@ -247,7 +247,7 @@ export const KeywordEditor: React.FC<KeywordEditorProps> = ({
                   e.preventDefault(); // prevent input blur
                   addKeyword(word);
                 }}
-                className="w-full px-3 py-2 text-left text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                className="w-full px-3 py-2 text-left text-xs text-text-secondary hover:bg-bg-card-hover hover:text-text-primary transition-colors"
               >
                 {word}
               </button>

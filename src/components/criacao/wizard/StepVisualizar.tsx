@@ -629,7 +629,7 @@ export function StepVisualizar({ state, setField, empresa, onRegenerate }: StepV
                       {idx + 1}
                     </span>
                     <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
-                      isActive ? "bg-[#3b82f6]/20 text-[#3b82f6]" : "bg-white/5 text-text-muted"
+                      isActive ? "bg-[#3b82f6]/20 text-[#3b82f6]" : "dark:bg-white/5 bg-bg-card text-text-muted"
                     }`}>
                       {CONTENT_TYPE_LABELS[rs.contentType] || rs.contentType}
                     </span>

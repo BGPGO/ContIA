@@ -3,6 +3,9 @@
 
 @import "tailwindcss";
 
+/* Dark mode controlado por classe `dark` no <html> (toggle manual via ThemeProvider) */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ── Custom fonts from PSD templates ── */
 @font-face {
   font-family: 'Formula1 Display';

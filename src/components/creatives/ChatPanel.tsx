@@ -91,20 +91,20 @@ export function ChatPanel({
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Header */}
-      <div className="shrink-0 px-4 py-3 border-b border-white/10 flex items-center justify-between gap-4">
+      <div className="shrink-0 px-4 py-3 border-b dark:border-white/10 border-border flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           {onOpenLibrary && (
             <button
               type="button"
               onClick={onOpenLibrary}
               title="Abrir biblioteca de criativos"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white text-xs font-medium transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg dark:bg-white/5 bg-bg-card-hover/60 dark:hover:bg-white/10 hover:bg-bg-card-hover dark:border-white/10 border-border text-text-secondary hover:text-text-primary text-xs font-medium transition-all cursor-pointer"
             >
               <Library className="w-3.5 h-3.5" />
               <span>Biblioteca</span>
             </button>
           )}
-          <h1 className="text-lg font-serif text-white leading-tight">Criativos IA</h1>
+          <h1 className="text-lg font-serif text-text-primary leading-tight">Criativos IA</h1>
         </div>
 
         <div className="flex flex-col items-end gap-1">
@@ -121,7 +121,7 @@ export function ChatPanel({
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer ${
                 useBrandKit
                   ? "bg-[#ec4899] text-black border-[#ec4899]"
-                  : "bg-transparent text-white/60 border-white/10 hover:text-white/80 hover:border-white/20"
+                  : "bg-transparent dark:text-white/60 text-text-secondary dark:border-white/10 border-border dark:hover:text-white/80 hover:text-text-primary dark:hover:border-white/20 hover:border-border"
               }`}
             >
               <Palette className="w-3.5 h-3.5" />
@@ -129,14 +129,14 @@ export function ChatPanel({
             </button>
 
             {/* Model toggle */}
-            <div className="flex items-center rounded-lg border border-white/10 overflow-hidden">
+            <div className="flex items-center rounded-lg border dark:border-white/10 border-border overflow-hidden">
               <button
                 type="button"
                 onClick={() => onModelChange("sonnet")}
                 className={`px-3 py-1.5 text-xs font-medium transition-all cursor-pointer ${
                   model === "sonnet"
                     ? "bg-[#4ecdc4] text-black"
-                    : "bg-transparent text-white/60 hover:text-white/80"
+                    : "bg-transparent dark:text-white/60 text-text-secondary dark:hover:text-white/80 hover:text-text-primary"
                 }`}
               >
                 Sonnet
@@ -147,7 +147,7 @@ export function ChatPanel({
                 className={`px-3 py-1.5 text-xs font-medium transition-all cursor-pointer ${
                   model === "opus"
                     ? "bg-[#4ecdc4] text-black"
-                    : "bg-transparent text-white/60 hover:text-white/80"
+                    : "bg-transparent dark:text-white/60 text-text-secondary dark:hover:text-white/80 hover:text-text-primary"
                 }`}
               >
                 Opus
@@ -162,12 +162,12 @@ export function ChatPanel({
                 <span className="text-[#4ecdc4] font-mono">
                   ${totalCostUsd.toFixed(3)}
                 </span>
-                <span className="text-white/30">
+                <span className="dark:text-white/30 text-text-muted">
                   {(totalTokens.input + totalTokens.output + totalTokens.cacheWrite + totalTokens.cacheRead).toLocaleString("pt-BR")} tokens
                 </span>
               </>
             ) : (
-              <span className="text-white/30 whitespace-nowrap">
+              <span className="dark:text-white/30 text-text-muted whitespace-nowrap">
                 {useBrandKit ? "Identidade ativa · " : ""}Sonnet ~$0.06 · Opus ~$0.30 por criativo
               </span>
             )}

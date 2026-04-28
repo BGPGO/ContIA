@@ -148,7 +148,7 @@ export function OtherAssetsGrid({ empresaId }: OtherAssetsGridProps) {
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-xs text-white/40 py-4">
+        <div className="flex items-center gap-2 text-xs text-text-muted py-4">
           <Loader2 size={12} className="animate-spin" />
           Carregando assets...
         </div>
@@ -158,15 +158,15 @@ export function OtherAssetsGrid({ empresaId }: OtherAssetsGridProps) {
             const groupAssets = assets.filter((a) => a.type === group.type);
             const isUploading = uploading === group.type;
             return (
-              <div key={group.type} className="bg-white/5 border border-white/10 rounded-xl p-5">
+              <div key={group.type} className="bg-bg-card border border-border rounded-xl p-5">
                 {/* Group header */}
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <span style={{ color: group.color }}>{group.icon}</span>
-                    <h3 className="text-sm font-semibold text-white/90">
+                    <h3 className="text-sm font-semibold text-text-primary">
                       {group.label}
                     </h3>
-                    <span className="text-xs text-white/30">
+                    <span className="text-xs text-text-muted">
                       ({groupAssets.length})
                     </span>
                   </div>
@@ -185,7 +185,7 @@ export function OtherAssetsGrid({ empresaId }: OtherAssetsGridProps) {
                         fileInputRefs.current[group.type]?.click()
                       }
                       disabled={isUploading}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-white/15 text-white/70 hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border text-text-secondary hover:bg-bg-card-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                     >
                       {isUploading ? (
                         <>
@@ -217,7 +217,7 @@ export function OtherAssetsGrid({ empresaId }: OtherAssetsGridProps) {
                         key={asset.id}
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="relative group rounded-lg overflow-hidden border border-white/10 bg-white/3 aspect-square"
+                        className="relative group rounded-lg overflow-hidden border border-border bg-bg-elevated aspect-square"
                       >
                         <img
                           src={asset.file_url}
@@ -245,7 +245,7 @@ export function OtherAssetsGrid({ empresaId }: OtherAssetsGridProps) {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-white/30 italic">
+                  <p className="text-xs text-text-muted italic">
                     Nenhum {group.label.toLowerCase()} cadastrado.
                   </p>
                 )}

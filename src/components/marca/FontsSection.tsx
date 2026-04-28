@@ -169,11 +169,11 @@ export function FontsSection({
         </div>
       </div>
 
-      <div className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-5">
+      <div className="bg-bg-card border border-border rounded-xl p-6 space-y-5">
         {/* Google Fonts list */}
         {allFonts.length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs font-medium text-white/50 uppercase tracking-wide mb-3">
+            <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-3">
               Fontes da marca
             </p>
             <div className="flex flex-col gap-2">
@@ -182,14 +182,14 @@ export function FontsSection({
                   key={font}
                   initial={{ opacity: 0, x: -8 }}
                   animate={{ opacity: 1, x: 0 }}
-                  className="flex items-center justify-between px-4 py-3 bg-white/5 border border-white/10 rounded-lg group"
+                  className="flex items-center justify-between px-4 py-3 bg-bg-elevated border border-border rounded-lg group"
                 >
                   <div className="flex flex-col gap-0.5">
-                    <span className="text-sm font-medium text-white/90">
+                    <span className="text-sm font-medium text-text-primary">
                       {font}
                     </span>
                     <span
-                      className="text-base text-white/50"
+                      className="text-base text-text-secondary"
                       style={{ fontFamily: `'${font}', sans-serif` }}
                     >
                       Aa Bb Cc 123
@@ -197,7 +197,7 @@ export function FontsSection({
                   </div>
                   <button
                     onClick={() => handleRemoveGoogleFont(font)}
-                    className="opacity-0 group-hover:opacity-100 text-white/40 hover:text-red-400 transition-all"
+                    className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-red-400 transition-all"
                     title="Remover fonte"
                   >
                     <X size={14} />
@@ -210,13 +210,13 @@ export function FontsSection({
 
         {/* Uploaded font files */}
         {loadingAssets ? (
-          <div className="flex items-center gap-2 text-xs text-white/40">
+          <div className="flex items-center gap-2 text-xs text-text-muted">
             <Loader2 size={12} className="animate-spin" />
             Carregando arquivos de fonte...
           </div>
         ) : fontAssets.length > 0 ? (
           <div className="space-y-2">
-            <p className="text-xs font-medium text-white/50 uppercase tracking-wide mb-3">
+            <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-3">
               Arquivos de fonte
             </p>
             <div className="flex flex-col gap-2">
@@ -225,18 +225,18 @@ export function FontsSection({
                   key={asset.id}
                   initial={{ opacity: 0, x: -8 }}
                   animate={{ opacity: 1, x: 0 }}
-                  className="flex items-center justify-between px-4 py-3 bg-white/5 border border-white/10 rounded-lg group"
+                  className="flex items-center justify-between px-4 py-3 bg-bg-elevated border border-border rounded-lg group"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-[#a29bfe]/15 border border-[#a29bfe]/20 flex items-center justify-center shrink-0">
                       <Type size={14} style={{ color: "#a29bfe" }} />
                     </div>
                     <div className="flex flex-col gap-0.5">
-                      <span className="text-sm font-medium text-white/90">
+                      <span className="text-sm font-medium text-text-primary">
                         {asset.name}
                       </span>
                       {asset.file_name && (
-                        <span className="text-xs text-white/40">
+                        <span className="text-xs text-text-muted">
                           {asset.file_name}
                         </span>
                       )}
@@ -244,7 +244,7 @@ export function FontsSection({
                   </div>
                   <button
                     onClick={() => handleDeleteFontAsset(asset.id)}
-                    className="opacity-0 group-hover:opacity-100 text-white/40 hover:text-red-400 transition-all"
+                    className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-red-400 transition-all"
                     title="Remover arquivo"
                   >
                     <X size={14} />
@@ -256,7 +256,7 @@ export function FontsSection({
         ) : null}
 
         {allFonts.length === 0 && fontAssets.length === 0 && !loadingAssets && (
-          <p className="text-xs text-white/40 italic">
+          <p className="text-xs text-text-muted italic">
             Nenhuma fonte cadastrada. Adicione fontes Google ou faça upload de
             arquivos.
           </p>
@@ -278,8 +278,8 @@ export function FontsSection({
               exit={{ opacity: 0, height: 0 }}
               className="overflow-hidden"
             >
-              <div className="pt-3 border-t border-white/10 space-y-3">
-                <p className="text-xs font-medium text-white/70">
+              <div className="pt-3 border-t border-border space-y-3">
+                <p className="text-xs font-medium text-text-secondary">
                   Nome da fonte (Google Fonts)
                 </p>
                 <div className="flex items-center gap-2">
@@ -291,7 +291,7 @@ export function FontsSection({
                       e.key === "Enter" && handleAddGoogleFont()
                     }
                     placeholder="Ex: Inter, Montserrat, Playfair Display"
-                    className="flex-1 h-9 px-3 text-sm bg-white/5 border border-white/15 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#4ecdc4]/40 transition-all"
+                    className="flex-1 h-9 px-3 text-sm bg-bg-input border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:border-[#4ecdc4]/40 transition-all"
                   />
                   <button
                     onClick={handleAddGoogleFont}
@@ -310,7 +310,7 @@ export function FontsSection({
                       setGoogleFontName("");
                       setError(null);
                     }}
-                    className="px-3 h-9 rounded-lg text-sm border border-white/15 text-white/60 hover:bg-white/5 transition-all"
+                    className="px-3 h-9 rounded-lg text-sm border border-border text-text-secondary hover:bg-bg-card-hover transition-all"
                   >
                     Cancelar
                   </button>
@@ -322,7 +322,7 @@ export function FontsSection({
 
         {/* Add buttons */}
         {addMode === null && (
-          <div className="flex gap-2 pt-2 border-t border-white/10">
+          <div className="flex gap-2 pt-2 border-t border-border">
             <input
               ref={fontFileInputRef}
               type="file"
@@ -332,7 +332,7 @@ export function FontsSection({
             />
             <button
               onClick={() => setAddMode("google")}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-white/15 text-white/80 hover:bg-white/5 transition-all"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-border text-text-secondary hover:bg-bg-card-hover transition-all"
             >
               <Plus size={14} />
               Google Font
@@ -340,7 +340,7 @@ export function FontsSection({
             <button
               onClick={() => fontFileInputRef.current?.click()}
               disabled={uploadingFont}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-white/15 text-white/80 hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-border text-text-secondary hover:bg-bg-card-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {uploadingFont ? (
                 <>

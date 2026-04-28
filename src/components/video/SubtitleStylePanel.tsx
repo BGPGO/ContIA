@@ -89,8 +89,8 @@ export function SubtitleStylePanel({ style, onChange }: SubtitleStylePanelProps)
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
         <div>
-          <h4 className="text-white font-semibold text-sm">Detalhes do estilo</h4>
-          <p className="text-xs text-zinc-500 mt-0.5">
+          <h4 className="text-text-primary font-semibold text-sm">Detalhes do estilo</h4>
+          <p className="text-xs text-text-muted mt-0.5">
             Customize manualmente após escolher um estilo da galeria.
           </p>
         </div>

@@ -20,7 +20,7 @@ interface FilterGroupProps {
 export function FilterGroup({ label, options, selected, onChange }: FilterGroupProps) {
   return (
     <div className="flex items-center gap-2 min-h-[24px]">
-      <span className="text-[9px] font-medium text-white/35 uppercase tracking-wider w-20 shrink-0">
+      <span className="text-[9px] font-medium dark:text-white/35 text-text-muted uppercase tracking-wider w-20 shrink-0">
         {label}
       </span>
       <div className="flex items-center gap-1 overflow-x-auto no-scrollbar flex-1">
@@ -35,7 +35,7 @@ export function FilterGroup({ label, options, selected, onChange }: FilterGroupP
                 "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border transition-all duration-150 shrink-0 whitespace-nowrap",
                 isActive
                   ? "text-black border-transparent"
-                  : "bg-white/5 border-white/10 text-white/60 hover:bg-white/10 hover:text-white/80"
+                  : "dark:bg-white/5 bg-bg-card-hover/60 dark:border-white/10 border-border dark:text-white/60 text-text-secondary dark:hover:bg-white/10 hover:bg-bg-card-hover dark:hover:text-white/80 hover:text-text-primary"
               )}
               style={
                 isActive

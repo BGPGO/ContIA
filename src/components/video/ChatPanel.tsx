@@ -481,7 +481,7 @@ function ActionCard({
             }`}
           >
             <span
-              className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+              className={`absolute top-0.5 w-4 h-4 rounded-full dark:bg-white bg-bg-elevated shadow transition-transform ${
                 subtitlesEnabled ? "left-[18px]" : "left-0.5"
               }`}
             />

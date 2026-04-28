@@ -169,7 +169,7 @@ export default function CalendarioPage() {
 
   if (!empresa) {
     return (
-      <div className="flex items-center justify-center h-64 text-white/50 text-sm">
+      <div className="flex items-center justify-center h-64 text-text-muted text-sm">
         Nenhuma empresa selecionada.
       </div>
     );
@@ -193,7 +193,7 @@ export default function CalendarioPage() {
 
       {/* ── header ──────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between py-0.5">
-        <h1 className="text-sm sm:text-base font-semibold text-white tracking-tight">
+        <h1 className="text-sm sm:text-base font-semibold text-text-primary tracking-tight">
           Calendário
         </h1>
         <div className="flex items-center gap-1">
@@ -205,7 +205,7 @@ export default function CalendarioPage() {
               "hidden md:flex p-1.5 rounded-lg transition-all duration-200 mr-2",
               showPhoneMock
                 ? "text-[#4ecdc4] bg-[#4ecdc4]/10"
-                : "text-white/40 hover:text-[#4ecdc4] hover:bg-[#4ecdc4]/10"
+                : "text-text-muted hover:text-[#4ecdc4] hover:bg-[#4ecdc4]/10"
             )}
             title="Preview do feed Instagram"
           >
@@ -215,7 +215,7 @@ export default function CalendarioPage() {
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
             onClick={() => { setDirection(-1); setCurrentMonth((m) => subMonths(m, 1)); }}
-            className="p-1 rounded-lg text-white/40 hover:text-[#4ecdc4] hover:bg-[#4ecdc4]/10 transition-all duration-200"
+            className="p-1 rounded-lg text-text-muted hover:text-[#4ecdc4] hover:bg-[#4ecdc4]/10 transition-all duration-200"
             aria-label="Mês anterior"
           >
             <ChevronLeft size={16} />
@@ -227,7 +227,7 @@ export default function CalendarioPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: direction * -10 }}
               transition={{ duration: 0.2 }}
-              className="text-xs sm:text-sm font-medium text-white min-w-[100px] sm:min-w-[130px] text-center"
+              className="text-xs sm:text-sm font-medium text-text-primary min-w-[100px] sm:min-w-[130px] text-center"
             >
               {capitalizedMonth}
             </motion.span>
@@ -236,7 +236,7 @@ export default function CalendarioPage() {
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
             onClick={() => { setDirection(1); setCurrentMonth((m) => addMonths(m, 1)); }}
-            className="p-1 rounded-lg text-white/40 hover:text-[#4ecdc4] hover:bg-[#4ecdc4]/10 transition-all duration-200"
+            className="p-1 rounded-lg text-text-muted hover:text-[#4ecdc4] hover:bg-[#4ecdc4]/10 transition-all duration-200"
             aria-label="Próximo mês"
           >
             <ChevronRight size={16} />
@@ -252,7 +252,7 @@ export default function CalendarioPage() {
           selected={activePlatforms}
           onChange={togglePlatform}
         />
-        <div className="h-px bg-white/5" />
+        <div className="h-px bg-border-subtle" />
         <FilterGroup
           label="Status"
           options={STATUS_OPTIONS}
@@ -263,7 +263,7 @@ export default function CalendarioPage() {
           <div className="flex justify-end pt-0.5">
             <button
               onClick={clearFilters}
-              className="inline-flex items-center gap-1 text-[10px] text-white/30 hover:text-white/60 transition-colors"
+              className="inline-flex items-center gap-1 text-[10px] text-text-muted hover:text-text-secondary transition-colors"
             >
               <X size={10} />
               Limpar filtros
@@ -294,7 +294,7 @@ export default function CalendarioPage() {
                 {WEEKDAY_LABELS.map((label) => (
                   <div
                     key={label}
-                    className="text-center text-[11px] uppercase tracking-wider text-white/40 py-2 font-medium"
+                    className="text-center text-[11px] uppercase tracking-wider text-text-muted py-2 font-medium"
                   >
                     {label}
                   </div>
@@ -362,7 +362,7 @@ export default function CalendarioPage() {
               return isSameMonth(day, currentMonth) && dayPosts.length > 0;
             }).length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 gap-3">
-                <p className="text-white/40 text-sm">Nenhum post neste mês.</p>
+                <p className="text-text-muted text-sm">Nenhum post neste mês.</p>
               </div>
             ) : (
               calendarDays.map((day, index) => {
@@ -394,7 +394,7 @@ export default function CalendarioPage() {
       <div className="md:hidden">
         <button
           onClick={() => setShowPhoneMock((v) => !v)}
-          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-bg-card border border-border text-white/50 text-xs font-medium hover:border-[#4ecdc4]/30 transition-colors"
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-bg-card border border-border text-text-muted text-xs font-medium hover:border-[#4ecdc4]/30 transition-colors"
         >
           <Smartphone size={14} />
           {showPhoneMock ? "Ocultar preview do feed" : "Ver preview do feed"}
@@ -426,22 +426,22 @@ export default function CalendarioPage() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3 }}
-        className="text-xs text-white/40 flex items-center gap-1 justify-center flex-wrap"
+        className="text-xs text-text-muted flex items-center gap-1 justify-center flex-wrap"
       >
         {loading ? (
           <span>Carregando posts…</span>
         ) : (
           <>
-            <span className="text-white font-medium">{countPublicado}</span>
+            <span className="text-text-primary font-medium">{countPublicado}</span>
             <span>publicados</span>
-            <span className="text-white/20 mx-1">&middot;</span>
-            <span className="text-white font-medium">{countAgendado}</span>
+            <span className="text-text-muted/40 mx-1">&middot;</span>
+            <span className="text-text-primary font-medium">{countAgendado}</span>
             <span>agendados</span>
-            <span className="text-white/20 mx-1">&middot;</span>
-            <span className="text-white font-medium">{countRascunho}</span>
+            <span className="text-text-muted/40 mx-1">&middot;</span>
+            <span className="text-text-primary font-medium">{countRascunho}</span>
             <span>rascunhos</span>
-            <span className="text-white/20 mx-1">&middot;</span>
-            <span className="text-white font-medium">{filteredPosts.length}</span>
+            <span className="text-text-muted/40 mx-1">&middot;</span>
+            <span className="text-text-primary font-medium">{filteredPosts.length}</span>
             <span>total</span>
           </>
         )}

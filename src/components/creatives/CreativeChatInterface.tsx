@@ -59,7 +59,7 @@ function PhaseIndicator({ phase }: { phase: StreamingPhase }) {
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -4 }}
-      className="flex items-center gap-2 px-4 py-3 text-xs text-white/60"
+      className="flex items-center gap-2 px-4 py-3 text-xs dark:text-white/60 text-text-secondary"
     >
       <div className="flex gap-1">
         {[0, 1, 2].map((i) => (
@@ -216,10 +216,10 @@ function SpecialErrorCard({ type }: { type: SpecialErrorType }) {
             {config.icon}
           </div>
           <div className="flex-1 min-w-0 space-y-2">
-            <h3 className="text-[15px] font-semibold text-white leading-tight">
+            <h3 className="text-[15px] font-semibold text-text-primary leading-tight">
               {config.title}
             </h3>
-            <p className="text-[13px] text-white/70 leading-relaxed">
+            <p className="text-[13px] text-text-secondary leading-relaxed">
               {config.description}
             </p>
             {config.action && (
@@ -267,7 +267,7 @@ function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
                   key={i}
                   src={a.url}
                   alt={a.name || "anexo"}
-                  className="w-20 h-20 rounded-md object-cover border border-white/10"
+                  className="w-20 h-20 rounded-md object-cover dark:border dark:border-white/10 border border-border"
                 />
               ))}
             </div>
@@ -310,7 +310,7 @@ function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
       className="flex justify-start"
     >
       <div className="max-w-[85%] space-y-1.5">
-        <div className="bg-bg-card text-text-primary border border-white/5 rounded-2xl rounded-bl-md px-4 py-3 text-sm leading-relaxed whitespace-pre-line">
+        <div className="bg-bg-card text-text-primary border dark:border-white/5 border-border-subtle rounded-2xl rounded-bl-md px-4 py-3 text-sm leading-relaxed whitespace-pre-line">
           {prose || (hasCode ? "Desenhando criativo…" : "")}
           {isStreaming && (
             <motion.span
@@ -322,7 +322,7 @@ function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
 
           {/* Barra de progresso animada enquanto o Claude desenha o HTML */}
           {isStreaming && hasCode && (
-            <div className="mt-3 h-1 w-full rounded-full bg-white/5 overflow-hidden">
+            <div className="mt-3 h-1 w-full rounded-full dark:bg-white/5 bg-bg-card-hover/60 overflow-hidden">
               <motion.div
                 className="h-full bg-gradient-to-r from-[#4ecdc4] to-[#6c5ce7]"
                 initial={{ width: "15%" }}
@@ -339,7 +339,7 @@ function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
           {/* HTML colapsável — só depois do streaming terminar */}
           {!isStreaming && hasCode && code.length > 0 && (
             <details className="mt-3 group">
-              <summary className="cursor-pointer text-[11px] text-white/40 hover:text-white/70 select-none list-none flex items-center gap-1 transition-colors">
+              <summary className="cursor-pointer text-[11px] dark:text-white/40 text-text-muted dark:hover:text-white/70 hover:text-text-secondary select-none list-none flex items-center gap-1 transition-colors">
                 <svg
                   className="w-3 h-3 transition-transform group-open:rotate-90"
                   fill="none"
@@ -350,7 +350,7 @@ function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
                 </svg>
                 Ver HTML gerado ({code.length.toLocaleString("pt-BR")} caracteres)
               </summary>
-              <pre className="mt-2 max-h-64 overflow-auto text-[10px] font-mono text-white/50 bg-black/30 rounded-md p-2 whitespace-pre-wrap break-all">
+              <pre className="mt-2 max-h-64 overflow-auto text-[10px] font-mono dark:text-white/50 text-text-secondary dark:bg-black/30 bg-bg-card rounded-md p-2 whitespace-pre-wrap break-all">
                 {code}
               </pre>
             </details>
@@ -359,7 +359,7 @@ function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
 
         {/* Badge de custo — aparece apenas quando cost está disponível */}
         {cost > 0 && (
-          <div className="mt-1 text-[10px] text-white/30 font-mono">
+          <div className="mt-1 text-[10px] dark:text-white/30 text-text-muted font-mono">
             ~${cost.toFixed(3)}
           </div>
         )}
@@ -505,7 +505,7 @@ export function CreativeChatInterface({
               exit={{ opacity: 0, y: -4 }}
               className="flex justify-start"
             >
-              <div className="bg-bg-card border border-white/5 rounded-2xl rounded-bl-md">
+              <div className="bg-bg-card border dark:border-white/5 border-border-subtle rounded-2xl rounded-bl-md">
                 <PhaseIndicator phase={streamingPhase} />
               </div>
             </motion.div>
@@ -530,13 +530,13 @@ export function CreativeChatInterface({
       <div className="shrink-0 px-3 py-3 border-t border-border">
         {/* Linha de anexos pendentes */}
         {pendingAttachments.length > 0 && (
-          <div className="flex items-center gap-2 flex-wrap mb-2 pb-2 border-b border-white/5">
+          <div className="flex items-center gap-2 flex-wrap mb-2 pb-2 dark:border-b dark:border-white/5 border-b border-border">
             {pendingAttachments.map((a) => (
               <div key={a.url} className="relative group shrink-0">
                 <img
                   src={a.url}
                   alt={a.name || "anexo"}
-                  className="w-14 h-14 rounded-md object-cover border border-white/10"
+                  className="w-14 h-14 rounded-md object-cover dark:border dark:border-white/10 border border-border"
                 />
                 <button
                   type="button"
@@ -564,7 +564,7 @@ export function CreativeChatInterface({
                 ? "Máximo de 3 imagens"
                 : "Anexar imagem (PNG, JPG, WEBP, máx 5MB)"
             }
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-white/50 hover:text-white/90 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-all shrink-0 mb-0.5"
+            className="w-9 h-9 rounded-xl flex items-center justify-center dark:text-white/50 text-text-secondary dark:hover:text-white/90 hover:text-text-primary dark:hover:bg-white/10 hover:bg-bg-card-hover/60 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-all shrink-0 mb-0.5"
           >
             <Paperclip size={16} />
           </button>
@@ -597,7 +597,7 @@ export function CreativeChatInterface({
               background:
                 !isStreaming && !disabled && inputValue.trim()
                   ? "linear-gradient(135deg, #6c5ce7 0%, #4ecdc4 100%)"
-                  : "rgba(255,255,255,0.06)",
+                  : "rgba(0,0,0,0.06)",
             }}
           >
             <Send size={16} />

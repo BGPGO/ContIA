@@ -604,7 +604,7 @@ export default function TemplateEditorPage() {
                   "w-full flex items-center justify-center gap-2",
                   "px-4 py-2.5 rounded-lg text-sm font-medium",
                   "text-white transition-colors",
-                  "bg-[#295d6f] hover:bg-[#347a8f]"
+                  "bg-accent/80 hover:bg-accent text-white"
                 )}
               >
                 <Download className="w-4 h-4" />

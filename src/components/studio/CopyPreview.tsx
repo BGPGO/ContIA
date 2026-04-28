@@ -134,7 +134,7 @@ function EditableField({
   return (
     <div
       onClick={() => setEditing(true)}
-      className={`cursor-pointer rounded-lg px-1 -mx-1 transition-colors hover:bg-white/5 ${className || ""}`}
+      className={`cursor-pointer rounded-lg px-1 -mx-1 transition-colors dark:hover:bg-white/5 hover:bg-bg-card-hover/60 ${className || ""}`}
       title="Clique para editar"
     >
       {value || <span className="text-text-muted italic">{placeholder}</span>}
@@ -234,7 +234,7 @@ function PostPreview({
         <EditableField
           value={copy.headline}
           onChange={(val) => onEdit("headline", val)}
-          className="text-xl font-bold text-white leading-snug"
+          className="text-xl font-bold text-text-primary leading-snug"
         />
       </div>
 
@@ -498,7 +498,7 @@ function RichCarouselPreview({
               {typeConfig.label}
             </span>
             {slide.tag && (
-              <span className="text-[10px] text-text-muted bg-white/5 px-2 py-0.5 rounded-full uppercase tracking-wider">
+              <span className="text-[10px] text-text-muted dark:bg-white/5 bg-bg-card px-2 py-0.5 rounded-full uppercase tracking-wider">
                 {slide.tag}
               </span>
             )}
@@ -508,7 +508,7 @@ function RichCarouselPreview({
           </div>
 
           {/* Headline with highlights */}
-          <h3 className="text-base font-bold text-white leading-snug">
+          <h3 className="text-base font-bold text-text-primary leading-snug">
             <HighlightedHeadline
               headline={slide.headline}
               highlights={slide.headlineHighlights}
@@ -609,7 +609,7 @@ function BasicCarouselPreview({
                 newSlides[activeSlide] = { ...newSlides[activeSlide], headline: val };
                 onEdit("slides", newSlides);
               }}
-              className="text-base font-bold text-white"
+              className="text-base font-bold text-text-primary"
             />
           </div>
 
@@ -820,12 +820,12 @@ export function CopyPreview({
           onClick={onCreateVisual}
           disabled={!isApproved}
           className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold
-            text-white disabled:opacity-40 disabled:cursor-not-allowed
+            text-white disabled:opacity-40 disabled:cursor-not-allowed disabled:bg-bg-card
             transition-all cursor-pointer hover:shadow-lg hover:shadow-secondary/20 active:scale-[0.98]"
           style={{
             background: isApproved
               ? "linear-gradient(135deg, #6c5ce7 0%, #4ecdc4 100%)"
-              : "rgba(255,255,255,0.06)",
+              : undefined,
           }}
         >
           <ArrowRight size={16} />

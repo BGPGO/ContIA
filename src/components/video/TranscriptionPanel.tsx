@@ -145,7 +145,7 @@ export function TranscriptionPanel({
                   ? "rgba(139, 92, 246, 0.08)"
                   : "transparent",
               }}
-              className={`group flex gap-2 px-2 py-1.5 rounded-lg transition-colors cursor-pointer hover:bg-white/[0.03] ${
+              className={`group flex gap-2 px-2 py-1.5 rounded-lg transition-colors cursor-pointer dark:hover:bg-white/[0.03] hover:bg-bg-card-hover/50 ${
                 isActive ? "border-l-2 border-accent" : "border-l-2 border-transparent"
               }`}
               onClick={() => {

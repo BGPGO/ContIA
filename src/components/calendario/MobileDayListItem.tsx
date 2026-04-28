@@ -19,7 +19,7 @@ const STATUS_CONFIG: Record<
 > = {
   publicado: { label: "Publicado", dot: "bg-green-500" },
   agendado: { label: "Agendado", dot: "bg-yellow-500" },
-  rascunho: { label: "Rascunho", dot: "bg-white/30" },
+  rascunho: { label: "Rascunho", dot: "dark:bg-white/30 bg-text-muted/30" },
   pendente_aprovacao: { label: "Aguardando aprovação", dot: "bg-yellow-500" },
   rejeitado: { label: "Rejeitado", dot: "bg-red-500" },
   erro: { label: "Erro", dot: "bg-red-500" },
@@ -75,7 +75,7 @@ export function MobileDayListItem({
         <span
           className={cn(
             "text-xs font-medium",
-            today ? "text-[#4ecdc4]" : "text-white/50"
+            today ? "text-[#4ecdc4]" : "dark:text-white/50 text-text-secondary"
           )}
         >
           {format(day, "EEE, dd MMM", { locale: ptBR })}
@@ -85,7 +85,7 @@ export function MobileDayListItem({
             Hoje
           </span>
         )}
-        <span className="text-[10px] text-white/30 ml-auto">
+        <span className="text-[10px] dark:text-white/30 text-text-muted ml-auto">
           {posts.length} post{posts.length !== 1 ? "s" : ""}
         </span>
       </div>
@@ -109,9 +109,9 @@ export function MobileDayListItem({
                 </p>
                 <div className="flex items-center gap-1.5 mt-1">
                   <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", statusConf.dot)} />
-                  <span className="text-[10px] text-white/50">{statusConf.label}</span>
+                  <span className="text-[10px] dark:text-white/50 text-text-secondary">{statusConf.label}</span>
                   {date && (
-                    <span className="text-[10px] text-white/40 tabular-nums">
+                    <span className="text-[10px] dark:text-white/40 text-text-muted tabular-nums">
                       {format(new Date(date), "HH:mm")}
                     </span>
                   )}

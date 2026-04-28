@@ -681,7 +681,7 @@ function DNACard({
             {synth.paleta_cores.slice(0, 6).map((color) => (
               <span
                 key={color}
-                className="w-5 h-5 rounded-full border border-white/10"
+                className="w-5 h-5 rounded-full border border-border-subtle"
                 style={{ backgroundColor: color }}
                 title={color}
               />

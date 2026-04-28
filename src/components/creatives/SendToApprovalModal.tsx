@@ -132,12 +132,12 @@ function ModalContent({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 16 }}
           transition={{ type: "spring", damping: 30, stiffness: 300 }}
-          className="relative z-10 w-full max-w-md bg-[#0d1025] border border-white/10 rounded-2xl p-8 shadow-2xl flex flex-col items-center text-center gap-4"
+          className="relative z-10 w-full max-w-md bg-bg-primary border dark:border-white/10 border-border rounded-2xl p-8 shadow-2xl flex flex-col items-center text-center gap-4"
           onClick={(e) => e.stopPropagation()}
         >
           <CheckCircle2 className="w-16 h-16 text-emerald-400" />
-          <h2 className="text-xl font-semibold text-white">Enviado pra aprovação!</h2>
-          <p className="text-sm text-white/60 leading-relaxed">
+          <h2 className="text-xl font-semibold text-text-primary">Enviado pra aprovação!</h2>
+          <p className="text-sm dark:text-white/60 text-text-secondary leading-relaxed">
             Seu criativo foi enviado e tá aguardando revisão.
           </p>
           <div className="flex items-center gap-3 mt-2 w-full">
@@ -150,7 +150,7 @@ function ModalContent({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-sm font-medium text-white/60 hover:text-white/90 hover:bg-white/8 transition-all border border-white/10"
+              className="px-4 py-2 rounded-xl text-sm font-medium dark:text-white/60 text-text-secondary dark:hover:text-white/90 hover:text-text-primary dark:hover:bg-white/8 hover:bg-bg-card-hover dark:border-white/10 border-border transition-all"
             >
               Fechar
             </button>
@@ -186,7 +186,7 @@ function ModalContent({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 16 }}
         transition={{ type: "spring", damping: 30, stiffness: 300 }}
-        className="relative z-10 w-full max-w-2xl bg-[#0d1025] border border-white/10 rounded-2xl p-6 shadow-2xl"
+        className="relative z-10 w-full max-w-2xl bg-bg-primary border dark:border-white/10 border-border rounded-2xl p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -195,7 +195,7 @@ function ModalContent({
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#4ecdc4]/20 to-[#6c5ce7]/20 border border-[#4ecdc4]/20 flex items-center justify-center">
               <Send className="w-4 h-4 text-[#4ecdc4]" />
             </div>
-            <h2 className="text-lg font-semibold text-white">
+            <h2 className="text-lg font-semibold text-text-primary">
               Enviar pra aprovação
             </h2>
           </div>
@@ -203,7 +203,7 @@ function ModalContent({
             type="button"
             onClick={onClose}
             disabled={loading}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-white/40 hover:text-white/80 hover:bg-white/10 transition-all disabled:opacity-30"
+            className="w-8 h-8 flex items-center justify-center rounded-lg dark:text-white/40 text-text-muted dark:hover:text-white/80 hover:text-text-primary dark:hover:bg-white/10 hover:bg-bg-card-hover transition-all disabled:opacity-30"
           >
             <X className="w-4 h-4" />
           </button>
@@ -218,7 +218,7 @@ function ModalContent({
                 <img
                   src={pngUrls[0]}
                   alt="Preview do criativo"
-                  className="rounded-xl object-contain border border-white/10 shadow-lg"
+                  className="rounded-xl object-contain border dark:border-white/10 border-border shadow-lg"
                   style={{ maxWidth: "200px", maxHeight: "250px" }}
                 />
               </div>
@@ -230,7 +230,7 @@ function ModalContent({
                     <img
                       src={url}
                       alt={`Slide ${i + 1}`}
-                      className="rounded-lg object-contain border border-white/10"
+                      className="rounded-lg object-contain border dark:border-white/10 border-border"
                       style={{ width: "90px", height: "110px", objectFit: "cover" }}
                     />
                     {i === thumbsToShow.length - 1 && extraCount > 0 && (
@@ -249,7 +249,7 @@ function ModalContent({
 
         {/* Legenda */}
         <div className="mb-4">
-          <label className="block text-sm font-medium text-white/70 mb-1.5">
+          <label className="block text-sm font-medium dark:text-white/70 text-text-secondary mb-1.5">
             Legenda do post
           </label>
           <textarea
@@ -258,13 +258,13 @@ function ModalContent({
             onChange={(e) => setCaption(e.target.value)}
             disabled={loading}
             placeholder="Escreva a legenda do post…"
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-white/25 outline-none focus:border-[#4ecdc4]/50 focus:bg-white/8 transition-all resize-none disabled:opacity-50"
+            className="w-full dark:bg-white/5 bg-bg-input border dark:border-white/10 border-border rounded-xl px-4 py-3 text-sm text-text-primary dark:placeholder-white/25 placeholder:text-text-muted outline-none focus:border-[#4ecdc4]/50 dark:focus:bg-white/8 focus:bg-bg-card-hover transition-all resize-none disabled:opacity-50"
           />
         </div>
 
         {/* Plataformas */}
         <div className="mb-5">
-          <label className="block text-sm font-medium text-white/70 mb-2">
+          <label className="block text-sm font-medium dark:text-white/70 text-text-secondary mb-2">
             Plataformas
           </label>
           <div className="flex flex-wrap gap-2">
@@ -279,7 +279,7 @@ function ModalContent({
                   className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
                     active
                       ? "bg-[#4ecdc4]/20 border-[#4ecdc4]/50 text-[#4ecdc4]"
-                      : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white/70 hover:border-white/20"
+                      : "dark:bg-white/5 bg-bg-card-hover dark:border-white/10 border-border dark:text-white/50 text-text-secondary dark:hover:bg-white/10 hover:bg-bg-elevated dark:hover:text-white/70 hover:text-text-primary dark:hover:border-white/20 hover:border-border"
                   } disabled:opacity-50`}
                 >
                   {plat.label}
@@ -312,7 +312,7 @@ function ModalContent({
             type="button"
             onClick={onClose}
             disabled={loading}
-            className="px-4 py-2 rounded-xl text-sm font-medium text-white/60 hover:text-white/90 hover:bg-white/8 transition-all disabled:opacity-40"
+            className="px-4 py-2 rounded-xl text-sm font-medium dark:text-white/60 text-text-secondary dark:hover:text-white/90 hover:text-text-primary dark:hover:bg-white/8 hover:bg-bg-card-hover transition-all disabled:opacity-40"
           >
             Cancelar
           </button>

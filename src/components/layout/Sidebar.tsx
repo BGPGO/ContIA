@@ -430,7 +430,7 @@ export function Sidebar() {
                           pathname === link.href ||
                           pathname.startsWith(link.href + "/");
                         const iconColor = active
-                          ? "text-white"
+                          ? "text-text-primary"
                           : iconColorMap[link.href] || "text-text-muted";
 
                         return (
@@ -441,7 +441,7 @@ export function Sidebar() {
                             aria-current={active ? "page" : undefined}
                             className={`relative flex items-center gap-2.5 px-2.5 h-9 rounded-xl text-[13px] font-medium transition-all duration-200 group/link ${
                               active
-                                ? "text-white bg-gradient-to-r from-[#4ecdc4]/20 via-[#6c5ce7]/10 to-transparent shadow-[inset_0_0_20px_rgba(78,205,196,0.06)]"
+                                ? "text-text-primary bg-gradient-to-r from-[#4ecdc4]/20 via-[#6c5ce7]/10 to-transparent shadow-[inset_0_0_20px_rgba(78,205,196,0.06)]"
                                 : "text-text-secondary hover:text-text-primary hover:bg-bg-card-hover/60"
                             }`}
                           >

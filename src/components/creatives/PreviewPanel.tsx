@@ -24,16 +24,16 @@ interface PreviewPanelProps {
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center h-full gap-6 px-8 text-center">
-      <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
+      <div className="w-14 h-14 rounded-2xl dark:bg-white/5 bg-bg-card-hover/60 dark:border-white/10 border-border flex items-center justify-center">
         <Sparkles size={24} className="text-[#4ecdc4]/60" />
       </div>
       <div className="space-y-2 max-w-xs">
-        <h2 className="text-2xl font-serif text-white leading-snug">
+        <h2 className="text-2xl font-serif text-text-primary leading-snug">
           O que vamos criar hoje?
         </h2>
-        <p className="text-sm text-white/40 leading-relaxed">
+        <p className="text-sm dark:text-white/40 text-text-secondary leading-relaxed">
           Digite um pedido no chat à esquerda. Ex:{" "}
-          <em className="text-white/60">
+          <em className="dark:text-white/60 text-text-primary/70">
             criativo viral sobre produtividade, fundo preto com vermelho, estilo Gary Vee
           </em>
         </p>
@@ -168,12 +168,12 @@ export function PreviewPanel({
         </div>
 
         {/* Barra inferior: download + aprovação */}
-        <div className="shrink-0 px-4 py-3 border-t border-white/10 flex items-center justify-end gap-2 flex-wrap">
+        <div className="shrink-0 px-4 py-3 dark:border-t dark:border-white/10 border-t border-border flex items-center justify-end gap-2 flex-wrap">
           {isCarousel && (
             <button
               onClick={downloadZip}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 text-white text-sm font-medium
-                hover:bg-white/15 transition-colors cursor-pointer border border-white/10"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg dark:bg-white/10 bg-bg-card-hover/60 text-text-primary text-sm font-medium
+                dark:hover:bg-white/15 hover:bg-bg-card-hover transition-colors cursor-pointer dark:border-white/10 border-border"
             >
               <FileArchive size={14} />
               Baixar ZIP
@@ -254,7 +254,7 @@ export function PreviewPanel({
   // ── Streaming sem HTML ainda (só texto chegando) ──
   return (
     <div className="flex items-center justify-center h-full">
-      <div className="flex flex-col items-center gap-3 text-white/40">
+      <div className="flex flex-col items-center gap-3 dark:text-white/40 text-text-secondary">
         <div className="flex gap-1.5">
           {[0, 1, 2].map((i) => (
             <div

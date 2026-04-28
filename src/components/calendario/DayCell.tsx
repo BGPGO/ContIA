@@ -90,7 +90,7 @@ export function DayCell({ day, currentMonth, posts, onDayClick }: DayCellProps) 
             ? "text-white drop-shadow-sm"
             : today
             ? "text-[#4ecdc4]"
-            : "text-white/40"
+            : "dark:text-white/40 text-text-muted"
         )}
       >
         <span className="text-xs leading-none font-medium">
@@ -115,7 +115,7 @@ export function DayCell({ day, currentMonth, posts, onDayClick }: DayCellProps) 
             <PostChip key={post.id} post={post} onSelect={() => onDayClick(day)} />
           ))}
           {noThumbPosts.length > 3 && (
-            <span className="text-[9px] text-white/40 pl-1.5 font-medium">
+            <span className="text-[9px] dark:text-white/40 text-text-muted pl-1.5 font-medium">
               +{noThumbPosts.length - 3} mais
             </span>
           )}

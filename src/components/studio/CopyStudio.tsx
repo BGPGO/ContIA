@@ -466,7 +466,7 @@ export function CopyStudio() {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -4, scale: 0.96 }}
                         transition={{ duration: 0.15 }}
-                        className="absolute top-full right-0 mt-1 z-50 bg-bg-card border border-white/10 rounded-xl shadow-xl w-[280px] py-2 max-h-[300px] overflow-y-auto"
+                        className="absolute top-full right-0 mt-1 z-50 bg-bg-card dark:border-white/10 border-border rounded-xl shadow-xl w-[280px] py-2 max-h-[300px] overflow-y-auto"
                       >
                         <p className="px-3 py-1 text-[10px] font-medium text-text-muted uppercase tracking-wider">Rascunhos recentes</p>
                         {draftSessions.map((draft) => {
@@ -479,7 +479,7 @@ export function CopyStudio() {
                                 studio.selectSession(draft.id);
                                 setDraftsOpen(false);
                               }}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-white/5 transition-colors cursor-pointer text-left"
+                              className="w-full flex items-center gap-2.5 px-3 py-2 dark:hover:bg-white/5 hover:bg-bg-card-hover/60 transition-colors cursor-pointer text-left"
                             >
                               <FmtIcon size={13} className="text-text-muted shrink-0" />
                               <div className="flex-1 min-w-0">
@@ -576,7 +576,7 @@ export function CopyStudio() {
                               type="button"
                               onClick={() => studio.selectSession(draft.id)}
                               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
-                                bg-bg-card border border-white/5
+                                bg-bg-card dark:border-white/5 border-border/40
                                 hover:border-[#4ecdc4]/20 transition-all cursor-pointer text-left"
                             >
                               <FmtIcon size={14} className="text-text-muted shrink-0" />
@@ -621,11 +621,11 @@ export function CopyStudio() {
                     onClick={handleQuickSubmit}
                     disabled={!quickInput.trim()}
                     className="w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer
-                      disabled:opacity-30 disabled:cursor-not-allowed shrink-0 text-white"
+                      disabled:opacity-30 disabled:cursor-not-allowed disabled:bg-bg-card shrink-0 text-white"
                     style={{
                       background: quickInput.trim()
                         ? "linear-gradient(135deg, #6c5ce7 0%, #4ecdc4 100%)"
-                        : "rgba(255,255,255,0.06)",
+                        : undefined,
                     }}
                   >
                     <Send size={16} />

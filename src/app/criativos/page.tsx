@@ -15,7 +15,7 @@ export default function CriativosPage() {
   if (!empresaId) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-white/60">Selecione uma empresa para gerar criativos.</p>
+        <p className="text-text-secondary">Selecione uma empresa para gerar criativos.</p>
       </div>
     );
   }
@@ -51,7 +51,7 @@ function CriativosPageInner({ empresaId }: { empresaId: string }) {
   return (
     <div className="flex h-full w-full relative">
       {/* Chat */}
-      <div className="flex-[3] min-w-0 border-r border-white/10 relative">
+      <div className="flex-[3] min-w-0 border-r dark:border-white/10 border-border relative">
         <ChatPanel
           messages={hook.messages}
           isStreaming={hook.isStreaming}

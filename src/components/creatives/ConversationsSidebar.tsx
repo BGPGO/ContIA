@@ -55,8 +55,8 @@ function SkeletonItem({ delay }: { delay: number }) {
       className="px-3 py-3 animate-pulse"
       style={{ animationDelay: `${delay}ms` }}
     >
-      <div className="h-3.5 bg-white/10 rounded-md mb-2 w-3/4" />
-      <div className="h-2.5 bg-white/6 rounded-md w-1/3" />
+      <div className="h-3.5 dark:bg-white/10 bg-bg-card-hover rounded-md mb-2 w-3/4" />
+      <div className="h-2.5 dark:bg-white/6 bg-bg-card-hover/60 rounded-md w-1/3" />
     </div>
   );
 }
@@ -145,8 +145,8 @@ function ConversationItem({
       transition={{ delay: index * 0.03, duration: 0.2 }}
       className={`group relative flex items-start gap-2 px-3 py-2.5 cursor-pointer rounded-lg mx-2 my-0.5 transition-all duration-150 border-l-2 ${
         isActive
-          ? "bg-white/10 border-[#4ecdc4]"
-          : "border-transparent hover:bg-white/5 hover:border-white/10"
+          ? "dark:bg-white/10 bg-bg-card-hover border-[#4ecdc4]"
+          : "border-transparent dark:hover:bg-white/5 hover:bg-bg-card-hover dark:hover:border-white/10 hover:border-border"
       }`}
       onClick={() => {
         if (!editMode) onSelect();
@@ -161,14 +161,14 @@ function ConversationItem({
             onKeyDown={handleKeyDown}
             onBlur={saveEdit}
             onClick={(e) => e.stopPropagation()}
-            className="w-full bg-white/10 border border-[#4ecdc4]/40 rounded px-1.5 py-0.5 text-sm text-white outline-none focus:border-[#4ecdc4]"
+            className="w-full dark:bg-white/10 bg-bg-input border border-[#4ecdc4]/40 rounded px-1.5 py-0.5 text-sm text-text-primary outline-none focus:border-[#4ecdc4]"
           />
         ) : (
-          <p className="text-sm font-medium text-white/90 leading-snug line-clamp-2 pr-6">
+          <p className="text-sm font-medium text-text-primary leading-snug line-clamp-2 pr-6">
             {conv.title}
           </p>
         )}
-        <p className="text-[11px] text-white/40 mt-0.5">
+        <p className="text-[11px] dark:text-white/40 text-text-muted mt-0.5">
           {relativeDate(conv.updatedAt)}
         </p>
       </div>
@@ -182,8 +182,8 @@ function ConversationItem({
               e.stopPropagation();
               setMenuOpen((v) => !v);
             }}
-            className={`w-6 h-6 rounded flex items-center justify-center text-white/40 hover:text-white/80 hover:bg-white/10 transition-all ${
-              menuOpen ? "opacity-100 bg-white/10" : "opacity-0 group-hover:opacity-100"
+            className={`w-6 h-6 rounded flex items-center justify-center dark:text-white/40 text-text-muted dark:hover:text-white/80 hover:text-text-primary dark:hover:bg-white/10 hover:bg-bg-card-hover transition-all ${
+              menuOpen ? "opacity-100 dark:bg-white/10 bg-bg-card-hover" : "opacity-0 group-hover:opacity-100"
             }`}
           >
             <MoreHorizontal className="w-3.5 h-3.5" />
@@ -196,13 +196,13 @@ function ConversationItem({
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.92, y: -4 }}
                 transition={{ duration: 0.12 }}
-                className="absolute right-0 top-7 z-50 w-36 bg-[#0d1025] border border-white/10 rounded-xl shadow-xl overflow-hidden"
+                className="absolute right-0 top-7 z-50 w-36 bg-bg-card dark:border-white/10 border-border rounded-xl shadow-xl overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
               >
                 <button
                   type="button"
                   onClick={handleRenameClick}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-white/70 hover:bg-white/8 hover:text-white transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm dark:text-white/70 text-text-secondary dark:hover:bg-white/8 hover:bg-bg-card-hover dark:hover:text-white hover:text-text-primary transition-colors"
                 >
                   <Pencil className="w-3.5 h-3.5" />
                   Renomear
@@ -240,8 +240,8 @@ export function ConversationsSidebar({
   return (
     <div className="flex flex-col h-full w-full bg-bg-primary">
       {/* Header fixo */}
-      <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-white/10">
-        <span className="text-sm font-semibold text-white/80 tracking-wide">
+      <div className="shrink-0 flex items-center justify-between px-4 py-3 dark:border-b dark:border-white/10 border-b border-border">
+        <span className="text-sm font-semibold dark:text-white/80 text-text-primary tracking-wide">
           Conversas
         </span>
         <button
@@ -267,7 +267,7 @@ export function ConversationsSidebar({
         ) : conversations.length === 0 ? (
           // Estado vazio
           <div className="flex flex-col items-center justify-center h-32 px-4 text-center">
-            <p className="text-sm text-white/30 leading-relaxed">
+            <p className="text-sm dark:text-white/30 text-text-muted leading-relaxed">
               Sem conversas ainda. Crie uma nova pra começar.
             </p>
           </div>

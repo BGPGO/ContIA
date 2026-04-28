@@ -97,7 +97,7 @@ function ConfirmDeleteModal({
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onCancel}
       />
-      <div className="relative bg-bg-secondary border border-white/[0.08] rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+      <div className="relative bg-bg-secondary dark:border-white/[0.08] border-border rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
         <h3 className="text-base font-semibold text-text-primary mb-2">
           Excluir template?
         </h3>
@@ -108,7 +108,7 @@ function ConfirmDeleteModal({
         <div className="flex items-center gap-3 justify-end">
           <button
             onClick={onCancel}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-text-muted hover:bg-white/5 transition-colors"
+            className="px-4 py-2 rounded-lg text-sm font-medium text-text-muted dark:hover:bg-white/5 hover:bg-bg-card-hover/60 transition-colors"
           >
             Cancelar
           </button>
@@ -309,7 +309,7 @@ export default function TemplatesPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar templates e assets..."
-          className="w-full pl-9 pr-4 py-2.5 bg-bg-card border border-white/[0.06] rounded-xl text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-[#4ecdc4]/40 transition-colors"
+          className="w-full pl-9 pr-4 py-2.5 bg-bg-card dark:border-white/[0.06] border-border rounded-xl text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-[#4ecdc4]/40 transition-colors"
         />
         {search && (
           <button
@@ -370,7 +370,7 @@ export default function TemplatesPage() {
             {filteredTemplates.map((tpl) => (
               <div
                 key={tpl.id}
-                className="group relative bg-bg-card rounded-xl overflow-hidden border border-white/[0.04] hover:border-[#4ecdc4]/30 transition-all duration-200"
+                className="group relative bg-bg-card rounded-xl overflow-hidden dark:border-white/[0.04] border-border/40 hover:border-[#4ecdc4]/30 transition-all duration-200"
               >
                 {/* Thumbnail */}
                 <button
@@ -444,7 +444,7 @@ export default function TemplatesPage() {
 
             {/* Empty state (no templates at all) */}
             {filteredTemplates.length === 0 && !search && (
-              <div className="col-span-full border border-dashed border-white/[0.06] rounded-xl p-10 text-center">
+              <div className="col-span-full dark:border-white/[0.06] border-dashed border-border rounded-xl p-10 text-center">
                 <Layout
                   size={32}
                   className="mx-auto text-text-muted opacity-30 mb-3"
@@ -490,7 +490,7 @@ export default function TemplatesPage() {
               onChange={(e) =>
                 setUploadType(e.target.value as BrandAsset["type"])
               }
-              className="px-2 py-1.5 rounded-lg text-xs bg-bg-card border border-white/[0.06] text-text-primary focus:outline-none focus:border-[#4ecdc4]/40"
+              className="px-2 py-1.5 rounded-lg text-xs bg-bg-card dark:border-white/[0.06] border-border text-text-primary focus:outline-none focus:border-[#4ecdc4]/40"
             >
               {ASSET_TYPE_OPTIONS.map((t) => (
                 <option key={t} value={t}>
@@ -545,7 +545,7 @@ export default function TemplatesPage() {
             {filteredAssets.map((asset) => (
               <div
                 key={asset.id}
-                className="group relative bg-bg-card rounded-xl overflow-hidden border border-white/[0.04] hover:border-white/[0.1] transition-all duration-200"
+                className="group relative bg-bg-card rounded-xl overflow-hidden dark:border-white/[0.04] border-border/40 hover:border-white/[0.1] transition-all duration-200"
               >
                 {/* Image */}
                 <div className="aspect-square bg-bg-primary flex items-center justify-center overflow-hidden">
@@ -583,7 +583,7 @@ export default function TemplatesPage() {
 
             {/* Empty state */}
             {filteredAssets.length === 0 && !search && (
-              <div className="col-span-full border border-dashed border-white/[0.06] rounded-xl p-8 text-center">
+              <div className="col-span-full dark:border-white/[0.06] border-dashed border-border rounded-xl p-8 text-center">
                 <ImageIcon
                   size={28}
                   className="mx-auto text-text-muted opacity-30 mb-2"

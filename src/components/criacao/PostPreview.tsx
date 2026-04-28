@@ -321,7 +321,7 @@ export function PostCarouselPreview({
               className={`rounded-full transition-all duration-200 ${
                 i === activeIndex
                   ? "w-6 h-2 bg-accent"
-                  : "w-2 h-2 bg-white/20 hover:bg-white/40"
+                  : "w-2 h-2 dark:bg-white/20 bg-text-muted/30 dark:hover:bg-white/40 hover:bg-text-muted/50"
               }`}
               aria-label={`Slide ${i + 1}`}
             />

@@ -62,10 +62,10 @@ function relativeDate(isoString: string): string {
 function SkeletonCard({ delay }: { delay: number }) {
   return (
     <div
-      className="aspect-[1/1.25] rounded-xl bg-white/5 animate-pulse overflow-hidden"
+      className="aspect-[1/1.25] rounded-xl dark:bg-white/5 bg-bg-card-hover animate-pulse overflow-hidden"
       style={{ animationDelay: `${delay}ms` }}
     >
-      <div className="w-full h-full bg-gradient-to-b from-white/5 to-white/10" />
+      <div className="w-full h-full dark:bg-gradient-to-b dark:from-white/5 dark:to-white/10 bg-gradient-to-b from-bg-card-hover/30 to-bg-card-hover" />
     </div>
   );
 }
@@ -161,7 +161,7 @@ function CreativeCard({
       className={`group relative aspect-[1/1.25] rounded-xl overflow-hidden cursor-pointer border transition-all duration-150 ${
         isActive
           ? "ring-2 ring-[#4ecdc4] border-[#4ecdc4]/50"
-          : "border-white/10 hover:border-[#4ecdc4]/40"
+          : "dark:border-white/10 border-border hover:border-[#4ecdc4]/40"
       }`}
       onClick={handleCardClick}
     >
@@ -174,7 +174,7 @@ function CreativeCard({
         />
       ) : (
         <div className="w-full h-full bg-gradient-to-br from-[#0d1025] via-[#111530] to-[#0a0d1f] flex items-center justify-center">
-          <ImageIcon className="w-8 h-8 text-white/15" />
+          <ImageIcon className="w-8 h-8 dark:text-white/15 text-text-muted" />
         </div>
       )}
 
@@ -242,12 +242,12 @@ function CreativeCard({
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.92, y: -4 }}
                 transition={{ duration: 0.12 }}
-                className="absolute right-0 top-7 z-50 w-36 bg-[#0d1025] border border-white/10 rounded-xl shadow-xl overflow-hidden"
+                className="absolute right-0 top-7 z-50 w-36 bg-bg-card border dark:border-white/10 border-border rounded-xl shadow-xl overflow-hidden"
               >
                 <button
                   type="button"
                   onClick={handleRenameClick}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-white/70 hover:bg-white/8 hover:text-white transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm dark:text-white/70 text-text-secondary dark:hover:bg-white/8 hover:bg-bg-card-hover dark:hover:text-white hover:text-text-primary transition-colors"
                 >
                   <Pencil className="w-3.5 h-3.5" />
                   Renomear
@@ -353,20 +353,20 @@ export function CreativesLibrary({
             className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
           >
             <div
-              className="relative w-full max-w-6xl max-h-[90vh] rounded-2xl bg-[#0d1025] border border-white/10 shadow-2xl flex flex-col overflow-hidden pointer-events-auto"
+              className="relative w-full max-w-6xl max-h-[90vh] rounded-2xl bg-bg-primary border dark:border-white/10 border-border shadow-2xl flex flex-col overflow-hidden pointer-events-auto"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header do modal */}
-              <div className="shrink-0 flex items-center justify-between px-6 py-5 border-b border-white/10">
+              <div className="shrink-0 flex items-center justify-between px-6 py-5 dark:border-b dark:border-white/10 border-b border-border">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-[#4ecdc4]/15 flex items-center justify-center">
                     <Library className="w-4.5 h-4.5 text-[#4ecdc4]" />
                   </div>
                   <div>
-                    <h2 className="text-base font-semibold text-white">
+                    <h2 className="text-base font-semibold text-text-primary">
                       Biblioteca de Criativos
                     </h2>
-                    <p className="text-xs text-white/40 mt-0.5">
+                    <p className="text-xs dark:text-white/40 text-text-muted mt-0.5">
                       Todos os criativos que você gerou
                     </p>
                   </div>
@@ -374,7 +374,7 @@ export function CreativesLibrary({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all"
+                  className="w-8 h-8 rounded-lg dark:bg-white/5 bg-bg-card-hover/60 dark:hover:bg-white/10 hover:bg-bg-card-hover flex items-center justify-center dark:text-white/50 text-text-secondary dark:hover:text-white hover:text-text-primary transition-all"
                   title="Fechar"
                 >
                   <X className="w-4 h-4" />
@@ -382,7 +382,7 @@ export function CreativesLibrary({
               </div>
 
               {/* Linha de ações */}
-              <div className="shrink-0 flex items-center gap-3 px-6 py-4 border-b border-white/6">
+              <div className="shrink-0 flex items-center gap-3 px-6 py-4 dark:border-b dark:border-white/6 border-b border-border">
                 <button
                   type="button"
                   onClick={handleNewConversation}
@@ -393,18 +393,18 @@ export function CreativesLibrary({
                 </button>
 
                 <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 dark:text-white/30 text-text-muted pointer-events-none" />
                   <input
                     type="text"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Buscar criativos..."
-                    className="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-4 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-[#4ecdc4]/40 focus:bg-white/8 transition-all"
+                    className="w-full dark:bg-white/5 bg-bg-input border dark:border-white/10 border-border rounded-lg pl-9 pr-4 py-2 text-sm text-text-primary dark:placeholder-white/30 placeholder:text-text-muted outline-none focus:border-[#4ecdc4]/40 dark:focus:bg-white/8 transition-all"
                   />
                 </div>
 
                 {!loading && (
-                  <span className="text-xs text-white/30 shrink-0">
+                  <span className="text-xs dark:text-white/30 text-text-muted shrink-0">
                     {filtered.length}{" "}
                     {filtered.length === 1 ? "criativo" : "criativos"}
                   </span>
@@ -423,14 +423,14 @@ export function CreativesLibrary({
                 ) : conversations.length === 0 ? (
                   // Estado vazio (sem conversas ainda)
                   <div className="flex flex-col items-center justify-center h-64 gap-4 text-center">
-                    <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center">
-                      <ImageIcon className="w-8 h-8 text-white/20" />
+                    <div className="w-16 h-16 rounded-2xl dark:bg-white/5 bg-bg-card-hover/60 flex items-center justify-center">
+                      <ImageIcon className="w-8 h-8 dark:text-white/20 text-text-muted" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-white/60">
+                      <p className="text-sm font-medium dark:text-white/60 text-text-secondary">
                         Nenhum criativo ainda
                       </p>
-                      <p className="text-xs text-white/30 mt-1">
+                      <p className="text-xs dark:text-white/30 text-text-muted mt-1">
                         Crie seu primeiro criativo para começar
                       </p>
                     </div>
@@ -446,13 +446,13 @@ export function CreativesLibrary({
                 ) : filtered.length === 0 ? (
                   // Empty de busca
                   <div className="flex flex-col items-center justify-center h-48 gap-3 text-center">
-                    <Search className="w-8 h-8 text-white/15" />
+                    <Search className="w-8 h-8 dark:text-white/15 text-text-muted" />
                     <div>
-                      <p className="text-sm text-white/50">
+                      <p className="text-sm dark:text-white/50 text-text-secondary">
                         Nenhum resultado para &ldquo;{query}&rdquo;
                       </p>
-                      <p className="text-xs text-white/30 mt-1">
-                        Tente outro termo de busca
+                      <p className="text-xs dark:text-white/30 text-text-muted mt-1">
+                      Tente outro termo de busca
                       </p>
                     </div>
                   </div>

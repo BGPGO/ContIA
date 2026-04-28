@@ -4,10 +4,10 @@ import type { EmpresaRole } from '@/types/rbac';
 import { ROLE_LABELS } from '@/types/rbac';
 
 const COLORS: Record<EmpresaRole, string> = {
-  owner: 'bg-violet-500/20 text-violet-300 border-violet-500/40',
-  editor: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
-  approver: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
-  creator: 'bg-zinc-500/20 text-zinc-300 border-zinc-500/40',
+  owner: 'bg-violet-500/20 dark:text-violet-300 text-violet-700 border-violet-500/40',
+  editor: 'bg-blue-500/20 dark:text-blue-300 text-blue-700 border-blue-500/40',
+  approver: 'bg-amber-500/20 dark:text-amber-300 text-amber-700 border-amber-500/40',
+  creator: 'bg-zinc-500/20 dark:text-zinc-300 text-zinc-600 border-zinc-500/40',
 };
 
 export function RoleBadge({ role, size = 'sm' }: { role: EmpresaRole; size?: 'sm' | 'md' }) {

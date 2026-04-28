@@ -105,7 +105,7 @@ function SaveTemplateModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-bg-card border border-white/10 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
+      <div className="relative bg-bg-card dark:border-white/10 border-border rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
         <h3 className="text-lg font-semibold text-text-primary mb-4">
           {isUpdate ? "Salvar Template" : "Salvar como Template"}
         </h3>
@@ -119,7 +119,7 @@ function SaveTemplateModal({
               className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
                 mode === "update"
                   ? "border-[#4ecdc4] text-[#4ecdc4] bg-[#4ecdc4]/10"
-                  : "border-white/10 text-text-secondary hover:text-text-primary hover:bg-white/5"
+                  : "dark:border-white/10 border-border text-text-secondary hover:text-text-primary dark:hover:bg-white/5 hover:bg-bg-card-hover/60"
               }`}
             >
               Salvar (substituir)
@@ -134,7 +134,7 @@ function SaveTemplateModal({
               className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
                 mode === "new"
                   ? "border-[#6c5ce7] text-[#6c5ce7] bg-[#6c5ce7]/10"
-                  : "border-white/10 text-text-secondary hover:text-text-primary hover:bg-white/5"
+                  : "dark:border-white/10 border-border text-text-secondary hover:text-text-primary dark:hover:bg-white/5 hover:bg-bg-card-hover/60"
               }`}
             >
               Salvar como novo
@@ -144,7 +144,7 @@ function SaveTemplateModal({
 
         {/* Update mode: shows current name (read-only) */}
         {isUpdate ? (
-          <div className="w-full bg-bg-primary border border-white/10 rounded-lg px-4 py-3 text-sm text-text-secondary">
+          <div className="w-full bg-bg-primary dark:border-white/10 border-border rounded-lg px-4 py-3 text-sm text-text-secondary">
             {originalTemplateName}
           </div>
         ) : (
@@ -158,7 +158,7 @@ function SaveTemplateModal({
               if (e.key === "Escape") onClose();
             }}
             placeholder="Nome do template..."
-            className="w-full bg-bg-primary border border-white/10 rounded-lg px-4 py-3 text-sm text-text-primary
+            className="w-full bg-bg-primary dark:border-white/10 border-border rounded-lg px-4 py-3 text-sm text-text-primary
               placeholder:text-text-muted focus:outline-none focus:border-[#4ecdc4]/40 transition-colors"
           />
         )}
@@ -168,7 +168,7 @@ function SaveTemplateModal({
             type="button"
             onClick={onClose}
             className="px-4 py-2 rounded-lg text-sm font-medium text-text-secondary
-              hover:text-text-primary hover:bg-white/5 transition-all cursor-pointer"
+              hover:text-text-primary dark:hover:bg-white/5 hover:bg-bg-card-hover/60 transition-all cursor-pointer"
           >
             Cancelar
           </button>
@@ -183,12 +183,12 @@ function SaveTemplateModal({
             }}
             disabled={(!isUpdate && !name.trim()) || isSaving}
             className="px-4 py-2 rounded-lg text-sm font-semibold text-white
-              disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+              disabled:opacity-40 disabled:cursor-not-allowed disabled:bg-bg-card transition-all cursor-pointer"
             style={{
               background:
                 isUpdate || name.trim()
                   ? "linear-gradient(135deg, #6c5ce7 0%, #4ecdc4 100%)"
-                  : "rgba(255,255,255,0.06)",
+                  : undefined,
             }}
           >
             {isSaving ? (
@@ -257,7 +257,7 @@ function CopyTextPanel({
           type="button"
           onClick={onGenerateLayout}
           className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold
-            text-text-primary bg-bg-card border border-white/10 cursor-pointer transition-all hover:border-[#4ecdc4]/30"
+            text-text-primary bg-bg-card border dark:border-white/10 border-border cursor-pointer transition-all hover:border-[#4ecdc4]/30"
         >
           <Sparkles size={12} className="text-[#4ecdc4]" />
           Gerar Layout Inteligente
@@ -277,7 +277,7 @@ function CopyTextPanel({
               <ClipboardCopy size={10} className={copiedField === "headline" ? "text-[#4ecdc4]" : ""} />
             </button>
           </div>
-          <p className="text-sm font-semibold text-text-primary select-all cursor-text bg-bg-primary rounded-lg px-3 py-2 border border-white/5">
+          <p className="text-sm font-semibold text-text-primary select-all cursor-text bg-bg-primary rounded-lg px-3 py-2 dark:border-white/5 border-border">
             {copy.headline}
           </p>
         </div>
@@ -296,7 +296,7 @@ function CopyTextPanel({
               <ClipboardCopy size={10} className={copiedField === "caption" ? "text-[#4ecdc4]" : ""} />
             </button>
           </div>
-          <p className="text-xs text-text-primary/80 select-all cursor-text bg-bg-primary rounded-lg px-3 py-2 border border-white/5 whitespace-pre-line max-h-[120px] overflow-y-auto">
+          <p className="text-xs text-text-primary/80 select-all cursor-text bg-bg-primary rounded-lg px-3 py-2 dark:border-white/5 border-border whitespace-pre-line max-h-[120px] overflow-y-auto">
             {copy.caption}
           </p>
         </div>
@@ -307,7 +307,7 @@ function CopyTextPanel({
         <div className="space-y-2">
           <label className="text-[10px] font-medium text-text-muted uppercase tracking-wider">Slides</label>
           {copy.slides.map((slide, i) => (
-            <div key={i} className="bg-bg-primary rounded-lg px-3 py-2 border border-white/5 space-y-1">
+            <div key={i} className="bg-bg-primary rounded-lg px-3 py-2 dark:border-white/5 border-border space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold text-[#4ecdc4]">Slide {slide.slideNumber || i + 1}</span>
                 <button
@@ -361,7 +361,7 @@ function CopyTextPanel({
               <ClipboardCopy size={10} className={copiedField === "cta" ? "text-[#4ecdc4]" : ""} />
             </button>
           </div>
-          <p className="text-xs font-medium text-[#6c5ce7] select-all cursor-text bg-bg-primary rounded-lg px-3 py-2 border border-white/5">
+          <p className="text-xs font-medium text-[#6c5ce7] select-all cursor-text bg-bg-primary rounded-lg px-3 py-2 dark:border-white/5 border-border">
             {copy.cta}
           </p>
         </div>
@@ -1043,7 +1043,7 @@ function EditorContent() {
       <div className="flex-1 flex overflow-hidden min-h-0">
 
         {/* LEFT: Layers Panel (desktop only) */}
-        <div className="hidden lg:flex flex-col w-[250px] shrink-0 border-r border-white/10 bg-bg-secondary">
+        <div className="hidden lg:flex flex-col w-[250px] shrink-0 dark:border-r dark:border-white/10 border-r border-border bg-bg-secondary">
           <LayersPanel
             canvasRef={canvasRef}
             selection={selection}
@@ -1100,9 +1100,9 @@ function EditorContent() {
         </div>
 
         {/* RIGHT: Properties + Brand Assets (desktop only) */}
-        <div className="hidden lg:flex flex-col w-[280px] shrink-0 border-l border-white/10 bg-bg-secondary">
+        <div className="hidden lg:flex flex-col w-[280px] shrink-0 dark:border-l dark:border-white/10 border-l border-border bg-bg-secondary">
           {/* Tab switcher */}
-          <div className="flex border-b border-white/10 shrink-0">
+          <div className="flex border-b dark:border-white/10 border-border shrink-0">
             <button
               onClick={() => setRightPanelTab("properties")}
               className={`flex-1 py-2 text-[10px] font-medium uppercase tracking-wider transition-all cursor-pointer

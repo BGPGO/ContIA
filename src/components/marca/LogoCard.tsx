@@ -98,13 +98,13 @@ export function LogoCard({ empresaId, logoUrl, onLogoUpdated }: LogoCardProps) {
         </div>
       </div>
 
-      <div className="bg-white/5 border border-white/10 rounded-xl p-6">
+      <div className="bg-bg-card border border-border rounded-xl p-6">
         <div className="flex items-start gap-6">
           {/* Preview */}
           <div className="shrink-0">
             {logoUrl ? (
               <div
-                className="w-[200px] h-[200px] rounded-xl border border-white/10 overflow-hidden flex items-center justify-center"
+                className="w-[200px] h-[200px] rounded-xl border border-border overflow-hidden flex items-center justify-center"
                 style={{
                   backgroundImage:
                     "repeating-conic-gradient(#ffffff08 0% 25%, transparent 0% 50%)",
@@ -121,9 +121,9 @@ export function LogoCard({ empresaId, logoUrl, onLogoUpdated }: LogoCardProps) {
                 />
               </div>
             ) : (
-              <div className="w-[200px] h-[200px] rounded-xl border border-dashed border-white/20 flex flex-col items-center justify-center gap-3 bg-white/3">
-                <ImageIcon size={36} className="text-white/30" />
-                <p className="text-xs text-white/40 text-center px-4">
+              <div className="bg-bg-elevated w-[200px] h-[200px] rounded-xl border border-dashed border-border flex flex-col items-center justify-center gap-3">
+                <ImageIcon size={36} className="text-text-muted" />
+                <p className="text-xs text-text-muted text-center px-4">
                   Nenhum logo cadastrado
                 </p>
               </div>
@@ -162,7 +162,7 @@ export function LogoCard({ empresaId, logoUrl, onLogoUpdated }: LogoCardProps) {
                 <button
                   onClick={handleRemove}
                   disabled={uploading || removing}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 border border-white/15 text-white hover:bg-white/5 disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 border border-border text-text-primary hover:bg-bg-card-hover disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {removing ? (
                     <>
@@ -197,7 +197,7 @@ export function LogoCard({ empresaId, logoUrl, onLogoUpdated }: LogoCardProps) {
               </button>
             )}
 
-            <p className="text-xs text-white/40">
+            <p className="text-xs text-text-muted">
               Formatos aceitos: PNG, JPG, SVG, WebP
             </p>
 

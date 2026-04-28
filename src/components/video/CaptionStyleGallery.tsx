@@ -24,7 +24,7 @@ export const CaptionStyleGallery: React.FC<CaptionStyleGalleryProps> = ({
 }) => {
   if (styles.length === 0) {
     return (
-      <div className="text-sm text-zinc-500 py-4">
+      <div className="text-sm text-text-muted py-4">
         Nenhum estilo disponível.
       </div>
     );
@@ -39,10 +39,10 @@ export const CaptionStyleGallery: React.FC<CaptionStyleGalleryProps> = ({
             key={style.id}
             type="button"
             onClick={() => onSelect(style)}
-            className={`group relative rounded-xl border bg-zinc-900 p-3 text-left cursor-pointer transition ${
+            className={`group relative rounded-xl border bg-bg-card p-3 text-left cursor-pointer transition ${
               isSelected
                 ? 'ring-2 ring-yellow-400 border-transparent'
-                : 'border-white/10 hover:border-white/30'
+                : 'dark:border-white/10 border-border dark:hover:border-white/30 hover:border-border-light'
             }`}
           >
             <div className="flex justify-center">
@@ -58,13 +58,13 @@ export const CaptionStyleGallery: React.FC<CaptionStyleGalleryProps> = ({
 
             <div className="mt-3">
               <div className="flex items-center justify-between">
-                <span className="text-white font-semibold text-sm">{style.name}</span>
-                <span className="text-[10px] uppercase tracking-wide text-zinc-400">
+                <span className="text-text-primary font-semibold text-sm">{style.name}</span>
+                <span className="text-[10px] uppercase tracking-wide text-text-muted">
                   {CAPTION_CATEGORIES[style.category]}
                 </span>
               </div>
               {style.description && (
-                <p className="text-xs text-zinc-500 mt-1 line-clamp-2">
+                <p className="text-xs text-text-muted mt-1 line-clamp-2">
                   {style.description}
                 </p>
               )}

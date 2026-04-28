@@ -116,17 +116,11 @@ function StepDots({ current, total }: { current: number; total: number }) {
       {Array.from({ length: total }).map((_, i) => (
         <span
           key={i}
-          className="transition-all duration-300"
+          className={`transition-all duration-300 ${i <= current ? "bg-[#6c5ce7]" : "bg-border"}`}
           style={{
             width: i === current ? 20 : 6,
             height: 6,
             borderRadius: 9999,
-            backgroundColor:
-              i < current
-                ? "#6c5ce7"
-                : i === current
-                ? "#6c5ce7"
-                : "#1e2348",
           }}
         />
       ))}
@@ -470,11 +464,10 @@ function Step3({
               <button
                 type="button"
                 onClick={() => toggle(p, !state.enabled)}
-                className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none"
-                style={{ backgroundColor: state.enabled ? "#6c5ce7" : "#1e2348" }}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${state.enabled ? "bg-[#6c5ce7]" : "bg-border"}`}
               >
                 <span
-                  className="pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200"
+                  className={`pointer-events-none inline-block h-4 w-4 rounded-full shadow-sm transition-transform duration-200 ${state.enabled ? "bg-white" : "bg-bg-primary border border-border"}`}
                   style={{ transform: state.enabled ? "translateX(16px)" : "translateX(0)" }}
                 />
               </button>
@@ -660,13 +653,15 @@ function Step5({
                 key={feed.url}
                 type="button"
                 onClick={() => toggleSuggested(feed)}
-                className="flex items-center gap-3 px-3 py-2 rounded-lg border transition-all duration-200 text-left"
-                style={{
-                  borderColor: active ? "#6c5ce7" : "#1e2348",
-                  backgroundColor: active ? "#6c5ce711" : "#0f1230",
-                }}
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg border transition-all duration-200 text-left ${
+                  active
+                    ? "border-[#6c5ce7] bg-[#6c5ce7]/[0.07]"
+                    : "border-border bg-bg-input hover:border-border-light"
+                }`}
               >
-                <Rss className="w-4 h-4 shrink-0" style={{ color: active ? "#6c5ce7" : "#454b6e" }} />
+                <Rss
+                  className={`w-4 h-4 shrink-0 ${active ? "text-[#6c5ce7]" : "text-text-muted"}`}
+                />
                 <div className="flex-1">
                   <p className="text-[13px] font-medium text-text-primary">
                     {feed.nome}
@@ -674,11 +669,11 @@ function Step5({
                   <p className="text-[11px] text-text-muted">{feed.topico}</p>
                 </div>
                 <span
-                  className="text-[11px] font-medium px-2 py-0.5 rounded-full"
-                  style={{
-                    color: active ? "#6c5ce7" : "#454b6e",
-                    backgroundColor: active ? "#6c5ce722" : "#1e2348",
-                  }}
+                  className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
+                    active
+                      ? "text-[#6c5ce7] bg-[#6c5ce7]/[0.13] border border-[#6c5ce7]/30"
+                      : "text-text-muted bg-bg-card border border-border"
+                  }`}
                 >
                   {active ? "Adicionado" : "Adicionar"}
                 </span>
@@ -977,12 +972,13 @@ export function EmpresaWizard({ open, onClose, onCreated }: EmpresaWizardProps) 
             {STEP_CONFIG.map(({ label }, i) => (
               <span
                 key={i}
-                className="text-[10px] font-medium px-2 py-0.5 rounded-full transition-all duration-200"
-                style={{
-                  backgroundColor:
-                    i < step ? "#6c5ce722" : i === step ? "#6c5ce733" : "#1e2348",
-                  color: i <= step ? "#a29bfe" : "#454b6e",
-                }}
+                className={`text-[10px] font-medium px-2 py-0.5 rounded-full transition-all duration-200 ${
+                  i < step
+                    ? "bg-[#6c5ce7]/[0.13] text-[#a29bfe]"
+                    : i === step
+                    ? "bg-[#6c5ce7]/20 text-[#a29bfe]"
+                    : "bg-bg-input text-text-muted border border-border"
+                }`}
               >
                 {label}
               </span>
