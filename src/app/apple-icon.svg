@@ -1,27 +1,13 @@
 <svg viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="appleGoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="appleGoAccent" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" stop-color="#4ecdc4"/>
       <stop offset="100%" stop-color="#6c5ce7"/>
     </linearGradient>
-    <linearGradient id="appleGoHighlight" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.22"/>
-      <stop offset="55%" stop-color="#ffffff" stop-opacity="0"/>
-    </linearGradient>
-    <radialGradient id="appleSparkGrad" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#fde68a"/>
-      <stop offset="55%" stop-color="#fbbf24"/>
-      <stop offset="100%" stop-color="#f59e0b"/>
-    </radialGradient>
   </defs>
-  <rect width="180" height="180" rx="40" fill="url(#appleGoGrad)"/>
-  <rect width="180" height="180" rx="40" fill="url(#appleGoHighlight)"/>
-  <text x="90" y="124" text-anchor="middle"
-        font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
-        font-size="84" font-weight="800" letter-spacing="-5"
-        fill="white">GO</text>
-  <circle cx="143" cy="37" r="20" fill="url(#appleSparkGrad)" opacity="0.32"/>
-  <circle cx="143" cy="37" r="9" fill="url(#appleSparkGrad)"/>
-  <path d="M 143 22 L 143 52 M 128 37 L 158 37"
-        stroke="#fef3c7" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
+  <rect width="180" height="180" rx="36" fill="#0a0a0a"/>
+  <path d="M 132.6 65.4 A 49 49 0 1 0 132.6 114.6 L 108.5 114.6 L 108.5 101.5"
+        fill="none" stroke="white" stroke-width="15.5"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="40" y="143" width="100" height="7" rx="3.5" fill="url(#appleGoAccent)"/>
 </svg>

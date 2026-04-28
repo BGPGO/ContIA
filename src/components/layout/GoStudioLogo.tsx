@@ -1,33 +1,34 @@
 "use client";
 
 /**
- * Logo GO Studio — quadrado arredondado com gradient teal→purple,
- * monograma "GO" e um spark dourado no canto.
+ * Logo GO Studio — minimalista e moderna.
+ *
+ * Composição:
+ *  - Quadrado preto carbono com border-radius pequeno (referência: Vercel/Linear)
+ *  - Monograma "G" desenhado em path SVG (anel aberto + traço interno),
+ *    branco puro, stroke uniforme com cantos arredondados sutis
+ *  - Detalhe accent: pequeno underline em gradient teal→purple bem discreto,
+ *    apenas como hint cromático (não dominante)
  *
  * Uso:
- *   <GoStudioLogo className="w-8 h-8" />
- *   <GoStudioLogo className="w-7 h-7" withSpark={false} />
+ *   <GoStudioLogo className="w-9 h-9" />
+ *   <GoStudioLogo className="w-7 h-7" idSuffix="mobile" />
  */
 
 interface GoStudioLogoProps {
   className?: string;
-  /** Spark dourado no canto superior direito (default true) */
-  withSpark?: boolean;
-  /** Drop-shadow externo ao redor do quadrado (default true) */
+  /** Drop-shadow externo (default false — moderna fica mais flat) */
   withShadow?: boolean;
-  /** ID único do gradient pra evitar colisão quando múltiplas instâncias renderizam */
+  /** ID único do gradient pra evitar colisão entre múltiplas instâncias */
   idSuffix?: string;
 }
 
 export function GoStudioLogo({
   className = "w-8 h-8",
-  withSpark = true,
-  withShadow = true,
+  withShadow = false,
   idSuffix = "default",
 }: GoStudioLogoProps) {
-  const gradId = `goLogoGrad-${idSuffix}`;
-  const highlightId = `goLogoHighlight-${idSuffix}`;
-  const sparkGradId = `goSparkGrad-${idSuffix}`;
+  const accentGradId = `goAccentGrad-${idSuffix}`;
 
   return (
     <svg
@@ -36,70 +37,52 @@ export function GoStudioLogo({
       className={className}
       style={
         withShadow
-          ? { filter: "drop-shadow(0 4px 12px rgba(78, 205, 196, 0.25))" }
+          ? { filter: "drop-shadow(0 2px 8px rgba(0, 0, 0, 0.25))" }
           : undefined
       }
       aria-label="GO Studio"
       role="img"
     >
       <defs>
-        {/* Gradient principal teal→purple */}
-        <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+        <linearGradient id={accentGradId} x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" stopColor="#4ecdc4" />
           <stop offset="100%" stopColor="#6c5ce7" />
         </linearGradient>
-
-        {/* Highlight diagonal pra dar volume */}
-        <linearGradient id={highlightId} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.22" />
-          <stop offset="55%" stopColor="#ffffff" stopOpacity="0" />
-        </linearGradient>
-
-        {/* Spark dourado radial */}
-        <radialGradient id={sparkGradId} cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#fde68a" />
-          <stop offset="55%" stopColor="#fbbf24" />
-          <stop offset="100%" stopColor="#f59e0b" />
-        </radialGradient>
       </defs>
 
-      {/* Background rounded-square */}
-      <rect width="64" height="64" rx="14" fill={`url(#${gradId})`} />
+      {/* Background quadrado preto carbono, border-radius pequeno */}
+      <rect width="64" height="64" rx="10" fill="#0a0a0a" />
 
-      {/* Highlight overlay */}
-      <rect width="64" height="64" rx="14" fill={`url(#${highlightId})`} />
+      {/*
+        Monograma "G" desenhado em path:
+        - Anel aberto à direita (arc de ~330°, sweep=0 indo anti-horário)
+        - Traço interno horizontal curto (a "perninha" do G)
+        Centro: (32, 32). Raio: 17.5. Stroke: 5.5.
+        Pontos da abertura: 30° acima e abaixo da horizontal direita.
+      */}
+      <path
+        d="
+          M 47.16 23.25
+          A 17.5 17.5 0 1 0 47.16 40.75
+          L 38.5 40.75
+          L 38.5 36
+        "
+        fill="none"
+        stroke="white"
+        strokeWidth="5.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
 
-      {/* Monograma "GO" — usa font system pra renderizar em qualquer ambiente */}
-      <text
-        x="32"
-        y="44"
-        textAnchor="middle"
-        fontFamily="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Plus Jakarta Sans', sans-serif"
-        fontSize="30"
-        fontWeight="800"
-        letterSpacing="-2"
-        fill="white"
-      >
-        GO
-      </text>
-
-      {/* Spark dourado no canto superior direito */}
-      {withSpark && (
-        <>
-          {/* Halo */}
-          <circle cx="51" cy="13" r="7" fill={`url(#${sparkGradId})`} opacity="0.32" />
-          {/* Núcleo */}
-          <circle cx="51" cy="13" r="3.2" fill={`url(#${sparkGradId})`} />
-          {/* Cross sparkle */}
-          <path
-            d="M 51 7.5 L 51 18.5 M 45.5 13 L 56.5 13"
-            stroke="#fef3c7"
-            strokeWidth="1"
-            strokeLinecap="round"
-            opacity="0.7"
-          />
-        </>
-      )}
+      {/* Underline accent gradient — hint de cor, bem discreto */}
+      <rect
+        x="14"
+        y="51"
+        width="36"
+        height="2.5"
+        rx="1.25"
+        fill={`url(#${accentGradId})`}
+      />
     </svg>
   );
 }

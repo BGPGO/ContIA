@@ -23,7 +23,7 @@ export default function LegalLayout({
             className="flex items-center gap-2 text-[#e8eaff] hover:text-[#4ecdc4] transition-colors"
             aria-label="GO Studio — Página inicial"
           >
-            <GoStudioLogo className="w-7 h-7" idSuffix="legal" withSpark={false} withShadow={false} />
+            <GoStudioLogo className="w-7 h-7" idSuffix="legal" />
             <span className="text-base font-semibold tracking-tight">GO Studio</span>
           </Link>
 

@@ -558,7 +558,7 @@ export function Sidebar() {
         >
           <Menu size={22} />
         </button>
-        <GoStudioLogo className="w-8 h-8" idSuffix="mobile" withSpark={false} />
+        <GoStudioLogo className="w-8 h-8" idSuffix="mobile" />
         <span className="text-[14px] font-bold tracking-tight text-text-primary">
           GO Studio
         </span>
