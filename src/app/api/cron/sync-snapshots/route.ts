@@ -127,9 +127,6 @@ export async function GET(req: NextRequest) {
         }
 
         if (conn.provider === "meta_ads") {
-          // Fix 5: passar dateRange dos últimos 30 dias para o driver Meta Ads.
-          // Isso garante que snapshots históricos sejam criados (backfill) na primeira execução
-          // e que execuções subsequentes cubram o range completo — não apenas o dia corrente.
           const metaAdsToday = new Date();
           const metaAdsSince = new Date(metaAdsToday);
           metaAdsSince.setDate(metaAdsSince.getDate() - 30);
@@ -139,11 +136,18 @@ export async function GET(req: NextRequest) {
             until: metaAdsToday,
           };
 
-          const [profile, content, metrics] = await Promise.all([
-            metaAdsDriver.syncProfile(conn),
+          // syncProfile escreve {account_status} no snapshot do dia.
+          // syncMetrics escreve métricas reais no mesmo snapshot (batch upsert).
+          // Rodar syncProfile PRIMEIRO em sequência garante que syncMetrics seja a última
+          // escrita — em Promise.all a ordem de finalização era não-determinística e
+          // syncProfile sobrescrevia as métricas (bug 2026-04-28).
+          const profile = await metaAdsDriver.syncProfile(conn);
+
+          const [content, metrics] = await Promise.all([
             metaAdsDriver.syncContent(conn, { since: metaAdsDateRange.since, until: metaAdsDateRange.until }),
             metaAdsDriver.syncMetrics(conn, { since: metaAdsDateRange.since, until: metaAdsDateRange.until }),
           ]);
+
           // syncInsights para as campanhas coletadas
           const campaignIds = content.map((c) => c.provider_content_id);
           const insights = campaignIds.length > 0 && metaAdsDriver.syncInsights
