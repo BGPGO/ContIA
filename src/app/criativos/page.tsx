@@ -68,6 +68,7 @@ function CriativosPageInner({ empresaId }: { empresaId: string }) {
           onAddAttachment={hook.addAttachment}
           onRemoveAttachment={hook.removeAttachment}
           onOpenLibrary={() => setLibraryOpen(true)}
+          empresaId={empresaId}
         />
       </div>
 

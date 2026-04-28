@@ -67,10 +67,17 @@ export function createInstagramPublisherWithEmpresa(
       // 2. Criar container de mídia
       let containerId: string;
       try {
+        const collaborators =
+          Array.isArray(post.instagram_collaborators) &&
+          (post.instagram_collaborators as string[]).length > 0
+            ? (post.instagram_collaborators as string[])
+            : undefined;
+
         containerId = await createMediaContainer(igUserId, token, {
-          image_url: post.midia_url,
+          image_url: post.midia_url ?? undefined,
           caption: post.conteudo,
           media_type: "IMAGE",
+          collaborators,
         });
       } catch (err) {
         const msg =

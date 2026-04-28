@@ -3,9 +3,28 @@ import {
   createMediaContainer,
   publishMedia,
   checkContainerStatus,
+  validateCollabSupport,
   InstagramAPIError,
 } from "@/lib/instagram";
 import { createClient } from "@/lib/supabase/server";
+
+/** Máximo de colaboradores permitido pela Instagram Graph API */
+const MAX_COLLABORATORS = 3;
+
+/**
+ * Sanitiza a lista de usernames de colaboradores:
+ * - Remove "@" inicial
+ * - Lowercase + trim
+ * - Descarta strings vazias
+ * - Limita a MAX_COLLABORATORS (3)
+ */
+function sanitizeCollaborators(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((u) => String(u).trim().toLowerCase().replace(/^@/, ""))
+    .filter((u) => u.length > 0)
+    .slice(0, MAX_COLLABORATORS);
+}
 
 /**
  * POST /api/instagram/publish
@@ -13,16 +32,20 @@ import { createClient } from "@/lib/supabase/server";
  *
  * Body: {
  *   empresa_id: string,
- *   image_url?: string,      // URL pública da imagem
- *   video_url?: string,      // URL pública do vídeo
+ *   image_url?: string,           // URL pública da imagem
+ *   video_url?: string,           // URL pública do vídeo
  *   caption?: string,
  *   media_type?: "IMAGE" | "VIDEO" | "CAROUSEL_ALBUM" | "REELS",
- *   children_urls?: string[] // URLs das imagens do carrossel
+ *   children_urls?: string[],     // URLs das imagens do carrossel
+ *   collaborators?: string[]      // Usernames dos colaboradores (sem "@", máx 3)
  * }
  */
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { empresa_id, image_url, video_url, caption, media_type, children_urls } = body;
+  const { empresa_id, image_url, video_url, caption, media_type, children_urls, collaborators: rawCollaborators } = body;
+
+  // Sanitize collaborators
+  const collaborators = sanitizeCollaborators(rawCollaborators);
 
   if (!empresa_id) {
     return NextResponse.json({ error: "empresa_id obrigatório" }, { status: 400 });
@@ -58,11 +81,22 @@ export async function POST(req: NextRequest) {
 
   const { access_token: token, provider_user_id: igId } = connection;
 
+  // Validar suporte a Collab se foram passados colaboradores
+  if (collaborators.length > 0) {
+    const collabCheck = await validateCollabSupport(igId, token);
+    if (!collabCheck.supported) {
+      return NextResponse.json(
+        { error: collabCheck.reason ?? "Collab não suportado para este perfil" },
+        { status: 400 }
+      );
+    }
+  }
+
   try {
     let containerId: string;
 
     if (media_type === "CAROUSEL_ALBUM" && children_urls?.length) {
-      // Criar containers individuais para cada imagem do carrossel
+      // Criar containers individuais para cada imagem do carrossel (SEM collaborators)
       const childIds: string[] = [];
       for (const url of children_urls) {
         const childId = await createMediaContainer(igId, token, {
@@ -71,11 +105,12 @@ export async function POST(req: NextRequest) {
         childIds.push(childId);
       }
 
-      // Criar container do carrossel
+      // Criar container do carrossel (COM collaborators se houver)
       containerId = await createMediaContainer(igId, token, {
         media_type: "CAROUSEL_ALBUM",
         caption,
         children: childIds,
+        collaborators: collaborators.length > 0 ? collaborators : undefined,
       });
     } else {
       // Post simples (imagem, vídeo ou reels)
@@ -84,6 +119,7 @@ export async function POST(req: NextRequest) {
         video_url,
         caption,
         media_type: media_type as "IMAGE" | "VIDEO" | "REELS" | undefined,
+        collaborators: collaborators.length > 0 ? collaborators : undefined,
       });
     }
 

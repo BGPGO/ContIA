@@ -365,6 +365,53 @@ export async function getInsights(
 
 /* ── Publicar ────────────────────────────────────── */
 
+/**
+ * Tipos de mídia que suportam o parâmetro `collaborators` na Graph API.
+ * Children de CAROUSEL_ALBUM NÃO devem receber collaborators.
+ */
+const COLLAB_SUPPORTED_TYPES = new Set<string>(["IMAGE", "REELS", "CAROUSEL_ALBUM"]);
+
+/**
+ * Valida se a conta suporta posts Collab (requer BUSINESS ou CREATOR).
+ * Reutiliza `detectAccountType` internamente via chamada à Graph API.
+ */
+export async function validateCollabSupport(
+  igUserId: string,
+  accessToken: string
+): Promise<{ supported: boolean; accountType: string | null; reason?: string }> {
+  const FB_GRAPH_URL = "https://graph.facebook.com/v21.0";
+  let accountType: "BUSINESS" | "CREATOR" | "PERSONAL" | null = null;
+
+  try {
+    const url = new URL(`${FB_GRAPH_URL}/${igUserId}`);
+    url.searchParams.set("fields", "account_type");
+    url.searchParams.set("access_token", accessToken);
+
+    const res = await fetch(url.toString());
+    if (res.ok) {
+      const data = (await res.json()) as { account_type?: string; error?: unknown };
+      if (!data.error) {
+        const t = data.account_type;
+        if (t === "BUSINESS" || t === "CREATOR" || t === "PERSONAL") {
+          accountType = t;
+        }
+      }
+    }
+  } catch {
+    // Falha ao detectar tipo de conta
+  }
+
+  if (accountType === "BUSINESS" || accountType === "CREATOR") {
+    return { supported: true, accountType };
+  }
+
+  return {
+    supported: false,
+    accountType,
+    reason: `Collab requer perfil Business/Creator. Tipo atual: ${accountType ?? "desconhecido"}`,
+  };
+}
+
 export async function createMediaContainer(
   igUserId: string,
   token: string,
@@ -374,6 +421,8 @@ export async function createMediaContainer(
     caption?: string;
     media_type?: "IMAGE" | "VIDEO" | "CAROUSEL_ALBUM" | "REELS";
     children?: string[];
+    /** Usernames dos colaboradores (sem "@"). Apenas para IMAGE, REELS, CAROUSEL_ALBUM raiz. */
+    collaborators?: string[];
   }
 ): Promise<string> {
   const url = new URL(`${IG_GRAPH_URL}/${igUserId}/media`);
@@ -392,6 +441,16 @@ export async function createMediaContainer(
     url.searchParams.set("video_url", options.video_url);
   } else if (options.image_url) {
     url.searchParams.set("image_url", options.image_url);
+  }
+
+  // Adicionar collaborators apenas para tipos suportados (IMAGE, REELS, CAROUSEL_ALBUM raiz)
+  const effectiveType = options.media_type ?? "IMAGE";
+  if (
+    options.collaborators &&
+    options.collaborators.length > 0 &&
+    COLLAB_SUPPORTED_TYPES.has(effectiveType)
+  ) {
+    url.searchParams.set("collaborators", JSON.stringify(options.collaborators));
   }
 
   const res = await fetch(url.toString(), { method: "POST" });

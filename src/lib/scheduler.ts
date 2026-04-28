@@ -48,6 +48,8 @@ export interface PlatformPublisher {
     titulo: string;
     conteudo: string;
     midia_url: string | null;
+    /** Usernames de colaboradores Instagram (sem "@"). Populado via posts.instagram_collaborators. */
+    instagram_collaborators?: string[] | null;
   }): Promise<{ success: boolean; platformPostId?: string; error?: string }>;
 }
 
@@ -293,10 +295,10 @@ export async function processJob(
   const results: PublishResult[] = [];
   let allSuccess = true;
 
-  // Buscar dados do post
+  // Buscar dados do post (incluindo instagram_collaborators para suporte a Collab)
   const { data: post, error: postError } = await supabase
     .from("posts")
-    .select("id, titulo, conteudo, midia_url")
+    .select("id, titulo, conteudo, midia_url, instagram_collaborators")
     .eq("id", job.post_id)
     .single();
 

@@ -20,6 +20,7 @@ import {
   Loader2,
   Send,
   XCircle,
+  Users,
 } from "lucide-react";
 import type { WizardState } from "@/hooks/useCreationWizard";
 import type { CreationTemplate, ContentFormat } from "@/types/ai";
@@ -27,6 +28,7 @@ import type { Post } from "@/types";
 import { getPlataformaLabel } from "@/lib/utils";
 import { submitPostForApproval } from "@/lib/posts";
 import { PostCanvas } from "@/components/post-design/PostCanvas";
+import { CollaboratorsInput } from "@/components/aprovacao/CollaboratorsInput";
 import type { PostDesignData, PostDesignTemplate } from "@/components/post-design/PostCanvas";
 
 interface StepExportProps {
@@ -73,6 +75,7 @@ export function StepExport({
   const [templateName, setTemplateName] = useState(state.templateName || "");
   const [exporting, setExporting] = useState(false);
   const [submittingApproval, setSubmittingApproval] = useState(false);
+  const [collaborators, setCollaborators] = useState<string[]>([]);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -230,21 +233,28 @@ export function StepExport({
 
       const isReels = state.format === "reels";
 
+      const publishBody: Record<string, unknown> = {
+        empresa_id: empresaId,
+        image_url: isReels ? undefined : state.generatedImageUrl,
+        video_url: isReels ? state.generatedImageUrl : undefined,
+        caption,
+        media_type: isReels ? "REELS" : "IMAGE",
+      };
+      if (collaborators.length > 0) {
+        publishBody.collaborators = collaborators;
+      }
+
       const res = await fetch("/api/instagram/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          empresa_id: empresaId,
-          image_url: isReels ? undefined : state.generatedImageUrl,
-          video_url: isReels ? state.generatedImageUrl : undefined,
-          caption,
-          media_type: isReels ? "REELS" : "IMAGE",
-        }),
+        body: JSON.stringify(publishBody),
       });
 
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.error || "Erro ao publicar no Instagram");
+        // Conta PERSONAL — mostrar mensagem do servidor em PT-BR
+        const errMsg: string = data.error || "Erro ao publicar no Instagram";
+        throw new Error(errMsg);
       }
 
       await updatePost(post.id, {
@@ -458,36 +468,70 @@ export function StepExport({
         </motion.button>
 
         {/* Publish now */}
-        <motion.button
+        <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.14 }}
-          whileHover={{ scale: 1.01 }}
-          whileTap={{ scale: 0.99 }}
-          onClick={handlePublishNow}
-          disabled={state.saving || !state.generatedImageUrl || !state.platforms.includes("instagram")}
-          className="w-full flex items-center gap-4 bg-gradient-to-r from-[#e1306c]/10 to-[#fd1d1d]/10 border border-[#e1306c]/30 rounded-xl p-4 hover:border-[#e1306c]/60 hover:from-[#e1306c]/15 hover:to-[#fd1d1d]/15 transition-all text-left group disabled:opacity-40 disabled:cursor-not-allowed"
+          className="space-y-2"
         >
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#e1306c] to-[#fd1d1d] flex items-center justify-center">
-            {state.saving ? (
-              <Loader2 size={18} className="text-white animate-spin" />
-            ) : (
-              <Send size={18} className="text-white" />
+          <motion.button
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.99 }}
+            onClick={handlePublishNow}
+            disabled={state.saving || !state.generatedImageUrl || !state.platforms.includes("instagram")}
+            className="w-full flex items-center gap-4 bg-gradient-to-r from-[#e1306c]/10 to-[#fd1d1d]/10 border border-[#e1306c]/30 rounded-xl p-4 hover:border-[#e1306c]/60 hover:from-[#e1306c]/15 hover:to-[#fd1d1d]/15 transition-all text-left group disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#e1306c] to-[#fd1d1d] flex items-center justify-center">
+              {state.saving ? (
+                <Loader2 size={18} className="text-white animate-spin" />
+              ) : (
+                <Send size={18} className="text-white" />
+              )}
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-text-primary">
+                {state.saving ? "Publicando..." : "Publicar Agora no Instagram"}
+              </p>
+              <p className="text-xs text-text-muted mt-0.5">
+                {!state.generatedImageUrl
+                  ? "Gere uma imagem antes de publicar"
+                  : !state.platforms.includes("instagram")
+                    ? "Adicione Instagram nas plataformas"
+                    : "Publica imediatamente na conta conectada"}
+              </p>
+            </div>
+          </motion.button>
+
+          {/* Collaborators sub-section — shown only when instagram is selected */}
+          <AnimatePresence>
+            {state.platforms.includes("instagram") && (
+              <motion.div
+                key="export-collaborators"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="bg-bg-card border border-[#e1306c]/20 rounded-xl p-4 space-y-2">
+                  <p className="text-[12px] font-medium text-text-secondary flex items-center gap-1.5">
+                    <Users size={13} className="text-[#e1306c]" />
+                    Colaboradores no Instagram{" "}
+                    <span className="text-text-muted font-normal">(opcional)</span>
+                  </p>
+                  <CollaboratorsInput
+                    value={collaborators}
+                    onChange={setCollaborators}
+                    disabled={state.saving}
+                  />
+                  <p className="text-[11px] text-text-muted">
+                    Marcar até 3 perfis. Funciona apenas em conta Business/Creator.
+                  </p>
+                </div>
+              </motion.div>
             )}
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-text-primary">
-              {state.saving ? "Publicando..." : "Publicar Agora no Instagram"}
-            </p>
-            <p className="text-xs text-text-muted mt-0.5">
-              {!state.generatedImageUrl
-                ? "Gere uma imagem antes de publicar"
-                : !state.platforms.includes("instagram")
-                  ? "Adicione Instagram nas plataformas"
-                  : "Publica imediatamente na conta conectada"}
-            </p>
-          </div>
-        </motion.button>
+          </AnimatePresence>
+        </motion.div>
 
         {/* Schedule */}
         <motion.div

@@ -20,7 +20,15 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { postId, empresaId, scheduledFor, platforms } = body;
+    const { postId, empresaId, scheduledFor, platforms, instagram_collaborators: rawCollaborators } = body;
+
+    // Sanitize collaborators: remover "@", lowercase, trim, descartar vazios, limitar a 3
+    const instagram_collaborators: string[] = Array.isArray(rawCollaborators)
+      ? rawCollaborators
+          .map((u: unknown) => String(u).trim().toLowerCase().replace(/^@/, ""))
+          .filter((u: string) => u.length > 0)
+          .slice(0, 3)
+      : [];
 
     // Validacoes basicas
     if (!postId || !empresaId || !scheduledFor || !platforms) {
@@ -84,6 +92,14 @@ export async function POST(request: NextRequest) {
         { error: "Post ja foi publicado." },
         { status: 409 }
       );
+    }
+
+    // Persistir collaborators no post antes de agendar (campo adicionado em 022)
+    if (instagram_collaborators.length > 0) {
+      await supabase
+        .from("posts")
+        .update({ instagram_collaborators })
+        .eq("id", postId);
     }
 
     const result = await schedulePost(

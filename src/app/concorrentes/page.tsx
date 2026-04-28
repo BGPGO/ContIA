@@ -18,6 +18,7 @@ import {
   ConcorrentePostsResult,
 } from "@/hooks/useConcorrentes";
 import { cn, formatNumber } from "@/lib/utils";
+import { ConcorrenteAdsTab } from "@/components/concorrentes/ConcorrenteAdsTab";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -175,6 +176,8 @@ function InstagramEmbed({ username }: InstagramEmbedProps) {
 
 // ─── Concorrente Section ────────────────────────────────────────────────────
 
+type ConcorrenteTab = "perfil" | "anuncios";
+
 interface ConcorrenteSectionProps {
   concorrente: ConcorrenteDB;
   onRemove: (id: string) => void;
@@ -195,6 +198,7 @@ function ConcorrenteSection({
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [activeTab, setActiveTab] = useState<ConcorrenteTab>("perfil");
 
   const igUsername = getInstagramUsername(concorrente);
 
@@ -311,17 +315,19 @@ function ConcorrenteSection({
               Ver no Instagram
             </a>
           )}
-          <button
-            onClick={() => loadProfile(true)}
-            disabled={loadingProfile}
-            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-card-hover transition-colors disabled:opacity-40"
-            title="Atualizar perfil"
-          >
-            <RefreshCw
-              size={13}
-              className={cn(loadingProfile && "animate-spin")}
-            />
-          </button>
+          {activeTab === "perfil" && (
+            <button
+              onClick={() => loadProfile(true)}
+              disabled={loadingProfile}
+              className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-card-hover transition-colors disabled:opacity-40"
+              title="Atualizar perfil"
+            >
+              <RefreshCw
+                size={13}
+                className={cn(loadingProfile && "animate-spin")}
+              />
+            </button>
+          )}
           <button
             onClick={handleRemove}
             disabled={removing}
@@ -333,14 +339,47 @@ function ConcorrenteSection({
         </div>
       </div>
 
-      {/* ── Instagram Embed ── */}
+      {/* ── Tabs ── */}
+      <div className="border-b border-border-subtle px-4">
+        <div className="flex items-center gap-0">
+          {(
+            [
+              { key: "perfil", label: "Perfil" },
+              { key: "anuncios", label: "Anúncios" },
+            ] as { key: ConcorrenteTab; label: string }[]
+          ).map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={cn(
+                "px-4 py-2.5 text-xs font-medium border-b-2 transition-colors -mb-px",
+                activeTab === tab.key
+                  ? "border-[#4ecdc4] text-text-primary"
+                  : "border-transparent text-text-muted hover:text-text-secondary"
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Tab content ── */}
       <div className="p-4">
-        {!igUsername ? (
-          <p className="text-text-muted text-xs text-center py-6">
-            Sem username Instagram configurado.
-          </p>
-        ) : (
-          <InstagramEmbed username={igUsername} />
+        {activeTab === "perfil" && (
+          <>
+            {!igUsername ? (
+              <p className="text-text-muted text-xs text-center py-6">
+                Sem username Instagram configurado.
+              </p>
+            ) : (
+              <InstagramEmbed username={igUsername} />
+            )}
+          </>
+        )}
+
+        {activeTab === "anuncios" && (
+          <ConcorrenteAdsTab concorrenteId={concorrente.id} />
         )}
       </div>
     </div>

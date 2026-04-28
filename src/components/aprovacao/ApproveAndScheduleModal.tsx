@@ -15,6 +15,7 @@ import {
   Play,
   Tv2,
 } from "lucide-react";
+import { CollaboratorsInput } from "./CollaboratorsInput";
 import { format, addHours, setMinutes } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Post, PostApproval } from "@/types";
@@ -100,6 +101,7 @@ export function ApproveAndScheduleModal({
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(
     post.plataformas
   );
+  const [collaborators, setCollaborators] = useState<string[]>([]);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState<"idle" | "approving" | "scheduling">(
@@ -114,6 +116,7 @@ export function ApproveAndScheduleModal({
       setComment("");
       setDatetimeLocal(getDefaultDatetime());
       setSelectedPlatforms(post.plataformas);
+      setCollaborators([]);
       setValidationError(null);
       setSubmitting(false);
       setStep("idle");
@@ -161,23 +164,41 @@ export function ApproveAndScheduleModal({
 
       // 2. Agendar
       setStep("scheduling");
+
+      const scheduleBody: Record<string, unknown> = {
+        postId: post.id,
+        empresaId: post.empresa_id,
+        scheduledFor: scheduledDate.toISOString(),
+        platforms: selectedPlatforms,
+      };
+      if (collaborators.length > 0) {
+        scheduleBody.instagram_collaborators = collaborators;
+      }
+
       const res = await fetch("/api/posts/schedule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          postId: post.id,
-          empresaId: post.empresa_id,
-          scheduledFor: scheduledDate.toISOString(),
-          platforms: selectedPlatforms,
-        }),
+        body: JSON.stringify(scheduleBody),
       });
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
+        const errorMsg: string = body.error ?? res.statusText;
+        // Conta Instagram PERSONAL — retornar mensagem do servidor em PT-BR
+        if (
+          errorMsg.includes("PERSONAL") ||
+          errorMsg.includes("Business/Creator") ||
+          errorMsg.includes("Business") ||
+          errorMsg.includes("Creator")
+        ) {
+          onError(errorMsg);
+          setSubmitting(false);
+          setStep("idle");
+          return;
+        }
         // approve já foi feito — informamos que aprovado mas agendamento falhou
         onError(
-          "Post aprovado, mas falhou ao agendar: " +
-            (body.error ?? res.statusText)
+          "Post aprovado, mas falhou ao agendar: " + errorMsg
         );
         onComplete(); // refetch pra tirar da lista de pendentes
         onClose();
@@ -380,6 +401,44 @@ export function ApproveAndScheduleModal({
                     </div>
                   )}
                 </div>
+
+                {/* Divisor */}
+                <div className="border-t border-border/50" />
+
+                {/* Seção 4: Colaboradores Instagram (condicional) */}
+                <AnimatePresence>
+                  {selectedPlatforms.some(
+                    (p) => p.toLowerCase() === "instagram"
+                  ) && (
+                    <motion.div
+                      key="collaborators-section"
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.22 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="space-y-2 pt-0.5">
+                        <label className="flex items-center gap-1.5 text-[12px] font-medium text-text-secondary">
+                          <Users className="w-3.5 h-3.5 text-[#e1306c]" />
+                          Colaboradores no Instagram{" "}
+                          <span className="text-text-muted font-normal">
+                            (opcional)
+                          </span>
+                        </label>
+                        <CollaboratorsInput
+                          value={collaborators}
+                          onChange={setCollaborators}
+                          disabled={submitting}
+                        />
+                        <p className="text-[11px] text-text-muted">
+                          Marcar até 3 perfis. Funciona apenas em conta
+                          Business/Creator.
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {/* Erro de validação */}
                 <AnimatePresence>

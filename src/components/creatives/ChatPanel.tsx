@@ -1,7 +1,9 @@
 "use client";
 
-import { Library, Palette } from "lucide-react";
+import { useState } from "react";
+import { Library, Palette, Lightbulb } from "lucide-react";
 import { CreativeChatInterface } from "./CreativeChatInterface";
+import { IdeasModal } from "./IdeasModal";
 import type { QuickAction, QuickActionConfig } from "@/types/copy-studio";
 import type { CreativeMessage, ModelKey, StreamingPhase, TokenTotals } from "@/hooks/useCreativeChat";
 import type { MessageAttachment } from "@/lib/creatives/history";
@@ -26,6 +28,7 @@ interface ChatPanelProps {
   onAddAttachment: (file: File) => void;
   onRemoveAttachment: (url: string) => void;
   onOpenLibrary?: () => void;
+  empresaId?: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -79,7 +82,10 @@ export function ChatPanel({
   onAddAttachment,
   onRemoveAttachment,
   onOpenLibrary,
+  empresaId = "",
 }: ChatPanelProps) {
+  const [ideasModalOpen, setIdeasModalOpen] = useState(false);
+
   // Handler de quick action: recebe o QuickAction id, mas usa o prompt mapeado
   const handleQuickAction = (actionId: QuickAction) => {
     const action = CREATIVE_QUICK_ACTIONS.find((a) => a.id === actionId);
@@ -90,6 +96,16 @@ export function ChatPanel({
 
   return (
     <div className="flex flex-col h-full min-h-0">
+      {/* Ideas Modal */}
+      <IdeasModal
+        open={ideasModalOpen}
+        onClose={() => setIdeasModalOpen(false)}
+        empresaId={empresaId}
+        onSelectIdea={(prompt) => {
+          onSendMessage(prompt);
+        }}
+      />
+
       {/* Header */}
       <div className="shrink-0 px-4 py-3 border-b dark:border-white/10 border-border flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -104,6 +120,21 @@ export function ChatPanel({
               <span>Biblioteca</span>
             </button>
           )}
+          {/* 5 Ideias por IA — botão destacado */}
+          <button
+            type="button"
+            onClick={() => setIdeasModalOpen(true)}
+            title="Gerar 5 ideias de criativos com IA"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+              border border-[#4ecdc4]/40 text-[#4ecdc4]
+              bg-gradient-to-r from-[#4ecdc4]/10 to-[#6c5ce7]/10
+              hover:from-[#4ecdc4]/20 hover:to-[#6c5ce7]/20
+              hover:border-[#4ecdc4]/70 hover:shadow-[0_0_12px_rgba(78,205,196,0.2)]
+              transition-all cursor-pointer"
+          >
+            <Lightbulb className="w-3.5 h-3.5" />
+            <span>5 ideias por IA</span>
+          </button>
           <h1 className="text-lg font-serif text-text-primary leading-tight">Criativos IA</h1>
         </div>
 
