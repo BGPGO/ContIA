@@ -44,7 +44,7 @@ const RequestSchema = z.object({
       ])
     )
     .min(1, "Selecione pelo menos 1 plataforma"),
-  reportType: z.enum(["weekly", "monthly", "quarterly", "custom"]),
+  reportType: z.enum(["weekly", "monthly", "quarterly", "custom", "agency"]),
   name: z.string().max(200).optional(),
   empresaId: z.string().uuid().optional(),
 });
@@ -82,6 +82,7 @@ const TYPE_LABELS: Record<ReportType, string> = {
   monthly: "Mensal",
   quarterly: "Trimestral",
   custom: "Personalizado",
+  agency: "Agência",
 };
 
 function generateReportName(reportType: ReportType, periodEnd: Date): string {

@@ -32,6 +32,9 @@ import {
 } from "lucide-react";
 import { formatNumber } from "@/lib/utils";
 import type { Report, ReportAnalysis, Insight, Recommendation, Warning, Comparison, Highlight } from "@/types/reports";
+import { AgencyReportView } from "./agency-view";
+import type { AgencyReportData } from "@/types/agency-report";
+import type { AgencyReportAnalysis } from "@/lib/ai/agency-report-generator";
 
 /* ── Sub-components ─────────────────────────────────────────── */
 
@@ -624,6 +627,24 @@ export default function ReportViewPage() {
   const analysis = report.ai_analysis as ReportAnalysis;
   const hasAnalysis = analysis && typeof analysis.summary === "string";
 
+  // Detecta Relatório Agência pela estrutura de data
+  const isAgencyReport =
+    report.data &&
+    typeof report.data === "object" &&
+    "meta" in report.data &&
+    "panorama" in report.data;
+
+  const agencyData = isAgencyReport
+    ? (report.data as unknown as AgencyReportData)
+    : null;
+
+  const agencyAnalysis =
+    report.ai_analysis &&
+    typeof report.ai_analysis === "object" &&
+    "panorama" in report.ai_analysis
+      ? (report.ai_analysis as unknown as AgencyReportAnalysis)
+      : null;
+
   const fmt = (d: string) => new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "long", year: "numeric" }).format(new Date(d));
 
   return (
@@ -687,8 +708,19 @@ export default function ReportViewPage() {
         </div>
       </motion.div>
 
-      {/* PDF iframe */}
-      {report.pdf_url && (
+      {/* Relatório Agência — view dedicada */}
+      {isAgencyReport && agencyData && report.status === "ready" && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}>
+          <AgencyReportView
+            data={agencyData}
+            analysis={agencyAnalysis}
+            pdfUrl={report.pdf_url}
+          />
+        </motion.div>
+      )}
+
+      {/* PDF iframe — apenas para relatórios não-agência */}
+      {!isAgencyReport && report.pdf_url && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className="bg-bg-card border border-border rounded-xl overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <span className="text-[13px] font-medium text-text-secondary">Visualização do PDF</span>
@@ -712,12 +744,12 @@ export default function ReportViewPage() {
         </div>
       )}
 
-      {/* Report Data (visual metrics) */}
-      {report.status === "ready" && report.data && Object.keys(report.data).length > 0 && (
+      {/* Report Data (visual metrics) — apenas para relatórios não-agência */}
+      {!isAgencyReport && report.status === "ready" && report.data && Object.keys(report.data).length > 0 && (
         <ReportDataSection data={report.data as ReportData} />
       )}
 
-      {hasAnalysis && (
+      {!isAgencyReport && hasAnalysis && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }} className="space-y-4">
           {/* Summary */}
           <SectionCard title="Resumo Executivo" icon={FileText}>

@@ -3,6 +3,8 @@ import { getAdminSupabase } from "@/lib/supabase/admin";
 import {
   fetchInstagramLive,
   persistInstagramSnapshot,
+  fetchAccountMetrics,
+  fetchAudienceDemographics,
 } from "@/lib/analytics/instagram-fetcher";
 import { facebookDriver } from "@/lib/drivers/facebook";
 import { metaAdsDriver } from "@/lib/drivers/meta_ads";
@@ -107,23 +109,48 @@ export async function GET(req: NextRequest) {
       const syncPromise: Promise<number> = (async () => {
         if (conn.provider === "instagram") {
           if (!conn.provider_user_id) throw new Error("provider_user_id ausente");
-          const liveData = await fetchInstagramLive(
-            conn.access_token,
-            conn.provider_user_id,
-            30
-          );
-          await persistInstagramSnapshot(conn.empresa_id, conn.id, liveData);
+
+          // Buscar dados live, métricas de conta e demographics em paralelo.
+          // Demographics só são coletadas semanalmente (domingo) para economizar quota da API.
+          const today = new Date();
+          const isSunday = today.getDay() === 0;
+
+          const [liveData, accountMetrics, demographics] = await Promise.all([
+            fetchInstagramLive(conn.access_token, conn.provider_user_id, 30),
+            fetchAccountMetrics(conn.provider_user_id, conn.access_token),
+            isSunday
+              ? fetchAudienceDemographics(conn.provider_user_id, conn.access_token)
+              : Promise.resolve(undefined),
+          ]);
+
+          await persistInstagramSnapshot(conn.empresa_id, conn.id, liveData, {
+            accountMetrics,
+            ...(demographics ? { demographics } : {}),
+          });
           return 1; // 1 snapshot gravado
         }
 
         if (conn.provider === "facebook") {
-          const [profile, content, metrics] = await Promise.all([
-            facebookDriver.syncProfile(conn),
-            facebookDriver.syncContent(conn),
+          // syncProfile primeiro (escreve fan_count/followers no snapshot).
+          // syncContent + syncMetrics em paralelo depois (ambos mesclam no snapshot existente).
+          const profile = await facebookDriver.syncProfile(conn);
+          void profile;
+
+          const [content, metrics] = await Promise.all([
+            facebookDriver.syncContent(conn, { since: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), until: new Date() }),
             facebookDriver.syncMetrics(conn),
           ]);
-          void profile; void metrics;
-          return 1 + content.length;
+          void metrics;
+
+          // syncInsights para posts já no banco (enriquece organic_reach, paid_reach, clicks)
+          const postIds = content
+            .filter((c) => c.content_type === "post")
+            .map((c) => c.provider_content_id);
+          const insights = postIds.length > 0 && facebookDriver.syncInsights
+            ? await facebookDriver.syncInsights(conn, postIds)
+            : [];
+
+          return 1 + content.length + insights.length;
         }
 
         if (conn.provider === "meta_ads") {
@@ -156,8 +183,17 @@ export async function GET(req: NextRequest) {
                 until: metaAdsDateRange.until,
               })
             : [];
+
+          // syncAds: granularidade de anúncio individual (content_type='ad')
+          const ads = metaAdsDriver.syncAds
+            ? await metaAdsDriver.syncAds(conn, {
+                since: metaAdsDateRange.since,
+                until: metaAdsDateRange.until,
+              })
+            : [];
+
           void profile; void metrics;
-          return 1 + content.length + insights.length;
+          return 1 + content.length + insights.length + ads.length;
         }
 
         if (conn.provider === "crm") {

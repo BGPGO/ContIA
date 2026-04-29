@@ -60,7 +60,7 @@ function mapMediaType(
     case 'VIDEO':
       return 'reel'
     case 'CAROUSEL_ALBUM':
-      return 'post'
+      return 'carousel'
     default:
       return 'post'
   }

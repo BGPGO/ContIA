@@ -30,6 +30,7 @@ import { PostsTable } from "@/components/analytics/PostsTable";
 import { SaveRateCard } from "@/components/analytics/SaveRateCard";
 import { EngagementBreakdown } from "@/components/analytics/EngagementBreakdown";
 import { FormatPerformanceCards } from "@/components/analytics/FormatPerformanceCards";
+import { ExportReportButton } from "@/components/analytics/ExportReportButton";
 
 /* ── Tipos ── */
 import type { ProviderKey } from "@/types/providers";
@@ -530,6 +531,14 @@ function AnalyticsContent() {
 
           <div className="flex flex-col gap-2 items-end">
             <div className="flex items-center gap-2">
+              {empresa && (
+                <ExportReportButton
+                  empresaId={empresa.id}
+                  periodStart={range.start.toISOString().split("T")[0]}
+                  periodEnd={range.end.toISOString().split("T")[0]}
+                  scope="panorama"
+                />
+              )}
               <button
                 onClick={refresh}
                 disabled={loading}

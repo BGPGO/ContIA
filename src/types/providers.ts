@@ -71,9 +71,11 @@ export type ContentType =
   | 'post'
   | 'reel'
   | 'story'
+  | 'carousel'
   | 'video'
   | 'landing_page'
   | 'ad_campaign'
+  | 'ad'
   | 'email'
   | 'whatsapp'
   | 'youtube_video'
@@ -195,6 +197,9 @@ export interface ConnectionDriver {
 
   /** Insights detalhados por conteúdo — opcional (nem todo provider suporta) */
   syncInsights?(connection: Connection, contentIds: string[], options?: SyncOptions): Promise<InsightData[]>
+
+  /** Sync de anúncios individuais (level=ad) — opcional, específico de Meta Ads */
+  syncAds?(connection: Connection, options?: SyncOptions): Promise<ContentItem[]>
 }
 
 /* ── SyncJob (sync_jobs row) ──────────────────────────────────────────────── */

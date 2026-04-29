@@ -74,6 +74,38 @@ interface Campaign {
   effective_status: string
 }
 
+interface Ad {
+  id: string
+  name: string
+  status: string
+  campaign_id: string
+  adset_id: string
+  creative?: {
+    id: string
+    thumbnail_url?: string
+    effective_instagram_story_id?: string
+    effective_object_story_id?: string
+  }
+  created_time: string
+  effective_status: string
+}
+
+/** Métricas by-platform retornadas com breakdown=publisher_platform */
+export interface ByPlatformMetrics {
+  reach?: number
+  impressions?: number
+  clicks?: number
+  spend?: number
+  inline_link_clicks?: number
+}
+
+export interface PlatformBreakdown {
+  facebook?: ByPlatformMetrics
+  instagram?: ByPlatformMetrics
+  audience_network?: ByPlatformMetrics
+  messenger?: ByPlatformMetrics
+}
+
 /* ── Token exchange (Facebook Graph API, NÃO Instagram) ─────────────────── */
 
 /**
@@ -181,32 +213,68 @@ function avgActionValues(
 /**
  * Extrai métricas numéricas de uma linha de insights da Marketing API.
  * Suporta tanto `actions[]` (conversions count) quanto `action_values[]` (valor).
+ *
+ * Conversões separadas por tipo:
+ *   - leads: action_type contém 'lead' ou 'onsite_conversion.lead_grouped'
+ *   - purchases: action_type contém 'purchase' ou 'omni_purchase'
+ *   - registrations: action_type contém 'complete_registration'
+ *   - conversions: soma legacy de todos os tipos (retrocompatibilidade)
+ *   - link_clicks: inline_link_clicks (diferente de clicks total)
  */
 function parseMetricsRow(raw: {
   spend?: string
   impressions?: string
   clicks?: string
+  inline_link_clicks?: string
   ctr?: string
   cpc?: string
   reach?: string
   frequency?: string
+  cpm?: string
   actions?: ActionStat[]
   action_values?: ActionStat[]
   purchase_roas?: ActionStat[]
 }): Record<string, number> {
   const conversionValue = sumActionValues(raw.action_values, ['purchase', 'lead', 'complete_registration'])
+  // Legacy aggregate conversions (retrocompatibilidade)
   const conversions = sumActions(raw.actions, ['offsite_conversion', 'lead', 'complete_registration', 'purchase'])
+  // Tipos separados de conversão
+  const leads = sumActions(raw.actions, [
+    'lead',
+    'onsite_conversion.lead_grouped',
+    'offsite_conversion.fb_pixel_lead',
+  ])
+  const purchases = sumActions(raw.actions, [
+    'purchase',
+    'omni_purchase',
+    'offsite_conversion.fb_pixel_purchase',
+  ])
+  const complete_registrations = sumActions(raw.actions, [
+    'complete_registration',
+    'offsite_conversion.fb_pixel_complete_registration',
+  ])
   const roas = avgActionValues(raw.purchase_roas, ['purchase'])
+
+  // link_clicks: prefer inline_link_clicks field, then fall back to inline actions
+  const link_clicks = raw.inline_link_clicks
+    ? parseInt(raw.inline_link_clicks, 10) || 0
+    : sumActions(raw.actions, ['link_click', 'inline_link_clicks'])
+
   return {
     spend: parseFloat(raw.spend ?? '0') || 0,
     impressions: parseInt(raw.impressions ?? '0', 10) || 0,
     clicks: parseInt(raw.clicks ?? '0', 10) || 0,
+    link_clicks,
     ctr: parseFloat(raw.ctr ?? '0') || 0,
     cpc: parseFloat(raw.cpc ?? '0') || 0,
+    cpm: parseFloat(raw.cpm ?? '0') || 0,
     reach: parseInt(raw.reach ?? '0', 10) || 0,
     frequency: parseFloat(raw.frequency ?? '0') || 0,
     conversions,
     conversion_value: conversionValue,
+    leads,
+    purchases,
+    complete_registrations,
     roas,
   }
 }
@@ -649,32 +717,63 @@ export const metaAdsDriver: ConnectionDriver = {
         }
       : { date_preset: 'today' }
 
-    let insightsData: {
-      data: Array<{
-        date_start?: string
-        date_stop?: string
-        spend?: string
-        impressions?: string
-        clicks?: string
-        ctr?: string
-        cpc?: string
-        reach?: string
-        frequency?: string
-        actions?: ActionStat[]
-        action_values?: ActionStat[]
-        purchase_roas?: ActionStat[]
-      }>
-    } = { data: [] }
+    type InsightsRow = {
+      date_start?: string
+      date_stop?: string
+      spend?: string
+      impressions?: string
+      clicks?: string
+      inline_link_clicks?: string
+      ctr?: string
+      cpc?: string
+      cpm?: string
+      reach?: string
+      frequency?: string
+      actions?: ActionStat[]
+      action_values?: ActionStat[]
+      purchase_roas?: ActionStat[]
+    }
+
+    type PlatformBreakdownRow = InsightsRow & {
+      publisher_platform?: string
+    }
+
+    let insightsData: { data: InsightsRow[] } = { data: [] }
+    let platformData: { data: PlatformBreakdownRow[] } = { data: [] }
+
+    const insightFields =
+      'spend,impressions,clicks,inline_link_clicks,ctr,cpc,cpm,reach,frequency,actions,action_values,purchase_roas'
 
     let fetchSucceeded = false
     try {
+      // Fetch 1: aggregate totals (same as before)
       insightsData = await fbFetch<typeof insightsData>(`/${accountId}/insights`, {
         access_token: token,
-        fields:
-          'spend,impressions,clicks,ctr,cpc,reach,frequency,actions,action_values,purchase_roas',
+        fields: insightFields,
         level: 'account',
         ...dateParams,
       })
+
+      // Fetch 2: breakdown by publisher_platform (single aggregate for the period)
+      // We use date_preset=last_30d or aggregate for the range — no time_increment here
+      // to keep payload small (1 row per platform rather than 1 per day per platform)
+      const platformDateParams: Record<string, string> = resolvedRange
+        ? { time_range: JSON.stringify(resolvedRange) }
+        : { date_preset: 'today' }
+
+      try {
+        platformData = await fbFetch<typeof platformData>(`/${accountId}/insights`, {
+          access_token: token,
+          fields: 'spend,impressions,clicks,inline_link_clicks,reach,publisher_platform',
+          level: 'account',
+          breakdowns: 'publisher_platform',
+          ...platformDateParams,
+        })
+      } catch (platformErr) {
+        // platform breakdown is best-effort — don't fail the whole sync
+        console.warn('[MetaAdsDriver.syncMetrics] Falha ao buscar breakdown por platform (non-fatal):', platformErr instanceof Error ? platformErr.message : platformErr)
+      }
+
       fetchSucceeded = true
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err)
@@ -699,27 +798,54 @@ export const metaAdsDriver: ConnectionDriver = {
         .eq('id', connection.id)
     }
 
+    // Build byPlatform object from breakdown rows
+    const byPlatform: PlatformBreakdown = {}
+    for (const row of platformData.data ?? []) {
+      const platform = row.publisher_platform?.toLowerCase()
+      if (!platform) continue
+      const key = platform as keyof PlatformBreakdown
+      byPlatform[key] = {
+        reach: parseInt(row.reach ?? '0', 10) || 0,
+        impressions: parseInt(row.impressions ?? '0', 10) || 0,
+        clicks: parseInt(row.clicks ?? '0', 10) || 0,
+        spend: parseFloat(row.spend ?? '0') || 0,
+        inline_link_clicks: parseInt(row.inline_link_clicks ?? '0', 10) || 0,
+      }
+    }
+
     const dailyRows = insightsData.data ?? []
 
     // --- Modo backfill: BATCH upsert de todos os snapshots do range em 1 query ---
     // (loop sequencial estourava timeout 30s do cron)
     if (resolvedRange && dailyRows.length > 0) {
-      const snapshotRows = dailyRows.map((row) => ({
-        empresa_id: connection.empresa_id,
-        connection_id: connection.id,
-        provider: 'meta_ads' as const,
-        snapshot_date: row.date_start ?? today,
-        metrics: parseMetricsRow(row),
-      }))
+      const snapshotRows = dailyRows.map((row) => {
+        const baseMetrics = parseMetricsRow(row)
+        return {
+          empresa_id: connection.empresa_id,
+          connection_id: connection.id,
+          provider: 'meta_ads' as const,
+          snapshot_date: row.date_start ?? today,
+          // byPlatform only on the last day (single aggregate for entire range)
+          metrics: {
+            ...baseMetrics,
+            ...(row.date_start === (dailyRows[dailyRows.length - 1]?.date_start ?? '')
+              ? { byPlatform }
+              : {}),
+          } as Record<string, unknown>,
+        }
+      })
 
       await supabase.from('provider_snapshots').upsert(snapshotRows, {
         onConflict: 'connection_id,snapshot_date',
       })
 
       // Achatar todos metric_events em 1 array e fazer 1 upsert só
-      const allMetricEvents = snapshotRows.flatMap((s) =>
-        Object.keys(s.metrics).length > 0
-          ? Object.entries(s.metrics).map(([key, value]) => ({
+      const allMetricEvents = snapshotRows.flatMap((s) => {
+        const numericMetrics = Object.fromEntries(
+          Object.entries(s.metrics).filter(([, v]) => typeof v === 'number')
+        ) as Record<string, number>
+        return Object.keys(numericMetrics).length > 0
+          ? Object.entries(numericMetrics).map(([key, value]) => ({
               empresa_id: connection.empresa_id,
               connection_id: connection.id,
               provider: 'meta_ads' as const,
@@ -730,7 +856,7 @@ export const metaAdsDriver: ConnectionDriver = {
               collected_at: now,
             }))
           : []
-      )
+      })
 
       if (allMetricEvents.length > 0) {
         await supabase.from('metric_events').upsert(allMetricEvents, {
@@ -745,13 +871,17 @@ export const metaAdsDriver: ConnectionDriver = {
         provider: 'meta_ads',
         snapshot_date: lastRow.date_start ?? today,
         metrics: parseMetricsRow(lastRow),
-        raw: { insights: dailyRows } as Record<string, unknown>,
+        raw: { insights: dailyRows, byPlatform } as Record<string, unknown>,
       }
     }
 
     // --- Modo legacy (today) ---
     const raw = dailyRows[0] ?? {}
     const metrics = parseMetricsRow(raw)
+    const metricsWithPlatform = {
+      ...metrics,
+      ...(Object.keys(byPlatform).length > 0 ? { byPlatform } : {}),
+    } as Record<string, unknown>
 
     // Escrita em provider_snapshots
     await supabase.from('provider_snapshots').upsert(
@@ -760,14 +890,18 @@ export const metaAdsDriver: ConnectionDriver = {
         connection_id: connection.id,
         provider: 'meta_ads',
         snapshot_date: today,
-        metrics,
+        metrics: metricsWithPlatform,
       },
       { onConflict: 'connection_id,snapshot_date' }
     )
 
-    // Escrita em metric_events
-    if (Object.keys(metrics).length > 0) {
-      const metricEvents = Object.entries(metrics).map(([key, value]) => ({
+    // Escrita em metric_events (só campos numéricos)
+    const numericMetrics = Object.fromEntries(
+      Object.entries(metricsWithPlatform).filter(([, v]) => typeof v === 'number')
+    ) as Record<string, number>
+
+    if (Object.keys(numericMetrics).length > 0) {
+      const metricEvents = Object.entries(numericMetrics).map(([key, value]) => ({
         empresa_id: connection.empresa_id,
         connection_id: connection.id,
         provider: 'meta_ads' as const,
@@ -788,7 +922,7 @@ export const metaAdsDriver: ConnectionDriver = {
       provider: 'meta_ads',
       snapshot_date: today,
       metrics,
-      raw: { insights: dailyRows } as Record<string, unknown>,
+      raw: { insights: dailyRows, byPlatform } as Record<string, unknown>,
     }
   },
 
@@ -860,7 +994,7 @@ export const metaAdsDriver: ConnectionDriver = {
         {
           access_token: token,
           fields:
-            'campaign_id,campaign_name,spend,impressions,clicks,ctr,cpc,reach,frequency,actions,action_values,purchase_roas',
+            'campaign_id,campaign_name,spend,impressions,clicks,inline_link_clicks,ctr,cpc,cpm,reach,frequency,actions,action_values,purchase_roas',
           level: 'campaign',
           limit: '500',
           ...dateParams,
@@ -906,5 +1040,170 @@ export const metaAdsDriver: ConnectionDriver = {
     )
 
     return results
+  },
+
+  /* ── syncAds ───────────────────────────────────────────────────────────── */
+  /**
+   * Sincroniza anúncios individuais (nível Ad, não Campaign) dos últimos 30 dias.
+   *
+   * Para cada ad ativo ou pausado recentemente:
+   *   1. Busca lista de ads com campos creative, campaign_id, adset_id
+   *   2. Busca insights por ad (spend, impressions, reach, clicks, actions, inline_link_clicks, etc.)
+   *   3. Persiste em content_items com content_type='ad'
+   *
+   * Salva campos extras necessários para tabela "Anúncios em Destaque":
+   *   - thumbnail_url: creative.thumbnail_url (se disponível)
+   *   - title: nome do ad
+   *   - metrics: mesmas separações de conversion que campaigns
+   *   - raw: inclui campaign_id, adset_id, creative para cruzamento
+   */
+  async syncAds(
+    connection: Connection,
+    options?: SyncOptions & { dateRange?: { since: string; until: string } }
+  ): Promise<ContentItem[]> {
+    const token = decryptToken(connection.access_token)
+    const accountId = resolveAccountId(connection)
+    const supabase = getAdminSupabase()
+    const now = new Date().toISOString()
+
+    const toDateString = (d: Date | string): string =>
+      typeof d === 'string' ? d.split('T')[0] : d.toISOString().split('T')[0]
+
+    let resolvedRange: { since: string; until: string } | null = null
+    if (options?.dateRange) {
+      resolvedRange = options.dateRange
+    } else if (options?.since && options?.until) {
+      resolvedRange = {
+        since: toDateString(options.since),
+        until: toDateString(options.until),
+      }
+    } else {
+      // Default: últimos 30 dias
+      const until = new Date()
+      const since = new Date(until)
+      since.setDate(since.getDate() - 30)
+      resolvedRange = {
+        since: since.toISOString().split('T')[0],
+        until: until.toISOString().split('T')[0],
+      }
+    }
+
+    const dateParams: Record<string, string> = resolvedRange
+      ? { time_range: JSON.stringify(resolvedRange) }
+      : { date_preset: 'last_30d' }
+
+    // 1. Fetch ads list
+    let ads: Ad[] = []
+    try {
+      const res = await fbFetch<{ data: Ad[] }>(`/${accountId}/ads`, {
+        access_token: token,
+        fields: 'id,name,status,campaign_id,adset_id,creative{thumbnail_url},created_time,effective_status',
+        effective_status: JSON.stringify(['ACTIVE', 'PAUSED', 'ARCHIVED']),
+        limit: '200',
+        ...dateParams,
+      })
+      ads = res.data ?? []
+    } catch (err) {
+      console.warn('[MetaAdsDriver.syncAds] Falha ao buscar ads:', err instanceof Error ? err.message : err)
+      return []
+    }
+
+    if (ads.length === 0) return []
+
+    // 2. Fetch insights for all ads in 1 request (level=ad)
+    type AdInsightRow = {
+      ad_id?: string
+      ad_name?: string
+      spend?: string
+      impressions?: string
+      clicks?: string
+      inline_link_clicks?: string
+      ctr?: string
+      cpc?: string
+      cpm?: string
+      reach?: string
+      frequency?: string
+      actions?: ActionStat[]
+      action_values?: ActionStat[]
+      purchase_roas?: ActionStat[]
+    }
+
+    let adInsights: AdInsightRow[] = []
+    try {
+      const res = await fbFetch<{ data: AdInsightRow[] }>(`/${accountId}/insights`, {
+        access_token: token,
+        fields:
+          'ad_id,ad_name,spend,impressions,clicks,inline_link_clicks,ctr,cpc,cpm,reach,frequency,actions,action_values,purchase_roas',
+        level: 'ad',
+        limit: '500',
+        ...dateParams,
+      })
+      adInsights = res.data ?? []
+    } catch (err) {
+      console.warn('[MetaAdsDriver.syncAds] Falha ao buscar insights por ad:', err instanceof Error ? err.message : err)
+      // Continue without metrics — still upsert ad records
+    }
+
+    // Build insights map by ad_id
+    const insightsMap = new Map<string, AdInsightRow>(
+      adInsights.filter((r) => r.ad_id).map((r) => [r.ad_id as string, r])
+    )
+
+    // 3. Build content rows
+    const contentRows = ads.map((ad) => {
+      const insight = insightsMap.get(ad.id) ?? {}
+      const metrics = parseMetricsRow(insight)
+      const thumbnailUrl = ad.creative?.thumbnail_url ?? null
+
+      return {
+        empresa_id: connection.empresa_id,
+        connection_id: connection.id,
+        provider: 'meta_ads' as const,
+        provider_content_id: ad.id,
+        content_type: 'ad' as const,
+        title: ad.name,
+        caption: ad.name,
+        url: `https://business.facebook.com/adsmanager/manage/ads?act=${connection.provider_user_id}&selected_ad_ids=${ad.id}`,
+        thumbnail_url: thumbnailUrl,
+        published_at: ad.created_time,
+        metrics,
+        raw: {
+          ad_id: ad.id,
+          ad_name: ad.name,
+          campaign_id: ad.campaign_id,
+          adset_id: ad.adset_id,
+          status: ad.status,
+          effective_status: ad.effective_status,
+          creative_id: ad.creative?.id ?? null,
+        } as Record<string, unknown>,
+        synced_at: now,
+      }
+    })
+
+    const { data: upserted, error } = await supabase
+      .from('content_items')
+      .upsert(contentRows, { onConflict: 'connection_id,provider_content_id' })
+      .select()
+
+    if (error) {
+      console.error('[MetaAdsDriver.syncAds] Erro ao upsert content_items:', error.message)
+    }
+
+    return (upserted ?? contentRows).map((row) => ({
+      id: (row as { id?: string }).id ?? '',
+      empresa_id: row.empresa_id,
+      connection_id: row.connection_id,
+      provider: row.provider,
+      provider_content_id: row.provider_content_id,
+      content_type: row.content_type,
+      title: row.title,
+      caption: row.caption,
+      url: row.url,
+      thumbnail_url: row.thumbnail_url,
+      published_at: row.published_at,
+      metrics: row.metrics,
+      raw: row.raw,
+      synced_at: row.synced_at,
+    }))
   },
 }

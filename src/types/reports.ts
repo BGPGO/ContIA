@@ -8,7 +8,7 @@ import type { ProviderKey } from './providers'
 
 /* ── Report Types ─────────────────────────────────────────────────────────── */
 
-export type ReportType = 'weekly' | 'monthly' | 'quarterly' | 'custom'
+export type ReportType = 'weekly' | 'monthly' | 'quarterly' | 'custom' | 'agency'
 export type ReportStatus = 'generating' | 'ready' | 'failed'
 
 /* ── Report (reports row) ─────────────────────────────────────────────────── */

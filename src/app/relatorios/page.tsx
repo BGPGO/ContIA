@@ -42,6 +42,7 @@ const TYPE_LABELS: Record<ReportType, string> = {
   monthly: "Mensal",
   quarterly: "Trimestral",
   custom: "Personalizado",
+  agency: "Agência",
 };
 
 const PROVIDER_COLORS: Record<string, string> = {
@@ -311,6 +312,7 @@ export default function RelatoriosPage() {
               <option value="monthly">Mensal</option>
               <option value="quarterly">Trimestral</option>
               <option value="custom">Personalizado</option>
+              <option value="agency">Agência</option>
             </select>
           </div>
 

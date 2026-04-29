@@ -267,7 +267,7 @@ export function toRecentPosts(data: InstagramLiveData): RecentPost[] {
     return {
       id: m.id,
       provider: "instagram" as ProviderKey,
-      content_type: m.media_type === "VIDEO" ? "reel" : "post",
+      content_type: m.media_type === "VIDEO" ? "reel" : m.media_type === "CAROUSEL_ALBUM" ? "carousel" : "post",
       title: null,
       caption: m.caption ?? null,
       thumbnail_url: m.thumbnail_url ?? m.media_url ?? null,
@@ -378,7 +378,7 @@ export function toProviderPosts(data: InstagramLiveData): ProviderPost[] {
     const mi = data.mediaInsightsMap.get(m.id);
     return {
       id: m.id,
-      content_type: m.media_type === "VIDEO" ? "reel" : "post",
+      content_type: m.media_type === "VIDEO" ? "reel" : m.media_type === "CAROUSEL_ALBUM" ? "carousel" : "post",
       title: null,
       caption: m.caption ?? null,
       thumbnail_url: m.thumbnail_url ?? m.media_url ?? null,
@@ -399,7 +399,7 @@ export function toProviderPosts(data: InstagramLiveData): ProviderPost[] {
 export function toProviderBreakdown(data: InstagramLiveData): BreakdownItem[] {
   const typeCounts = new Map<string, number>();
   for (const m of data.media) {
-    const t = m.media_type === "VIDEO" ? "reel" : "post";
+    const t = m.media_type === "VIDEO" ? "reel" : m.media_type === "CAROUSEL_ALBUM" ? "carousel" : "post";
     typeCounts.set(t, (typeCounts.get(t) ?? 0) + 1);
   }
 
@@ -407,6 +407,7 @@ export function toProviderBreakdown(data: InstagramLiveData): BreakdownItem[] {
   const COLORS: Record<string, string> = {
     post: "#6c5ce7",
     reel: "#fbbf24",
+    carousel: "#4ecdc4",
   };
 
   return Array.from(typeCounts.entries())
@@ -674,7 +675,11 @@ export function toInstagramAdvanced(data: InstagramLiveData): InstagramAdvancedA
 export async function persistInstagramSnapshot(
   empresaId: string,
   connectionId: string,
-  liveData: InstagramLiveData
+  liveData: InstagramLiveData,
+  extraMetrics?: {
+    accountMetrics?: InstagramAccountMetrics;
+    demographics?: InstagramAudienceDemographics;
+  }
 ): Promise<void> {
   const admin = getAdminSupabase();
   const today = new Date().toISOString().split("T")[0];
@@ -693,6 +698,28 @@ export async function persistInstagramSnapshot(
         ...(liveData.kpis.reach > 0 ? { reach: liveData.kpis.reach } : {}),
         // null = indisponível para esse tipo de conta; preservar null no JSONB (não converter para 0)
         impressions: liveData.kpis.impressions,
+        // Métricas adicionais de conta (apenas se fornecidas e não nulas)
+        ...(extraMetrics?.accountMetrics?.profile_visits != null
+          ? { profile_visits: extraMetrics.accountMetrics.profile_visits }
+          : {}),
+        ...(extraMetrics?.accountMetrics?.profile_links_taps != null
+          ? {
+              profile_links_taps: extraMetrics.accountMetrics.profile_links_taps,
+              ...(extraMetrics.accountMetrics.profile_links_taps_breakdown
+                ? { profile_links_taps_breakdown: extraMetrics.accountMetrics.profile_links_taps_breakdown }
+                : {}),
+            }
+          : {}),
+        ...(extraMetrics?.accountMetrics?.views_total != null
+          ? { views_total: extraMetrics.accountMetrics.views_total }
+          : {}),
+        // Audience demographics (semanal - só persiste se fornecido)
+        ...(extraMetrics?.demographics?.audience_gender_age
+          ? { audience_gender_age: extraMetrics.demographics.audience_gender_age }
+          : {}),
+        ...(extraMetrics?.demographics?.audience_city
+          ? { audience_city: extraMetrics.demographics.audience_city }
+          : {}),
       },
     },
     { onConflict: "connection_id,snapshot_date" }
@@ -707,7 +734,7 @@ export async function persistInstagramSnapshot(
         connection_id: connectionId,
         provider: "instagram",
         provider_content_id: media.id,
-        content_type: media.media_type === "VIDEO" ? "reel" : "post",
+        content_type: media.media_type === "VIDEO" ? "reel" : media.media_type === "CAROUSEL_ALBUM" ? "carousel" : "post",
         caption: media.caption ?? null,
         url: media.permalink ?? null,
         thumbnail_url: media.thumbnail_url ?? media.media_url ?? null,
@@ -724,5 +751,461 @@ export async function persistInstagramSnapshot(
     await admin
       .from("content_items")
       .upsert(rows, { onConflict: "connection_id,provider_content_id" });
+  }
+}
+
+/* ── Métricas de conta adicionais (profile_visits, profile_links_taps, views_total) ── */
+
+export interface InstagramAccountMetrics {
+  profile_visits: number | null;
+  /** Total de cliques no perfil (soma de todos os tipos de link) */
+  profile_links_taps: number | null;
+  /** Breakdown por tipo: email_contacts, call_button_clicks, direction_button_clicks, website_clicks */
+  profile_links_taps_breakdown: Record<string, number> | null;
+  /** Total de visualizações (orgânico + pago) */
+  views_total: number | null;
+}
+
+/**
+ * Busca métricas de conta do Instagram via account_insights.
+ * Requer conta BUSINESS ou CREATOR.
+ * Retorna null nos campos quando a conta não suporta.
+ */
+export async function fetchAccountMetrics(
+  igUserId: string,
+  accessToken: string
+): Promise<InstagramAccountMetrics> {
+  const until = Math.floor(Date.now() / 1000);
+  const since = until - 28 * 24 * 60 * 60; // últimos 28 dias
+
+  const metricsToFetch = [
+    "profile_visits",
+    "profile_links_taps",
+    "views",
+  ].join(",");
+
+  const result: InstagramAccountMetrics = {
+    profile_visits: null,
+    profile_links_taps: null,
+    profile_links_taps_breakdown: null,
+    views_total: null,
+  };
+
+  try {
+    const url = new URL(`${FB_GRAPH_URL}/${igUserId}/insights`);
+    url.searchParams.set("metric", metricsToFetch);
+    url.searchParams.set("period", "day");
+    url.searchParams.set("since", String(since));
+    url.searchParams.set("until", String(until));
+    url.searchParams.set("access_token", accessToken);
+
+    const res = await fetch(url.toString());
+    if (!res.ok) {
+      console.warn(`[IG account_metrics] HTTP ${res.status}`);
+      return result;
+    }
+
+    const data = (await res.json()) as {
+      data?: Array<{ name: string; values: Array<{ value: number | Record<string, number> }> }>;
+      error?: { code: number; message: string };
+    };
+
+    if (data.error) {
+      console.warn(`[IG account_metrics] Erro API ${data.error.code}: ${data.error.message}`);
+      return result;
+    }
+
+    for (const metric of data.data ?? []) {
+      const total = metric.values.reduce((s, v) => {
+        if (typeof v.value === "number") return s + v.value;
+        // breakdown object: soma todos os valores
+        return s + Object.values(v.value as Record<string, number>).reduce((a, b) => a + b, 0);
+      }, 0);
+
+      if (metric.name === "profile_visits") {
+        result.profile_visits = total;
+      } else if (metric.name === "profile_links_taps") {
+        result.profile_links_taps = total;
+        // IMPORTANTE 3: Somar todos os valores por chave (email, call, directions, website)
+        // para obter o total acumulado do período, não apenas o último valor
+        const breakdown: Record<string, number> = {};
+        for (const v of metric.values) {
+          if (v.value && typeof v.value === "object") {
+            for (const [key, val] of Object.entries(v.value as Record<string, number>)) {
+              breakdown[key] = (breakdown[key] ?? 0) + (typeof val === "number" ? val : 0);
+            }
+          }
+        }
+        if (Object.keys(breakdown).length > 0) {
+          result.profile_links_taps_breakdown = breakdown;
+        }
+      } else if (metric.name === "views") {
+        result.views_total = total;
+      }
+    }
+  } catch (err) {
+    console.warn("[IG account_metrics] Exceção:", err instanceof Error ? err.message : err);
+  }
+
+  return result;
+}
+
+/* ── Audience Demographics (follower_demographics — Graph API v22+) ── */
+
+export interface InstagramAudienceDemographics {
+  /**
+   * Mapa de "F.25-34", "M.18-24", etc. → contagem.
+   * Chaves combinadas são aproximadas: construídas a partir de chamadas separadas
+   * por age e gender. A API v22+ não suporta breakdown composto numa única chamada.
+   * Decisão: retornar chaves somente por idade ("25-34" → count) e por gênero
+   * ("F" → count, "M" → count) para maior precisão, mais chave composta "gender.age"
+   * estimada quando ambas disponíveis.
+   */
+  audience_gender_age: Record<string, number> | null;
+  /** Top 10 cidades → contagem (ex: "São Paulo, Brazil" → 1234) */
+  audience_city: Record<string, number> | null;
+}
+
+/**
+ * Resposta da Graph API v22+ para follower_demographics.
+ * Estrutura: metric.total_value.breakdowns[0].results[{ dimension_values, value }]
+ */
+interface FollowerDemographicsResponse {
+  data?: Array<{
+    name: string;
+    total_value?: {
+      breakdowns?: Array<{
+        dimension_keys: string[];
+        results: Array<{
+          dimension_values: string[];
+          value: number;
+        }>;
+      }>;
+    };
+  }>;
+  error?: { code: number; message: string };
+}
+
+/**
+ * Faz uma chamada follower_demographics com um único breakdown.
+ * Retorna mapa dimensionValue → count.
+ */
+async function fetchFollowerDemographicsBreakdown(
+  igUserId: string,
+  accessToken: string,
+  breakdown: "age" | "gender" | "city"
+): Promise<Record<string, number> | null> {
+  try {
+    const url = new URL(`${FB_GRAPH_URL}/${igUserId}/insights`);
+    url.searchParams.set("metric", "follower_demographics");
+    url.searchParams.set("period", "lifetime");
+    url.searchParams.set("metric_type", "total_value");
+    url.searchParams.set("breakdown", breakdown);
+    url.searchParams.set("access_token", accessToken);
+
+    const res = await fetch(url.toString());
+    if (!res.ok) {
+      console.warn(`[IG demographics/${breakdown}] HTTP ${res.status}`);
+      return null;
+    }
+
+    const data = (await res.json()) as FollowerDemographicsResponse;
+
+    if (data.error) {
+      console.warn(`[IG demographics/${breakdown}] API error ${data.error.code}: ${data.error.message}`);
+      return null;
+    }
+
+    const metric = data.data?.[0];
+    if (!metric?.total_value?.breakdowns?.length) return null;
+
+    const results = metric.total_value.breakdowns[0].results ?? [];
+    const out: Record<string, number> = {};
+    for (const r of results) {
+      const key = r.dimension_values[0] ?? "";
+      if (key) out[key] = (out[key] ?? 0) + r.value;
+    }
+    return out;
+  } catch (err) {
+    console.warn(`[IG demographics/${breakdown}] Exceção:`, err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+/**
+ * Busca demographics de audiência via Instagram Graph API v22+.
+ * Usa follower_demographics (substituta de audience_gender_age/audience_city).
+ * Faz 3 chamadas separadas (age, gender, city) e combina os resultados.
+ *
+ * audience_gender_age retorna chaves:
+ *   - Por gênero: "F" → count, "M" → count, "U" → count
+ *   - Por idade: "18-24" → count, "25-34" → count, etc.
+ *   - Combinadas estimadas: "F.25-34" → count (produto de proporções, não exato)
+ *     NÃO retornamos combinadas para evitar dados enganosos — apenas gênero e idade puros.
+ *     O aggregator e o frontend devem tratar chaves puras de gênero (F/M/U) e de faixa etária.
+ */
+export async function fetchAudienceDemographics(
+  igUserId: string,
+  accessToken: string
+): Promise<InstagramAudienceDemographics> {
+  const result: InstagramAudienceDemographics = {
+    audience_gender_age: null,
+    audience_city: null,
+  };
+
+  // Tentar novo endpoint follower_demographics (v22+)
+  const [ageData, genderData, cityData] = await Promise.all([
+    fetchFollowerDemographicsBreakdown(igUserId, accessToken, "age"),
+    fetchFollowerDemographicsBreakdown(igUserId, accessToken, "gender"),
+    fetchFollowerDemographicsBreakdown(igUserId, accessToken, "city"),
+  ]);
+
+  // Combinar age + gender num único mapa (chaves puras sem composto — ver docstring)
+  const genderAge: Record<string, number> = {};
+  if (ageData) {
+    for (const [key, val] of Object.entries(ageData)) {
+      genderAge[key] = val; // ex: "25-34" → 1234
+    }
+  }
+  if (genderData) {
+    for (const [key, val] of Object.entries(genderData)) {
+      genderAge[key] = val; // ex: "F" → 5678
+    }
+  }
+  if (Object.keys(genderAge).length > 0) {
+    result.audience_gender_age = genderAge;
+  }
+
+  // Manter top 10 cidades por contagem
+  if (cityData) {
+    const sorted = Object.entries(cityData)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 10);
+    result.audience_city = Object.fromEntries(sorted);
+  }
+
+  // Fallback: se o novo endpoint falhar completamente, tentar API legada (v21 e anterior)
+  if (!result.audience_gender_age && !result.audience_city) {
+    console.warn("[IG demographics] follower_demographics falhou — tentando API legada");
+    try {
+      const url = new URL(`${FB_GRAPH_URL}/${igUserId}/insights`);
+      url.searchParams.set("metric", "audience_gender_age,audience_city");
+      url.searchParams.set("period", "lifetime");
+      url.searchParams.set("access_token", accessToken);
+
+      const res = await fetch(url.toString());
+      if (res.ok) {
+        const data = (await res.json()) as {
+          data?: Array<{ name: string; values: Array<{ value: Record<string, number> }> }>;
+          error?: { code: number; message: string };
+        };
+
+        if (!data.error) {
+          for (const metric of data.data ?? []) {
+            const lastValue = metric.values[0]?.value ?? metric.values[metric.values.length - 1]?.value;
+            if (!lastValue) continue;
+            if (metric.name === "audience_gender_age") {
+              result.audience_gender_age = lastValue as Record<string, number>;
+            } else if (metric.name === "audience_city") {
+              const sorted = Object.entries(lastValue as Record<string, number>)
+                .sort(([, a], [, b]) => b - a)
+                .slice(0, 10);
+              result.audience_city = Object.fromEntries(sorted);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("[IG demographics] Fallback legado também falhou:", err instanceof Error ? err.message : err);
+    }
+  }
+
+  return result;
+}
+
+/* ── Stories Sync ── */
+
+export interface IGStory {
+  id: string;
+  media_type: string;
+  media_url?: string;
+  thumbnail_url?: string;
+  timestamp: string;
+  permalink?: string;
+}
+
+export interface IGStoryInsights {
+  impressions: number;
+  reach: number;
+  replies: number;
+  exits: number;
+  taps_forward: number;
+  taps_back: number;
+  /** Métricas de navigation (taps_forward, taps_back, exits, swipe_away) */
+  navigation: number;
+}
+
+/**
+ * Busca stories ativos do usuário IG.
+ * Stories expiram em 24h — deve ser chamado diariamente.
+ * Retorna lista de stories com suas métricas (se disponíveis).
+ */
+export async function fetchActiveStories(
+  igUserId: string,
+  accessToken: string
+): Promise<Array<IGStory & { insights: Partial<IGStoryInsights> }>> {
+  const results: Array<IGStory & { insights: Partial<IGStoryInsights> }> = [];
+
+  try {
+    const url = new URL(`${FB_GRAPH_URL}/${igUserId}/stories`);
+    url.searchParams.set("fields", "id,media_type,media_url,thumbnail_url,timestamp,permalink");
+    url.searchParams.set("access_token", accessToken);
+
+    const res = await fetch(url.toString());
+    if (!res.ok) {
+      console.warn(`[IG stories] HTTP ${res.status}`);
+      return results;
+    }
+
+    const data = (await res.json()) as {
+      data?: IGStory[];
+      error?: { code: number; message: string };
+    };
+
+    if (data.error) {
+      console.warn(`[IG stories] Erro API ${data.error.code}: ${data.error.message}`);
+      return results;
+    }
+
+    const stories = data.data ?? [];
+
+    if (stories.length === 0) return results;
+
+    // Buscar insights de cada story em paralelo — CRÍTICO 2: contar falhas
+    let successCount = 0;
+    let failedCount = 0;
+
+    const insightPromises = stories.map(async (story) => {
+      try {
+        const insights = await fetchStoryInsights(story.id, accessToken);
+        successCount++;
+        return { ...story, insights };
+      } catch (err) {
+        failedCount++;
+        console.warn(
+          `[IG stories] Falha ao buscar insights story_id=${story.id}:`,
+          err instanceof Error ? err.message : err
+        );
+        // Retorna story com insights vazios para não perder o story em si
+        return { ...story, insights: {} as Partial<IGStoryInsights> };
+      }
+    });
+
+    const resolved = await Promise.all(insightPromises);
+
+    // Se >50% dos stories falharam, lançar erro para o caller
+    const totalStories = stories.length;
+    if (totalStories > 0 && failedCount / totalStories > 0.5) {
+      const errorMsg = `[IG stories] ${failedCount}/${totalStories} insights falharam (>${Math.round(failedCount / totalStories * 100)}%)`;
+      console.error(errorMsg);
+      throw new Error(errorMsg);
+    }
+
+    if (failedCount > 0) {
+      console.warn(`[IG stories] ${failedCount}/${totalStories} insights falharam, ${successCount} com sucesso`);
+    }
+
+    results.push(...resolved);
+  } catch (err) {
+    console.warn("[IG stories] Exceção:", err instanceof Error ? err.message : err);
+    // Re-lança apenas se for o erro de >50% falhas (para o caller tratar)
+    if (err instanceof Error && err.message.includes("insights falharam")) {
+      throw err;
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Busca insights de um story individual.
+ * Métricas disponíveis: impressions, reach, replies, exits, taps_forward, taps_back, navigation.
+ * Lança erro em caso de falha para permitir contagem de successCount/failedCount no caller.
+ */
+async function fetchStoryInsights(
+  storyId: string,
+  accessToken: string
+): Promise<Partial<IGStoryInsights>> {
+  const insights: Partial<IGStoryInsights> = {};
+
+  const url = new URL(`${FB_GRAPH_URL}/${storyId}/insights`);
+  url.searchParams.set("metric", "impressions,reach,replies,exits,taps_forward,taps_back,navigation");
+  url.searchParams.set("access_token", accessToken);
+
+  const res = await fetch(url.toString());
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+
+  const data = (await res.json()) as {
+    data?: Array<{ name: string; values: Array<{ value: number }> }>;
+    error?: { code: number; message: string };
+  };
+
+  if (data.error) {
+    throw new Error(`API error ${data.error.code}: ${data.error.message}`);
+  }
+
+  for (const metric of data.data ?? []) {
+    const value = metric.values?.[0]?.value ?? 0;
+    (insights as Record<string, number>)[metric.name] = typeof value === "number" ? value : 0;
+  }
+
+  return insights;
+}
+
+/**
+ * Persiste stories ativos no banco como content_items com content_type='story'.
+ * Idempotente via UNIQUE(connection_id, provider_content_id).
+ */
+export async function persistActiveStories(
+  empresaId: string,
+  connectionId: string,
+  stories: Array<IGStory & { insights: Partial<IGStoryInsights> }>
+): Promise<void> {
+  if (stories.length === 0) return;
+
+  const admin = getAdminSupabase();
+  const now = new Date().toISOString();
+
+  const rows = stories.map((story) => ({
+    empresa_id: empresaId,
+    connection_id: connectionId,
+    provider: "instagram",
+    provider_content_id: story.id,
+    content_type: "story" as const,
+    caption: null,
+    url: story.permalink ?? null,
+    thumbnail_url: story.thumbnail_url ?? story.media_url ?? null,
+    published_at: story.timestamp ?? null,
+    metrics: {
+      impressions: story.insights.impressions ?? 0,
+      reach: story.insights.reach ?? 0,
+      replies: story.insights.replies ?? 0,
+      exits: story.insights.exits ?? 0,
+      taps_forward: story.insights.taps_forward ?? 0,
+      taps_back: story.insights.taps_back ?? 0,
+      navigation: story.insights.navigation ?? 0,
+    },
+    raw: { media_type: story.media_type, ...story.insights } as Record<string, unknown>,
+    synced_at: now,
+  }));
+
+  const { error } = await admin
+    .from("content_items")
+    .upsert(rows, { onConflict: "connection_id,provider_content_id" });
+
+  if (error) {
+    console.error("[IG stories persist] Erro ao upsert stories:", error.message);
   }
 }

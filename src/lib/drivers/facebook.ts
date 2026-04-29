@@ -74,9 +74,37 @@ interface FBPost {
   created_time: string
   full_picture?: string
   permalink_url?: string
+  attachments?: { data: Array<{ type?: string }> }
   reactions?: { summary: { total_count: number } }
   comments?: { summary: { total_count: number } }
   shares?: { count: number }
+}
+
+interface FBPostInsight {
+  name: string
+  // values may be a number or an object (e.g. reactions breakdown)
+  values: Array<{ value: number | Record<string, number> }>
+}
+
+interface FBReel {
+  id: string
+  title?: string
+  description?: string
+  permalink_url?: string
+  picture?: string
+  created_time: string
+  length?: number
+}
+
+interface FBVideoInsight {
+  name: string
+  values: Array<{ value: number }>
+}
+
+interface FBPageInsightLifetime {
+  name: string
+  // lifetime insights return a single values array (period=lifetime)
+  values: Array<{ value: number | Record<string, number> }>
 }
 
 /* ── HTTP helper ─────────────────────────────────────────────────────────── */
@@ -500,77 +528,229 @@ export const facebookDriver: ConnectionDriver = {
     const pageId = connection.page_id ?? connection.provider_user_id
     const limit = options?.contentLimit ?? 50
 
-    // Fix 4: usar /feed (mais permissivo) com fallback gracioso se falhar por permissão
-    let res: { data: FBPost[] } = { data: [] }
-    try {
-      res = await fbFetch<{ data: FBPost[] }>(`/${pageId}/feed`, {
-        access_token: token,
-        fields:
-          'id,message,created_time,full_picture,permalink_url,reactions.summary(total_count),comments.summary(total_count),shares',
-        limit: String(limit),
-      })
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      const isPermErr = err instanceof Error && (
-        msg.includes('#10') ||
-        msg.includes('pages_read_user_content') ||
-        msg.includes('OAuthException')
-      )
-      if (isPermErr) {
-        console.warn('[FacebookDriver.syncContent] /feed sem permissão. Pulando posts. Solicite pages_read_user_content via App Review.')
-        // Fix 5: registrar last_error em social_connections
-        const supabase = getAdminSupabase()
-        await supabase.from('social_connections').update({
-          last_error: `[${new Date().toISOString()}] syncContent: ${msg}`,
-        }).eq('id', connection.id)
-        return []
-      }
-      console.warn('[FacebookDriver.syncContent] Falha ao buscar feed:', msg)
-      // Fix 5: registrar last_error em social_connections para erros genéricos também
-      const supabase = getAdminSupabase()
-      await supabase.from('social_connections').update({
-        last_error: `[${new Date().toISOString()}] syncContent: ${msg}`,
-      }).eq('id', connection.id)
-      return []
-    }
-
-    const posts = res.data ?? []
-    if (posts.length === 0) return []
+    // Calcular janela de 30 dias (ou usar o since/until de options)
+    const until = options?.until ?? new Date()
+    const since = options?.since ?? new Date(until.getTime() - 30 * 24 * 60 * 60 * 1000)
+    const sinceTs = Math.floor(since.getTime() / 1000).toString()
+    const untilTs = Math.floor(until.getTime() / 1000).toString()
 
     const supabase = getAdminSupabase()
     const now = new Date().toISOString()
 
-    const contentRows = posts.map((p) => ({
-      empresa_id: connection.empresa_id,
-      connection_id: connection.id,
-      provider: 'facebook' as const,
-      provider_content_id: p.id,
-      content_type: 'post' as const,
-      title: null,
-      caption: p.message ?? null,
-      url: p.permalink_url ?? null,
-      thumbnail_url: p.full_picture ?? null,
-      published_at: p.created_time,
-      metrics: {
-        reactions: p.reactions?.summary?.total_count ?? 0,
-        comments: p.comments?.summary?.total_count ?? 0,
-        shares: p.shares?.count ?? 0,
-      } as Record<string, number>,
-      raw: p as unknown as Record<string, unknown>,
-      synced_at: now,
-    }))
+    // ── 1. Posts orgânicos publicados (published_posts) ────────────────────
+    let posts: FBPost[] = []
+    try {
+      const res = await fbFetch<{ data: FBPost[] }>(`/${pageId}/published_posts`, {
+        access_token: token,
+        fields: 'id,message,permalink_url,full_picture,created_time,attachments',
+        limit: String(limit),
+        since: sinceTs,
+        until: untilTs,
+      })
+      posts = res.data ?? []
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.warn('[FacebookDriver.syncContent] /published_posts falhou, tentando /feed:', msg)
 
-    const { data: upserted, error } = await supabase
-      .from('content_items')
-      .upsert(contentRows, { onConflict: 'connection_id,provider_content_id' })
-      .select()
+      // Fallback para /feed (mais permissivo) com campos compatíveis
+      try {
+        const fallback = await fbFetch<{ data: FBPost[] }>(`/${pageId}/feed`, {
+          access_token: token,
+          fields: 'id,message,created_time,full_picture,permalink_url,attachments',
+          limit: String(limit),
+          since: sinceTs,
+          until: untilTs,
+        })
+        posts = fallback.data ?? []
+      } catch (err2) {
+        const msg2 = err2 instanceof Error ? err2.message : String(err2)
+        const isPermErr =
+          msg2.includes('#10') ||
+          msg2.includes('pages_read_user_content') ||
+          msg2.includes('OAuthException')
+        if (isPermErr) {
+          console.warn(
+            '[FacebookDriver.syncContent] /feed sem permissão. Pulando posts. Solicite pages_read_user_content via App Review.'
+          )
+        } else {
+          console.warn('[FacebookDriver.syncContent] Falha ao buscar feed:', msg2)
+        }
+        await supabase.from('social_connections').update({
+          last_error: `[${new Date().toISOString()}] syncContent: ${msg2}`,
+        }).eq('id', connection.id)
 
-    if (error) {
-      console.error('[FacebookDriver.syncContent] Erro ao upsert content_items:', error.message)
+        // Prosseguir para tentar reels mesmo sem posts
+        posts = []
+      }
     }
 
-    return (upserted ?? contentRows).map((row) => ({
-      id: (row as { id?: string }).id ?? '',
+    // ── 2. Per-post insights (organic reach, paid reach, reactions breakdown, clicks) ──
+    const POST_INSIGHT_METRICS = [
+      'post_impressions',
+      'post_impressions_organic',
+      'post_impressions_paid',
+      'post_engaged_users',
+      'post_reactions_by_type_total',
+      'post_clicks',
+    ].join(',')
+
+    const postInsightsMap = new Map<string, Record<string, number>>()
+
+    for (const p of posts) {
+      try {
+        const insightRes = await fbFetch<{ data: FBPostInsight[] }>(`/${p.id}/insights`, {
+          access_token: token,
+          metric: POST_INSIGHT_METRICS,
+        })
+        const insightMetrics: Record<string, number> = {}
+        for (const item of insightRes.data ?? []) {
+          const rawVal = item.values?.[0]?.value
+          if (typeof rawVal === 'number') {
+            insightMetrics[item.name] = rawVal
+          } else if (rawVal && typeof rawVal === 'object') {
+            // post_reactions_by_type_total — soma total e salva breakdown
+            const breakdown = rawVal as Record<string, number>
+            insightMetrics[item.name + '_total'] = Object.values(breakdown).reduce((a, b) => a + b, 0)
+            for (const [reactionType, count] of Object.entries(breakdown)) {
+              insightMetrics[`reaction_${reactionType}`] = count
+            }
+          }
+        }
+        postInsightsMap.set(p.id, insightMetrics)
+      } catch {
+        // Insights podem falhar por permissão — continuar sem eles
+        // TODO(wave1-B): se pages_read_engagement não cobrir post insights, precisará de App Review
+      }
+    }
+
+    // ── 3. Persistir posts orgânicos ──────────────────────────────────────
+    const postRows = posts.map((p) => {
+      const insights = postInsightsMap.get(p.id) ?? {}
+      return {
+        empresa_id: connection.empresa_id,
+        connection_id: connection.id,
+        provider: 'facebook' as const,
+        provider_content_id: p.id,
+        content_type: 'post' as const,
+        title: null,
+        caption: p.message ?? null,
+        url: p.permalink_url ?? null,
+        thumbnail_url: p.full_picture ?? null,
+        published_at: p.created_time,
+        metrics: {
+          reactions: p.reactions?.summary?.total_count ?? 0,
+          comments: p.comments?.summary?.total_count ?? 0,
+          shares: p.shares?.count ?? 0,
+          // Enriched per-post insights
+          organic_reach: insights.post_impressions_organic ?? 0,
+          paid_reach: insights.post_impressions_paid ?? 0,
+          impressions: insights.post_impressions ?? 0,
+          engaged_users: insights.post_engaged_users ?? 0,
+          clicks: insights.post_clicks ?? 0,
+          ...insights,
+        } as Record<string, number>,
+        raw: p as unknown as Record<string, unknown>,
+        synced_at: now,
+      }
+    })
+
+    if (postRows.length > 0) {
+      const { error } = await supabase
+        .from('content_items')
+        .upsert(postRows, { onConflict: 'connection_id,provider_content_id' })
+      if (error) {
+        console.error('[FacebookDriver.syncContent] Erro ao upsert posts:', error.message)
+      }
+    }
+
+    // ── 4. Reels do Facebook ──────────────────────────────────────────────
+    let reels: FBReel[] = []
+    try {
+      // TODO(wave1-B): endpoint video_reels requer pages_read_engagement + pages_show_list.
+      // Se retornar erro de permissão, o fallback é pular silenciosamente.
+      const reelRes = await fbFetch<{ data: FBReel[] }>(`/${pageId}/video_reels`, {
+        access_token: token,
+        fields: 'id,title,description,permalink_url,picture,created_time,length',
+        limit: String(limit),
+      })
+      reels = reelRes.data ?? []
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.warn('[FacebookDriver.syncContent] /video_reels falhou (pode precisar de permissão adicional):', msg)
+      // TODO(wave1-B): se o erro for de permissão (OAuthException / #10), solicitar
+      // pages_read_user_content ou publish_video via App Review para acessar reels
+    }
+
+    // Per-reel video insights
+    const REEL_INSIGHT_METRICS = [
+      'total_video_impressions',
+      'total_video_avg_time_watched',
+      'total_video_views',
+      'total_video_complete_views',
+      'post_video_view_time',
+    ].join(',')
+
+    const reelInsightsMap = new Map<string, Record<string, number>>()
+
+    for (const r of reels) {
+      try {
+        const vInsightRes = await fbFetch<{ data: FBVideoInsight[] }>(`/${r.id}/video_insights`, {
+          access_token: token,
+          metric: REEL_INSIGHT_METRICS,
+        })
+        const vMetrics: Record<string, number> = {}
+        for (const item of vInsightRes.data ?? []) {
+          const val = item.values?.[0]?.value
+          if (typeof val === 'number') {
+            vMetrics[item.name] = val
+          }
+        }
+        reelInsightsMap.set(r.id, vMetrics)
+      } catch {
+        // TODO(wave1-B): métricas de vídeo podem variar por versão de API — ignorar falhas individuais
+      }
+    }
+
+    const reelRows = reels.map((r) => {
+      const vInsights = reelInsightsMap.get(r.id) ?? {}
+      return {
+        empresa_id: connection.empresa_id,
+        connection_id: connection.id,
+        provider: 'facebook' as const,
+        provider_content_id: r.id,
+        content_type: 'reel' as const,
+        title: r.title ?? null,
+        caption: r.description ?? null,
+        url: r.permalink_url ?? null,
+        thumbnail_url: r.picture ?? null,
+        published_at: r.created_time,
+        metrics: {
+          impressions: vInsights.total_video_impressions ?? 0,
+          views: vInsights.total_video_views ?? 0,
+          complete_views: vInsights.total_video_complete_views ?? 0,
+          avg_watch_time: vInsights.total_video_avg_time_watched ?? 0,
+          view_time_ms: vInsights.post_video_view_time ?? 0,
+          duration_seconds: r.length ?? 0,
+          ...vInsights,
+        } as Record<string, number>,
+        raw: r as unknown as Record<string, unknown>,
+        synced_at: now,
+      }
+    })
+
+    if (reelRows.length > 0) {
+      const { error } = await supabase
+        .from('content_items')
+        .upsert(reelRows, { onConflict: 'connection_id,provider_content_id' })
+      if (error) {
+        console.error('[FacebookDriver.syncContent] Erro ao upsert reels:', error.message)
+      }
+    }
+
+    // ── 5. Retornar todos os items sincronizados ───────────────────────────
+    const allRows = [...postRows, ...reelRows]
+    return allRows.map((row) => ({
+      id: '',
       empresa_id: row.empresa_id,
       connection_id: row.connection_id,
       provider: row.provider,
@@ -597,55 +777,115 @@ export const facebookDriver: ConnectionDriver = {
     const pageId = connection.page_id ?? connection.provider_user_id
     const today = new Date().toISOString().split('T')[0]
 
-    const INSIGHT_METRICS = [
+    // ── Métricas diárias (period=day) ─────────────────────────────────────
+    const DAILY_METRICS = [
       'page_impressions',
       'page_impressions_unique',
       'page_engaged_users',
       'page_post_engagements',
       'page_fan_adds',
       'page_fan_removes',
+      'page_views_total',
+      'page_messages_new_conversations',
     ].join(',')
 
-    let insightsData: { data: Array<{ name: string; values: Array<{ value: number }> }> } = { data: [] }
+    // ── Métricas lifetime (period=lifetime) ───────────────────────────────
+    // page_fans_city e page_fans_gender_age são somente lifetime
+    const LIFETIME_METRICS = [
+      'page_fans_city',
+      'page_fans_gender_age',
+    ].join(',')
+
+    type InsightRow = { data: Array<{ name: string; values: Array<{ value: number | Record<string, number> }> }> }
+
+    let dailyData: InsightRow = { data: [] }
+    let lifetimeData: InsightRow = { data: [] }
     let insightsFetchSucceeded = false
 
+    const supabase = getAdminSupabase()
+
     try {
-      insightsData = await fbFetch<typeof insightsData>(`/${pageId}/insights`, {
+      dailyData = await fbFetch<InsightRow>(`/${pageId}/insights`, {
         access_token: token,
-        metric: INSIGHT_METRICS,
+        metric: DAILY_METRICS,
         period: 'day',
       })
       insightsFetchSucceeded = true
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      console.warn('[FacebookDriver.syncMetrics] Falha ao buscar insights:', msg)
-      // Fix 5: registrar last_error em social_connections
-      const supabase = getAdminSupabase()
+      console.warn('[FacebookDriver.syncMetrics] Falha ao buscar insights diários:', msg)
       await supabase.from('social_connections').update({
         last_error: `[${new Date().toISOString()}] syncMetrics: ${msg}`,
       }).eq('id', connection.id)
     }
 
-    // Limpar last_error em caso de sucesso da chamada
+    // Lifetime metrics — falha silenciosa (podem estar indisponíveis por permissão)
+    try {
+      lifetimeData = await fbFetch<InsightRow>(`/${pageId}/insights`, {
+        access_token: token,
+        metric: LIFETIME_METRICS,
+        period: 'lifetime',
+      })
+    } catch (err) {
+      // TODO(wave1-B): page_fans_city e page_fans_gender_age requerem
+      // pages_read_engagement — se falhar, continua sem demographics
+      console.warn(
+        '[FacebookDriver.syncMetrics] Falha ao buscar insights lifetime (demographics):',
+        err instanceof Error ? err.message : err
+      )
+    }
+
+    // Limpar last_error em caso de sucesso da chamada principal
     if (insightsFetchSucceeded) {
-      const supabase = getAdminSupabase()
       await supabase
         .from('social_connections')
         .update({ last_error: null })
         .eq('id', connection.id)
     }
 
-    const metrics: Record<string, number> = {}
-    for (const insight of insightsData.data) {
+    const metrics: Record<string, number | Record<string, number>> = {}
+    const numericMetrics: Record<string, number> = {}
+
+    // Processar métricas diárias (todas numéricas)
+    for (const insight of dailyData.data) {
       const val = insight.values?.[0]?.value ?? 0
-      metrics[insight.name] = val
+      if (typeof val === 'number') {
+        metrics[insight.name] = val
+        numericMetrics[insight.name] = val
+      }
     }
 
-    const supabase = getAdminSupabase()
+    // Processar métricas lifetime (podem ser objetos: {city: count})
+    for (const insight of lifetimeData.data) {
+      const val = insight.values?.[0]?.value
+      if (val === undefined || val === null) continue
+      if (typeof val === 'number') {
+        metrics[insight.name] = val
+        numericMetrics[insight.name] = val
+      } else if (typeof val === 'object') {
+        // Armazenar top-10 cities / gender-age breakdown como JSON serializado em metrics
+        // Para page_fans_city: {city_name: count} — pegar top 10 por count
+        if (insight.name === 'page_fans_city') {
+          const cityMap = val as Record<string, number>
+          const top10 = Object.entries(cityMap)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 10)
+          // Guardar como string JSON em uma chave especial do snapshot
+          metrics['page_fans_city_json'] = JSON.stringify(top10) as unknown as number
+          // Também salvar total de cidades
+          numericMetrics['page_fans_city_total'] = Object.values(cityMap).reduce((a, b) => a + b, 0)
+          metrics['page_fans_city_total'] = numericMetrics['page_fans_city_total']
+        } else if (insight.name === 'page_fans_gender_age') {
+          // {M.18-24: count, F.18-24: count, ...}
+          metrics['page_fans_gender_age_json'] = JSON.stringify(val) as unknown as number
+        }
+      }
+    }
+
     const now = new Date().toISOString()
 
-    // Fix 2: guard — não upsert com metrics vazio (preserva snapshot do syncProfile)
-    if (Object.keys(metrics).length === 0) {
+    // Fix 2: guard — não upsert com metrics vazio
+    if (Object.keys(numericMetrics).length === 0) {
       console.warn('[FacebookDriver.syncMetrics] Nenhum metric retornado — pulando upsert pra preservar dados de syncProfile')
       return {
         connection_id: connection.id,
@@ -664,6 +904,7 @@ export const facebookDriver: ConnectionDriver = {
       .eq('snapshot_date', today)
       .maybeSingle()
 
+    // Mesclar — metrics com objetos JSON string coexistem com métricas numéricas no JSONB
     const mergedMetrics = { ...(existingSnapshot?.metrics ?? {}), ...metrics }
 
     // Escrita em provider_snapshots com metrics mesclados
@@ -678,9 +919,9 @@ export const facebookDriver: ConnectionDriver = {
       { onConflict: 'connection_id,snapshot_date' }
     )
 
-    // Escrita em metric_events
-    if (Object.keys(metrics).length > 0) {
-      const metricEvents = Object.entries(metrics).map(([key, value]) => ({
+    // Escrita em metric_events (apenas métricas numéricas)
+    if (Object.keys(numericMetrics).length > 0) {
+      const metricEvents = Object.entries(numericMetrics).map(([key, value]) => ({
         empresa_id: connection.empresa_id,
         connection_id: connection.id,
         provider: 'facebook' as const,
@@ -700,8 +941,11 @@ export const facebookDriver: ConnectionDriver = {
       connection_id: connection.id,
       provider: 'facebook',
       snapshot_date: today,
-      metrics,
-      raw: { insights: insightsData.data } as Record<string, unknown>,
+      metrics: numericMetrics,
+      raw: {
+        daily_insights: dailyData.data,
+        lifetime_insights: lifetimeData.data,
+      } as Record<string, unknown>,
     }
   },
 
@@ -734,15 +978,25 @@ export const facebookDriver: ConnectionDriver = {
     for (const postId of contentIds) {
       try {
         const insightRes = await fbFetch<{
-          data: Array<{ name: string; values: Array<{ value: number }> }>
+          data: Array<{ name: string; values: Array<{ value: number | Record<string, number> }> }>
         }>(`/${postId}/insights`, {
           access_token: token,
-          metric: 'post_impressions,post_engaged_users,post_reactions_by_type_total',
+          metric: 'post_impressions,post_impressions_organic,post_impressions_paid,post_engaged_users,post_reactions_by_type_total,post_clicks',
         })
 
         const rawInsights: Record<string, number> = {}
         for (const insight of insightRes.data ?? []) {
-          rawInsights[insight.name] = insight.values?.[0]?.value ?? 0
+          const val = insight.values?.[0]?.value
+          if (typeof val === 'number') {
+            rawInsights[insight.name] = val
+          } else if (val && typeof val === 'object') {
+            // post_reactions_by_type_total returns an object
+            const breakdown = val as Record<string, number>
+            rawInsights[insight.name + '_total'] = Object.values(breakdown).reduce((a, b) => a + b, 0)
+            for (const [reactionType, count] of Object.entries(breakdown)) {
+              rawInsights[`reaction_${reactionType}`] = count
+            }
+          }
         }
 
         if (Object.keys(rawInsights).length === 0) continue

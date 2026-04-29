@@ -453,4 +453,5 @@ const REPORT_TYPE_LABELS: Record<ReportType, string> = {
   monthly: "Mensal",
   quarterly: "Trimestral",
   custom: "Personalizado",
+  agency: "Agência",
 };

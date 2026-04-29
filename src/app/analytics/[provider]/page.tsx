@@ -51,6 +51,10 @@ import { LeadsByOriginCard } from "@/components/analytics/LeadsByOriginCard";
 import { LeadTemperatureGauge } from "@/components/analytics/LeadTemperatureGauge";
 import { EmailEngagementCard } from "@/components/analytics/EmailEngagementCard";
 import { WhatsAppEngagementCard } from "@/components/analytics/WhatsAppEngagementCard";
+import {
+  ExportReportButton,
+  type ExportScope,
+} from "@/components/analytics/ExportReportButton";
 
 /* ── Tipos ── */
 import type { ProviderKey } from "@/types/providers";
@@ -715,17 +719,30 @@ function ProviderAnalyticsContent() {
             </div>
           </div>
 
-          {/* Lado direito: PeriodSelector + Atualizar */}
+          {/* Lado direito: PeriodSelector + Atualizar + Exportar */}
           <div className="flex flex-col gap-2 items-end">
-            <button
-              onClick={refresh}
-              disabled={loading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-all disabled:opacity-50"
-              aria-label="Atualizar dados"
-            >
-              <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
-              Atualizar
-            </button>
+            <div className="flex items-center gap-2">
+              {empresa &&
+                (provider === "instagram" ||
+                  provider === "facebook" ||
+                  provider === "meta_ads") && (
+                  <ExportReportButton
+                    empresaId={empresa.id}
+                    periodStart={range.start.toISOString().split("T")[0]}
+                    periodEnd={range.end.toISOString().split("T")[0]}
+                    scope={provider as ExportScope}
+                  />
+                )}
+              <button
+                onClick={refresh}
+                disabled={loading}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-all disabled:opacity-50"
+                aria-label="Atualizar dados"
+              >
+                <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+                Atualizar
+              </button>
+            </div>
             <PeriodSelector
               preset={preset}
               onPresetChange={setPreset}
