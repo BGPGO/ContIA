@@ -158,10 +158,17 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Token inválido' }, { status: 500 })
   }
 
-  const accountId = connection.provider_user_id as string
-  if (!accountId) {
-    return NextResponse.json({ error: 'provider_user_id (ad_account_id) ausente' }, { status: 500 })
+  // Ad Account IDs no Meta API precisam do prefixo "act_". O provider_user_id
+  // guarda só o número — metadata.active_account_id pode ter o ID já formatado.
+  const meta = connection.metadata as Record<string, unknown> | null
+  const rawAccountId =
+    (meta?.active_account_id as string | undefined) ??
+    (meta?.ad_account_id as string | undefined) ??
+    (connection.provider_user_id as string | undefined)
+  if (!rawAccountId) {
+    return NextResponse.json({ error: 'ad_account_id ausente' }, { status: 500 })
   }
+  const accountId = rawAccountId.startsWith('act_') ? rawAccountId : `act_${rawAccountId}`
 
   const currency =
     (connection.metadata as Record<string, unknown> | null)?.currency as string ?? 'BRL'
